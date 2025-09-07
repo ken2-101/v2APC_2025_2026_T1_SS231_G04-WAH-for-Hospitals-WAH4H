@@ -1,5 +1,5 @@
 # apc-msyadd1-template
-Template repository for APC SMSYADD1
+Template repository for APC SSYADD
 
 John Kenneth Jajurie
 Mariyah Vanna Monique Chavez
