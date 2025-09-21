@@ -389,7 +389,7 @@ const Billing = () => {
                   <div
                     key={patient.id}
                     className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
-                    onClick={() => handlePatientSelect(patient)}
+                    
                   >
                     <div className="flex-1">
                       <div className="flex items-center gap-3">
@@ -411,8 +411,10 @@ const Billing = () => {
                         <span>Physician: {patient.physician}</span>
                       </div>
                     </div>
-                    <div className="text-right flex gap-2">
+                    <div className="text-right flex gap-2"
+                    onClick={() => handlePatientSelect(patient)}>
                       <Button variant="outline" size="sm">
+                        
                         {hasBilling ? 'View Billing' : 'Create Bill'}
                       </Button>
                       {isFinalized && (
@@ -550,7 +552,7 @@ const Billing = () => {
             />
           </div>
           <div>
-            <Label htmlFor="rate">Rate per Day</Label>
+            <Label htmlFor="rate">Rate per Day ₱</Label>
             <Input
               id="rate"
               type="number"
@@ -572,7 +574,7 @@ const Billing = () => {
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="attending-fee">Attending Physician Fee</Label>
+            <Label htmlFor="attending-fee">Attending Physician ₱</Label>
             <Input
               id="attending-fee"
               type="number"
@@ -581,7 +583,7 @@ const Billing = () => {
             />
           </div>
           <div>
-            <Label htmlFor="specialist-fee">Specialist Fee</Label>
+            <Label htmlFor="specialist-fee">Specialist ₱</Label>
             <Input
               id="specialist-fee"
               type="number"
@@ -590,7 +592,7 @@ const Billing = () => {
             />
           </div>
           <div>
-            <Label htmlFor="surgeon-fee">Surgeon / Anesthesiologist Fee</Label>
+            <Label htmlFor="surgeon-fee">Surgeon / Anesthesiologist ₱</Label>
             <Input
               id="surgeon-fee"
               type="number"
@@ -599,7 +601,7 @@ const Billing = () => {
             />
           </div>
           <div>
-            <Label htmlFor="other-fees">Others</Label>
+            <Label htmlFor="other-fees">Others ₱</Label>
             <Input
               id="other-fees"
               type="number"
@@ -694,24 +696,32 @@ const Billing = () => {
           </div>
           <div>
             <Label htmlFor="meals-per-day">Meals per Day</Label>
-            <Input
-              id="meals-per-day"
-              type="number"
-              value={mealsPerDay}
-              onChange={(e) => setMealsPerDay(Number(e.target.value))}
-            />
+            <div className="flex justify-center pb-2">
+              <Input
+                id="meals-per-day"
+                type="number"
+                value={mealsPerDay}
+                onChange={(e) => setMealsPerDay(Number(e.target.value))}
+              />
+              <span className="text-2xl text-gray-500 mx-4 mt-0.5">&times;</span>
+            </div>
           </div>
+                    
           <div>
             <Label htmlFor="diet-duration">Duration (days)</Label>
+            <div className="flex justify-center pb-2 ">
             <Input
               id="diet-duration"
               type="number"
               value={dietDuration}
               onChange={(e) => setDietDuration(Number(e.target.value))}
             />
+              <span className="text-2xl text-gray-500 mx-4 mt-0.5">&times;</span>
+            </div>
           </div>
+          
           <div>
-            <Label htmlFor="cost-per-meal">Cost per Meal</Label>
+            <Label htmlFor="cost-per-meal">Cost per Meal ₱</Label>
             <Input
               id="cost-per-meal"
               type="number"
@@ -779,7 +789,7 @@ const Billing = () => {
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="supplies">Supplies Charge</Label>
+            <Label htmlFor="supplies">Supplies Charge ₱</Label>
             <Input
               id="supplies"
               type="number"
@@ -788,7 +798,7 @@ const Billing = () => {
             />
           </div>
           <div>
-            <Label htmlFor="procedures">Procedures / Surgery</Label>
+            <Label htmlFor="procedures">Procedures / Surgery ₱</Label>
             <Input
               id="procedures"
               type="number"
@@ -797,7 +807,7 @@ const Billing = () => {
             />
           </div>
           <div>
-            <Label htmlFor="nursing">Nursing and Monitoring</Label>
+            <Label htmlFor="nursing">Nursing and Monitoring ₱</Label>
             <Input
               id="nursing"
               type="number"
@@ -806,7 +816,7 @@ const Billing = () => {
             />
           </div>
           <div>
-            <Label htmlFor="miscellaneous">Miscellaneous</Label>
+            <Label htmlFor="miscellaneous">Miscellaneous ₱</Label>
             <Input
               id="miscellaneous"
               type="number"
@@ -826,9 +836,9 @@ const Billing = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-discount">
             <div>
-              <Label htmlFor="discount">Discounts / Deductions</Label>
+              <Label htmlFor="discount">Discounts / Deductions  ₱</Label>
               <Input
                 id="discount"
                 type="number"

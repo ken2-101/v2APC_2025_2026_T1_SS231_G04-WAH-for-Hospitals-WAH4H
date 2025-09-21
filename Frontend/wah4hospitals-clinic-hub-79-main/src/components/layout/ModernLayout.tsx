@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Bell, User, Search, HelpCircle, X, Plus, Crown, Pencil, Grid } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -155,10 +156,26 @@ const ModernLayout: React.FC<ModernLayoutProps> = ({
             className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105"
             onClick={() => handleTabClick(tab.id)}
           >
-            <CardContent className="p-6 text-center">
+            <CardContent className="p-6 text-center relative">
+              <div className="absolute top-4 right-4">
+                <Tooltip delayDuration={0}>
+                  <TooltipTrigger asChild>
+                    <button className="text-gray-400 hover:text-primary transition-colors z-[9999]">
+                      <HelpCircle className="w-5 h-5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <span>
+                      This module lets you manage {tab.name}. <br />
+                      (Mock help text: More info about this module.)
+                    </span>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
               <div className="w-12 h-12 bg-gradient-to-r from-primary to-secondary rounded-lg mx-auto mb-3 flex items-center justify-center text-white">
                 {tab.icon}
               </div>
+
               <h3 className="font-medium text-gray-900">{tab.name}</h3>
               <Badge variant="outline" className="mt-2 text-xs">
                 {getRoleDisplayName()} Access
@@ -305,7 +322,7 @@ const ModernLayout: React.FC<ModernLayoutProps> = ({
               return (
                 <div
                   key={tabId}
-                  className={`chrome-tab ${activeTab === tabId ? 'active' : ''} group`}
+                  className={`chrome-tab ${activeTab === tabId ? 'active' : ''} group `}
                   onClick={() => handleTabClick(tabId)}
                 >
                   <div className="flex items-center space-x-2 flex-1 min-w-0">
@@ -317,7 +334,7 @@ const ModernLayout: React.FC<ModernLayoutProps> = ({
                   {openTabs.length > 1 && (
                     <button
                       onClick={(e) => handleTabClose(tabId, e)}
-                      className="flex-shrink-0 w-4 h-4 rounded-full hover:bg-gray-600 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                      className="flex-shrink-0 w-4 h-4 rounded-full hover:bg-gray-600 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center ml-2"
                     >
                       <X className="w-3 h-3" />
                     </button>

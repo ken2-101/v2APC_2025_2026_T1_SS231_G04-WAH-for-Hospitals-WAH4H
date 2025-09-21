@@ -25,7 +25,7 @@ const ModernDashboard = () => {
     { month: 'Jun', admissions: 188, discharges: 182 }
   ];
 
-  const recentPatients = [
+  const currentPatients = [
     { id: 'P001', name: 'Juan Dela Cruz', condition: 'Hypertension', room: '201A', status: 'stable' },
     { id: 'P002', name: 'Maria Santos', condition: 'Diabetes', room: '202B', status: 'critical' },
     { id: 'P003', name: 'Pedro Reyes', condition: 'COVID-19', room: '301C', status: 'recovering' },
@@ -181,12 +181,12 @@ const ModernDashboard = () => {
           <CardHeader>
             <CardTitle className="chart-title flex items-center">
               <Activity className="w-5 h-5 mr-2" />
-              Recent Patients
+              Current Patients
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {recentPatients.map((patient) => (
+              {currentPatients.map((patient) => (
                 <div key={patient.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                   <div className="flex items-center space-x-3">
                     <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">

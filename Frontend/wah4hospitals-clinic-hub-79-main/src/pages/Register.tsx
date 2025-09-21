@@ -104,7 +104,7 @@ const Register = () => {
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   className={errors.firstName ? 'border-red-500' : ''}
-                  placeholder="Enter first name"
+                  placeholder="First name"
                 />
                 {errors.firstName && (
                   <p className="text-sm text-red-500">{errors.firstName}</p>
@@ -118,7 +118,7 @@ const Register = () => {
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   className={errors.lastName ? 'border-red-500' : ''}
-                  placeholder="Enter last name"
+                  placeholder="Last name"
                 />
                 {errors.lastName && (
                   <p className="text-sm text-red-500">{errors.lastName}</p>
@@ -134,7 +134,7 @@ const Register = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className={errors.email ? 'border-red-500' : ''}
-                placeholder="Enter your email"
+                placeholder="Enter email"
               />
               {errors.email && (
                 <p className="text-sm text-red-500">{errors.email}</p>
@@ -169,7 +169,7 @@ const Register = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className={errors.password ? 'border-red-500 pr-10' : 'pr-10'}
-                  placeholder="Enter your password"
+                  placeholder="Enter password"
                 />
                 <Button
                   type="button"
@@ -199,7 +199,7 @@ const Register = () => {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   className={errors.confirmPassword ? 'border-red-500 pr-10' : 'pr-10'}
-                  placeholder="Confirm your password"
+                  placeholder="Confirm password"
                 />
                 <Button
                   type="button"
