@@ -191,126 +191,137 @@ const ModernLayout: React.FC<ModernLayoutProps> = ({
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* Header */}
       <header className="glass-card border-b border-white/20 sticky top-0 z-40">
-        <div className="flex items-center justify-between px-6 py-4">
-          {/* Logo and Title */}
-          <div className="flex items-center space-x-4">
-            <div className="w-10 h-10 gradient-primary rounded-full flex items-center justify-center">
-              <img src="/wah_logo.png" alt="WAH4Hospitals Logo" className="w-8 h-8" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-gradient">WAH4H</h1>
-              <div className="flex items-center space-x-2">
-                <p className="text-sm text-gray-500">Healthcare Information System</p>
-                <Badge variant="secondary" className="bg-purple-100 text-purple-800 border-purple-200 text-xs">
-                  <Crown className="w-3 h-3 mr-1" />
-                  {getRoleDisplayName()}
-                </Badge>
-              </div>
-            </div>
-          </div>
-
-          {/* Search Bar */}
-          <div className="flex-1 max-w-md mx-8">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input 
-                placeholder="Search patients, records, or modules..." 
-                className="pl-10 input-modern"
-              />
-            </div>
-          </div>
-
-          {/* Right Actions */}
-          <div className="flex items-center space-x-4">
-            {/* Notifications */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="relative hover-lift">
-                  <Bell className="w-5 h-5" />
-                  {notifications.length > 0 && (
-                    <Badge className="justify-center absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs bg-red-500 text-white">
-                      {2}
-                    </Badge>
-                  )}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-80 modal-content">
-                <div className="p-4 border-b">
-                  <h3 className="font-semibold">Notifications</h3>
-                </div>
-                <div className="max-h-64 overflow-y-auto">
-                  {notifications.map((notification) => (
-                    <DropdownMenuItem key={notification.id} className="p-4 border-b last:border-b-0">
-                      <div className="flex items-start space-x-3">
-                        <div className={`w-2 h-2 rounded-full mt-2 ${
-                          notification.type === 'success' ? 'bg-green-500' :
-                          notification.type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500'
-                        }`} />
-                        <div className="flex-1">
-                          <p className="text-sm font-medium">{notification.title}</p>
-                          <p className="text-xs text-gray-500">{notification.time}</p>
-                        </div>
-                      </div>
-                    </DropdownMenuItem>
-                  ))}
-                </div>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* Help */}
-            <HelpSupportModal>
-              <Button variant="ghost" size="sm" className="hover-lift">
-                <HelpCircle className="w-5 h-5" />
-              </Button>
-            </HelpSupportModal>
-
-            {/* Customization */}
-            <CustomizationPanel 
-              isDarkMode={isDarkMode} 
-              onToggleDarkMode={setIsDarkMode} 
-            />
-
-            {/* User Menu */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="flex items-center space-x-2 hover-lift">
-                  <div className="w-8 h-8 gradient-primary rounded-full flex items-center justify-center">
-                    <User className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="text-left hidden md:block">
-                    <p className="text-sm font-medium">
-                      {user ? `${user.firstName} ${user.lastName}` : 'Dr. Maria Santos'}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {getRoleDisplayName()}
-                    </p>
-                  </div>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="modal-content">
-                <DropdownMenuItem className="font-medium text-purple-700">
-                  <Crown className="w-4 h-4 mr-2" />
-                  {getRoleDisplayName()} Mode
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleNavigateToAccountSettings}>
-                  <User className="w-4 h-4 mr-2" />
-                  My Profile
-                </DropdownMenuItem>
-                <HelpSupportModal>
-                  <DropdownMenuItem>
-                    <HelpCircle className="w-4 h-4 mr-2" />
-                    Help & Support
-                  </DropdownMenuItem>
-                </HelpSupportModal>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-red-600" onClick={handleSignOut}>
-                  Sign Out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+        <div className="px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between">
+    
+    {/* Row 1: Logo/Title (left) + Right Actions */}
+    <div className="flex items-center justify-between w-full">
+      {/* Logo + Title */}
+      <div className="flex items-center space-x-4">
+        <div className="w-10 h-10 gradient-primary rounded-full flex items-center justify-center">
+          <img src="/wah_logo.png" alt="WAH4Hospitals Logo" className="w-8 h-8" />
+        </div>
+        <div>
+          <h1 className="text-xl font-bold text-gradient">WAH4H</h1>
+          <div className="flex items-center space-x-2 hidden sm:flex">
+            <p className="text-sm text-gray-500">Healthcare Information System</p>
+            <Badge variant="secondary" className="bg-purple-100 text-purple-800 border-purple-200 text-xs">
+              <Crown className="w-3 h-3 mr-1" />
+              {getRoleDisplayName()}
+            </Badge>
           </div>
         </div>
+      </div>
+
+      {/* Right Actions */}
+      <div className="flex items-center space-x-4">
+        {/* Notifications */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="relative hover-lift">
+              <Bell className="w-5 h-5" />
+              {notifications.length > 0 && (
+                <Badge className="justify-center absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs bg-red-500 text-white">
+                  {2}
+                </Badge>
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-80 modal-content">
+            <div className="p-4 border-b">
+              <h3 className="font-semibold">Notifications</h3>
+            </div>
+            <div className="max-h-64 overflow-y-auto">
+              {notifications.map((notification) => (
+                <DropdownMenuItem key={notification.id} className="p-4 border-b last:border-b-0">
+                  <div className="flex items-start space-x-3">
+                    <div
+                      className={`w-2 h-2 rounded-full mt-2 ${
+                        notification.type === 'success'
+                          ? 'bg-green-500'
+                          : notification.type === 'warning'
+                          ? 'bg-yellow-500'
+                          : 'bg-blue-500'
+                      }`}
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{notification.title}</p>
+                      <p className="text-xs text-gray-500">{notification.time}</p>
+                    </div>
+                  </div>
+                </DropdownMenuItem>
+              ))}
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* Help */}
+        <HelpSupportModal>
+          <Button variant="ghost" size="sm" className="hover-lift">
+            <HelpCircle className="w-5 h-5" />
+          </Button>
+        </HelpSupportModal>
+
+        {/* Customization */}
+        <CustomizationPanel
+          isDarkMode={isDarkMode}
+          onToggleDarkMode={setIsDarkMode}
+        />
+
+        {/* User Menu */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="flex items-center space-x-2 hover-lift"
+            >
+              <div className="w-8 h-8 gradient-primary rounded-full flex items-center justify-center">
+                <User className="w-4 h-4 text-white" />
+              </div>
+              <div className="text-left hidden md:block">
+                <p className="text-sm font-medium">
+                  {user ? `${user.firstName} ${user.lastName}` : 'Dr. Maria Santos'}
+                </p>
+                <p className="text-xs text-gray-500">{getRoleDisplayName()}</p>
+              </div>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="modal-content">
+            <DropdownMenuItem className="font-medium text-purple-700">
+              <Crown className="w-4 h-4 mr-2" />
+              {getRoleDisplayName()} Mode
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleNavigateToAccountSettings}>
+              <User className="w-4 h-4 mr-2" />
+              My Profile
+            </DropdownMenuItem>
+            <HelpSupportModal>
+              <DropdownMenuItem>
+                <HelpCircle className="w-4 h-4 mr-2" />
+                Help & Support
+              </DropdownMenuItem>
+            </HelpSupportModal>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-red-600" onClick={handleSignOut}>
+              Sign Out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+
+    {/* Row 2: Search Bar (full width on mobile, inline on desktop) */}
+    <div className="w-full mt-3 md:mt-0 md:max-w-md md:mx-8">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+        <Input
+          placeholder="Search patients, records, or modules..."
+          className="pl-10 input-modern w-full"
+        />
+      </div>
+    </div>
+  </div>
 
         {/* Chrome-style Tab Navigation */}
         <div className="px-6 pb-0">
