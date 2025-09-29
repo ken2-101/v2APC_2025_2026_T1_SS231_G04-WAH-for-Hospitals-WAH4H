@@ -335,7 +335,7 @@ const PhilHealthClaims = () => {
             <p className="text-gray-600">Manage and submit PhilHealth insurance claims</p>
           </div>
           <div className="flex flex-wrap items-center space-x-2 justify-center">
-            <PrintButton className="m-3" onPrint={handlePrintclaims} children="Print Claims Report" />
+            <PrintButton className="m-3" onPrint={handlePrintClaims} children="Print Claims Report" />
             <Button className="m-3 bg-blue-600 hover:bg-blue-700">
               <Upload className="w-4 h-4 mr-2" />
               Submit New Claim
