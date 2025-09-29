@@ -472,12 +472,12 @@ const PatientRegistration = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Patient Records Management</h1>
           <p className="text-gray-600">Comprehensive patient information and registration system</p>
         </div>
-        <Button onClick={() => setIsRegistrationModalOpen(true)} className="bg-blue-600 hover:bg-blue-700">
+        <Button onClick={() => setIsRegistrationModalOpen(true)} className="bg-blue-600 hover:bg-blue-700 m-2">
           <UserPlus className="w-4 h-4 mr-2" />
           Register New Patient
         </Button>
@@ -485,21 +485,21 @@ const PatientRegistration = () => {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Patient Directory</CardTitle>
-            <div className="flex items-center space-x-2">
-              <div className="relative">
+          <div className="flex flex-col md: flex-row md:items-center md: justify-between gap-4">
+            <CardTitle className="mb-2 md:mb-0">Patient Directory</CardTitle>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
+              <div className="relative w-full sm:w-80">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <Input
                   placeholder="Search patients, ID, phone, department..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-80"
+                  className="pl-10 w-full"
                 />
               </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" className="w-full sm:w-auto">
                     <Filter className="w-4 h-4 mr-2" />
                     Filter
                     {hasActiveFilters && (

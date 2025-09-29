@@ -329,14 +329,14 @@ const PhilHealthClaims = () => {
   return (
     <div className="space-y-6">
       <div id="printable-content">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">PhilHealth Claims</h1>
             <p className="text-gray-600">Manage and submit PhilHealth insurance claims</p>
           </div>
-          <div className="flex items-center space-x-2">
-            <PrintButton onPrint={handlePrintClaims} children="Print Claims Report" />
-            <Button className="bg-blue-600 hover:bg-blue-700">
+          <div className="flex flex-wrap items-center space-x-2 justify-center">
+            <PrintButton className="m-3" onPrint={handlePrintclaims} children="Print Claims Report" />
+            <Button className="m-3 bg-blue-600 hover:bg-blue-700">
               <Upload className="w-4 h-4 mr-2" />
               Submit New Claim
             </Button>
@@ -403,21 +403,21 @@ const PhilHealthClaims = () => {
 
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Recent Claims</CardTitle>
-              <div className="flex items-center space-x-2">
-                <div className="relative">
+            <div className="flex flex-col md:flex-row md:items-center md: justify-between gap-4">
+              <CardTitle className="mb-2 md:mb-0">Recent Claims</CardTitle>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
+                <div className="relative w-full sm:w-80">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                   <Input
                     placeholder="Search claims, patient, hospital, procedure..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 w-80"
+                    className="pl-10 w-full"
                   />
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" className="w-full sm:w-auto">
                       <Filter className="w-4 h-4 mr-2" />
                       Filter
                       {hasActiveFilters && (
