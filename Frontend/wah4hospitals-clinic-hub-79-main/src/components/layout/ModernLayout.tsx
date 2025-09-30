@@ -157,7 +157,7 @@ const ModernLayout: React.FC<ModernLayoutProps> = ({
             onClick={() => handleTabClick(tab.id)}
           >
             <CardContent className="p-6 text-center relative">
-              <div className="absolute top-4 right-4">
+              <div className="absolute top-4 right-4 sm:block">
                 <Tooltip delayDuration={0}>
                   <TooltipTrigger asChild>
                     <button className="text-gray-400 hover:text-primary transition-colors z-[9999]">
