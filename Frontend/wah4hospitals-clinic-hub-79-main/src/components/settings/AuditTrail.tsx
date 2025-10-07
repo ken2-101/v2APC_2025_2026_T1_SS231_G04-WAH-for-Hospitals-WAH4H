@@ -76,18 +76,20 @@ const AuditTrail = () => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex gap-4 mb-4">
+        <div className="flex flex-col sm:flex-row gap-4 mb-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search audit logs..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-10 w-full"
             />
           </div>
+          {/*Filter + Export */}
+          <div className="flex gap-2 sm:gap-4 sm:w-auto w-full">
           <Select value={actionFilter} onValueChange={setActionFilter}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="flex-1 sm:w-48">
               <SelectValue placeholder="Filter by action" />
             </SelectTrigger>
             <SelectContent>
@@ -98,14 +100,16 @@ const AuditTrail = () => {
               <SelectItem value="System">System Changes</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline">
+          <Button variant="outline" className="flex-1 sm:flex-none">
             <Download className="w-4 h-4 mr-2" />
             Export
           </Button>
         </div>
+      </div>
 
-        <div className="border rounded-lg">
-          <div className="grid grid-cols-12 gap-4 p-4 border-b bg-gray-50 font-medium">
+      <div className="border rounded-lg oveflow-x-auto no-scrollbar">
+        <div className="min-w-[900px]">
+          <div className="grid grid-cols-12 gap-4 p-4 border-b bg-gray-50 font-medium text-sm">
             <div className="col-span-2">Timestamp</div>
             <div className="col-span-2">User</div>
             <div className="col-span-2">Action</div>
@@ -114,21 +118,23 @@ const AuditTrail = () => {
             <div className="col-span-1">Status</div>
           </div>
           
+          {/* Data Rows */}
           {filteredLogs.map((log) => (
             <div key={log.id} className="grid grid-cols-12 gap-4 p-4 border-b items-center text-sm">
-              <div className="col-span-2 font-mono">{log.timestamp}</div>
-              <div className="col-span-2 font-medium">{log.user}</div>
-              <div className="col-span-2">{log.action}</div>
-              <div className="col-span-4 text-muted-foreground">{log.details}</div>
-              <div className="col-span-1 font-mono text-xs">{log.ipAddress}</div>
+              <div className="col-span-2 font-mono truncate"title={log.timestamp}>{log.timestamp}</div>
+              <div className="col-span-2 font-medium truncate"title={log.user}>{log.user}</div>
+              <div className="col-span-2 truncate" title={log.action}>{log.action}</div>
+              <div className="col-span-4 text-muted-foreground truncate" title={log.details}>{log.details}</div>
+              <div className="col-span-1 font-mono text-xs truncate"title={log.ipAddress}>{log.ipAddress}</div>
               <div className="col-span-1">
                 <Badge variant={getStatusColor(log.status)}>
                   {log.status}
                 </Badge>
               </div>
             </div>
-          ))}
+            ))}
         </div>
+      </div>
       </CardContent>
     </Card>
   );

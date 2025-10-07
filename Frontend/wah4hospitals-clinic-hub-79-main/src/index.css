@@ -60,6 +60,15 @@
     --chart-5: 263 40% 75%;
   }
 }
+/* Hide scrollbar but keep scrolling functional */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollar {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
 
 @layer base {
   * {

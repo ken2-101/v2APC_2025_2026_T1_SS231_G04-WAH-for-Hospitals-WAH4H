@@ -80,10 +80,10 @@ const Monitoring = () => {
         bloodPressure: data.vitalSigns.bloodPressure,
         temperature: data.vitalSigns.temperature,
         oxygenSat: data.oxygenSaturation,
-        lastUpdated: new Date().toLocaleTimeString('en-US', { 
-          hour: 'numeric', 
-          minute: '2-digit', 
-          hour12: true 
+        lastUpdated: new Date().toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
         })
       };
       setMonitoringData(prev => [...prev, newPatient]);
@@ -98,10 +98,10 @@ const Monitoring = () => {
             bloodPressure: data.vitalSigns.bloodPressure,
             temperature: data.vitalSigns.temperature,
             oxygenSat: data.oxygenSaturation,
-            lastUpdated: new Date().toLocaleTimeString('en-US', { 
-              hour: 'numeric', 
-              minute: '2-digit', 
-              hour12: true 
+            lastUpdated: new Date().toLocaleTimeString('en-US', {
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true
             })
           };
         }
@@ -187,9 +187,12 @@ const Monitoring = () => {
           <CardTitle>Active Patients</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="space-y-4 overflow-x-auto sm:overflow-visible">
             {monitoringData.map((patient) => (
-              <div key={patient.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
+              <div 
+                key={patient.id}
+                className="flex items-center justify-between p-4 border rounded-lg
+                  hover:bg-gray-50 min-w-[600px] sm:win-w-0">
                 <div>
                   <p className="font-medium">{patient.patientName} - Room {patient.room}</p>
                   <p className="text-sm text-gray-500">Last updated: {patient.lastUpdated}</p>

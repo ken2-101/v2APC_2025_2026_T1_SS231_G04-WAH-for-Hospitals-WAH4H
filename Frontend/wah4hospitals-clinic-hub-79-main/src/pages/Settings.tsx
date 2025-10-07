@@ -18,32 +18,34 @@ const Settings = () => {
       </div>
 
       <Tabs defaultValue="security" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="security" className="flex items-center gap-2">
+        <TabsList 
+    className="flex w-full space-x-2 overflow-x-auto no-scrollbar
+            sm:justify-between sm:overflow-visible">
+    <TabsTrigger value="security" className="flex items-center gap-2 flex-shrink-0">
             <Lock className="w-4 h-4" />
             Security
-          </TabsTrigger>
-          <TabsTrigger value="alerts" className="flex items-center gap-2">
+    </TabsTrigger>
+    <TabsTrigger value="alerts" className="flex items-center gap-2 flex-shrink-0">
             <Bell className="w-4 h-4" />
             Alerts
-          </TabsTrigger>
-          <TabsTrigger value="access" className="flex items-center gap-2">
-            <Crown className="w-4 h-4" />
-            Admin Access
-          </TabsTrigger>
-          <TabsTrigger value="users" className="flex items-center gap-2">
-            <Users className="w-4 h-4" />
-            Users
-          </TabsTrigger>
-          <TabsTrigger value="system" className="flex items-center gap-2">
-            <SettingsIcon className="w-4 h-4" />
-            System
-          </TabsTrigger>
-          <TabsTrigger value="audit" className="flex items-center gap-2">
-            <Clock className="w-4 h-4" />
-            Audit
-          </TabsTrigger>
-        </TabsList>
+    </TabsTrigger>
+    <TabsTrigger value="access" className="flex items-center gap-2 flex-shrink-0">
+      <Crown className="w-4 h-4" />
+      Admin Access
+    </TabsTrigger>
+    <TabsTrigger value="users" className="flex items-center gap-2 flex-shrink-0">
+      <Users className="w-4 h-4" />
+      Users
+    </TabsTrigger>
+    <TabsTrigger value="system" className="flex items-center gap-2 flex-shrink-0">
+      <SettingsIcon className="w-4 h-4" />
+      System
+    </TabsTrigger>
+    <TabsTrigger value="audit" className="flex items-center gap-2 flex-shrink-0">
+      <Clock className="w-4 h-4" />
+      Audit
+    </TabsTrigger>
+  </TabsList>
 
         <TabsContent value="security" className="space-y-4">
           <PasswordSettings />
