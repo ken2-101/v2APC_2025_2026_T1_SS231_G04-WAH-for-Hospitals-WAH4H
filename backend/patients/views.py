@@ -1,4 +1,10 @@
-from django.http import JsonResponse
+from rest_framework import viewsets
+from .models import Patient
+from .serializers import PatientSerializer
 
-def get_patients(request):
-    return JsonResponse({"message": "Patient API working!"})
+class PatientViewSet(viewsets.ModelViewSet):
+    """
+    A simple ViewSet for viewing and editing patients.
+    """
+    queryset = Patient.objects.all()
+    serializer_class = PatientSerializer
