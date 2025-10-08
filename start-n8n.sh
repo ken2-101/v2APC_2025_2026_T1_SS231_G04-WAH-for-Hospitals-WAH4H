@@ -7,4 +7,4 @@ docker run -d --name n8n \
   -e WEBHOOK_URL="https://obscure-enigma-jjqwr695pjvwfqxjr-5678.app.github.dev" \
   --restart unless-stopped \
   docker.n8n.io/n8nio/n8n
-echo "n8n started! Access it at http://localhost:5678"
+echo "n8n started! Access it at https://obscure-enigma-jjqwr695pjvwfqxjr-5678.app.github.dev
