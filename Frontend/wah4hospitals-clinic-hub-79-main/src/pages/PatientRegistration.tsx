@@ -46,24 +46,25 @@ const PatientRegistration: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch patients
-  const fetchPatients = async (): Promise<void> => {
-    try {
-      setLoading(true);
-      const res = await fetch('/api/patients');
-      if (!res.ok) throw new Error('Failed to fetch patients');
-      const data: Patient[] = await res.json();
-      setPatients(data);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+// Fetch patients
+// Fetch patients from backend
+const fetchPatients = async (): Promise<void> => {
+  try {
+    setLoading(true);
+    const res = await fetch('http://127.0.0.1:8000/api/patients/'); // FULL backend URL
+    if (!res.ok) throw new Error(`Failed to fetch patients: ${res.status}`);
+    const data: Patient[] = await res.json();
+    setPatients(data);
+  } catch (err: any) {
+    setError(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
-  useEffect(() => {
-    fetchPatients();
-  }, []);
+useEffect(() => {
+  fetchPatients();
+}, []);
 
   const handleViewDetails = (patient: Patient): void => {
     setSelectedPatient(patient);
@@ -89,21 +90,22 @@ const PatientRegistration: React.FC = () => {
     setActiveFilters({ status: [], gender: [], department: [], civilStatus: [] });
   };
 
-  const handleRegisterPatient = async (patientData: Patient): Promise<void> => {
-    try {
-      const res = await fetch('/api/patients', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patientData),
-      });
-      if (!res.ok) throw new Error('Failed to register patient');
-      const newPatient: Patient = await res.json();
-      setPatients(prev => [...prev, newPatient]);
-      setIsRegistrationModalOpen(false);
-    } catch (err: any) {
-      alert(err.message);
-    }
-  };
+// Register patient
+const handleRegisterPatient = async (patientData: Patient): Promise<void> => {
+  try {
+    const res = await fetch('http://localhost:8000/api/patients/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patientData),
+    });
+    if (!res.ok) throw new Error('Failed to register patient');
+    const newPatient: Patient = await res.json();
+    setPatients(prev => [...prev, newPatient]);
+    setIsRegistrationModalOpen(false);
+  } catch (err: any) {
+    alert(err.message);
+  }
+};
 
   // Filter patients
   const filteredPatients = patients.filter(patient => {
