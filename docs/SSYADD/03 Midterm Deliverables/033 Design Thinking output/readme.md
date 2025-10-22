@@ -1,0 +1,1 @@
+Desing Thinking [LINK](https://asiapacificcollege.sharepoint.com/:u:/r/sites/SSYADD1SS231T1AY2025-2026/Shared%20Documents/G04%20Pseudoers/MIDTERMS%20DELIVERABLES/Design%20Thinking%20Output%20(5%20Stages)/Design%20Thinking%20Stage%203%20-%20Ideate.url?csf=1&web=1&e=sccxUc)
