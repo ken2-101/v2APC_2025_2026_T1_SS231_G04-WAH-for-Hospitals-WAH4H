@@ -11,13 +11,12 @@ import ModernLayout from "@/components/layout/ModernLayout";
 import ModernDashboard from "@/pages/ModernDashboard";
 import PatientRegistration from "./pages/PatientRegistration";
 import PhilHealthClaims from "./pages/PhilHealthClaims";
-/*import Appointments from "./pages/Appointments";*/
+
 import Monitoring from "./pages/Monitoring";
 import Discharge from "./pages/Discharge";
 import Inventory from "./pages/Inventory";
 import Compliance from "./pages/Compliance";
-/*import Statistics from "./pages/Statistics";*/
-/*import ERPView from "./pages/ERPView";*/
+
 import Settings from "./pages/Settings";
 import Billing from "./pages/Billing";
 import AccountSettings from "./pages/AccountSettings";
@@ -103,8 +102,7 @@ const AppContent = () => {
         return <PatientRegistration />;
       case 'philhealth':
         return <PhilHealthClaims />;
-      /*case 'appointments':
-        return <Appointments />;*/
+
       case 'monitoring':
         return <Monitoring />;
       case 'discharge':
@@ -113,10 +111,7 @@ const AppContent = () => {
         return <Inventory />;
       case 'compliance':
         return <Compliance />;
-      /*case 'statistics':
-        return <Statistics />;*/
-      /*case 'erp':
-        return <ERPView />;*/
+
       case 'billing':
         return <Billing />;
       case 'settings':
