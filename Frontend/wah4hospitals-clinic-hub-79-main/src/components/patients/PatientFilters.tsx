@@ -58,16 +58,16 @@ export const PatientFilters: React.FC<PatientFiltersProps> = ({
           Inactive
         </DropdownMenuCheckboxItem>
         <DropdownMenuSeparator />
-        <DropdownMenuLabel>Filter by Gender</DropdownMenuLabel>
+        <DropdownMenuLabel>Filter by Sex</DropdownMenuLabel>
         <DropdownMenuCheckboxItem
-          checked={activeFilters.gender.includes('Male')}
-          onCheckedChange={() => handleFilterChange('gender', 'Male')}
+          checked={activeFilters.gender.includes('M')}
+          onCheckedChange={() => handleFilterChange('gender', 'M')}
         >
           Male
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
-          checked={activeFilters.gender.includes('Female')}
-          onCheckedChange={() => handleFilterChange('gender', 'Female')}
+          checked={activeFilters.gender.includes('F')}
+          onCheckedChange={() => handleFilterChange('gender', 'F')}
         >
           Female
         </DropdownMenuCheckboxItem>

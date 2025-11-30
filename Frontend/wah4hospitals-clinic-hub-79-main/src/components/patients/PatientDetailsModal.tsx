@@ -35,11 +35,11 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({ isOpen
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
               <span className="text-white font-bold text-xl">
-                {patient.name.split(' ').map((n) => n[0]).join('')}
+                {(patient.first_name[0] + (patient.last_name[0] || '')).toUpperCase()}
               </span>
             </div>
             <div>
-              <h3 className="text-xl font-semibold">{patient.name}</h3>
+              <h3 className="text-xl font-semibold">{`${patient.last_name}, ${patient.first_name} ${patient.middle_name || ''} ${patient.suffix || ''}`}</h3>
               <p className="text-gray-600">Patient ID: {patient.id}</p>
               <Badge className="mt-1">{patient.status}</Badge>
             </div>

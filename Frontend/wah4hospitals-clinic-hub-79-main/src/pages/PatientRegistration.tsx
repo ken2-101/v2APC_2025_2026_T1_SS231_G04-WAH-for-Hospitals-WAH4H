@@ -19,7 +19,6 @@ const PatientRegistration = () => {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isRegistrationModalOpen, setIsRegistrationModalOpen] = useState(false);
-  const [showPhilHealthIds, setShowPhilHealthIds] = useState<Record<string, boolean>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilters, setActiveFilters] = useState({
     status: [] as string[],
@@ -28,28 +27,41 @@ const PatientRegistration = () => {
     civilStatus: [] as string[],
   });
 
-  // New patient form state
   const [formData, setFormData] = useState<PatientFormData>({
     id: '',
-    name: '',
-    age: '',
-    gender: '',
+    philhealth_id: '',
+    last_name: '',
+    first_name: '',
+    middle_name: '',
+    suffix: '',
+    sex: 'M',
+    date_of_birth: '',
     civil_status: '',
-    phone: '',
-    address: '',
-    occupation: '',
-    room: '',
+    nationality: '',
+    mobile_number: '',
+    telephone: '',
+    email: '',
+    region: '',
+    province: '',
+    city_municipality: '',
+    barangay: '',
+    house_no_street: '',
+    status: 'Active',
+    admission_date: new Date().toISOString().split('T')[0],
     department: '',
-    admission_date: '',
-    condition: '',
+    room: '',
     physician: '',
-    status: '',
-    philhealth_id: ''
+    condition: '',
+    occupation: '',
+    national_id: '',
+    passport_number: '',
+    drivers_license: '',
+    senior_citizen_id: '',
+    pwd_id: '',
   });
-
   const [formLoading, setFormLoading] = useState(false);
-  const [success, setSuccess] = useState('');
   const [formError, setFormError] = useState('');
+  const [success, setSuccess] = useState('');
 
   // Fetch patients from the Django backend
   useEffect(() => {
@@ -71,17 +83,6 @@ const PatientRegistration = () => {
   const handleViewDetails = (patient: Patient) => {
     setSelectedPatient(patient);
     setIsDetailsModalOpen(true);
-  };
-
-  const togglePhilHealthVisibility = (patientId: string) => {
-    setShowPhilHealthIds(prev => ({
-      ...prev,
-      [patientId]: !prev[patientId]
-    }));
-  };
-
-  const maskPhilHealthId = (id: string) => {
-    return id.replace(/(.{3})(.*)(.{4})/, '$1********$3');
   };
 
   const handleFilterChange = (filterType: string, value: string) => {
@@ -123,10 +124,8 @@ const PatientRegistration = () => {
     setSuccess('');
 
     try {
-      // Convert age to number for API
       const payload = {
         ...formData,
-        age: parseInt(formData.age, 10)
       };
 
       const response = await axios.post<Patient>('http://localhost:8000/api/patients/', payload);
@@ -138,20 +137,35 @@ const PatientRegistration = () => {
       // Reset form
       setFormData({
         id: '',
-        name: '',
-        age: '',
-        gender: '',
+        philhealth_id: '',
+        last_name: '',
+        first_name: '',
+        middle_name: '',
+        suffix: '',
+        sex: 'M',
+        date_of_birth: '',
         civil_status: '',
-        phone: '',
-        address: '',
-        occupation: '',
-        room: '',
+        nationality: '',
+        mobile_number: '',
+        telephone: '',
+        email: '',
+        region: '',
+        province: '',
+        city_municipality: '',
+        barangay: '',
+        house_no_street: '',
+        status: 'Active',
+        admission_date: new Date().toISOString().split('T')[0],
         department: '',
-        admission_date: '',
-        condition: '',
+        room: '',
         physician: '',
-        status: '',
-        philhealth_id: ''
+        condition: '',
+        occupation: '',
+        national_id: '',
+        passport_number: '',
+        drivers_license: '',
+        senior_citizen_id: '',
+        pwd_id: '',
       });
       
       // Close modal after successful registration
@@ -168,15 +182,16 @@ const PatientRegistration = () => {
   };
 
   const filteredPatients = patients.filter(patient => {
-    const matchesSearch = patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const fullName = `${patient.last_name}, ${patient.first_name} ${patient.middle_name || ''}`.toLowerCase();
+    const matchesSearch = fullName.includes(searchTerm.toLowerCase()) ||
       patient.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      patient.phone.includes(searchTerm) ||
+      patient.mobile_number.includes(searchTerm) ||
       patient.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
       patient.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      patient.occupation.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      patient.physician.toLowerCase().includes(searchTerm.toLowerCase());
+      (patient.occupation && patient.occupation.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (patient.physician && patient.physician.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesStatus = activeFilters.status.length === 0 || activeFilters.status.includes(patient.status);
-    const matchesGender = activeFilters.gender.length === 0 || activeFilters.gender.includes(patient.gender);
+    const matchesGender = activeFilters.gender.length === 0 || activeFilters.gender.includes(patient.sex);
     const matchesDepartment = activeFilters.department.length === 0 || activeFilters.department.includes(patient.department);
     const matchesCivilStatus = activeFilters.civilStatus.length === 0 || activeFilters.civilStatus.includes(patient.civil_status);
     return matchesSearch && matchesStatus && matchesGender && matchesDepartment && matchesCivilStatus;
@@ -254,9 +269,6 @@ const PatientRegistration = () => {
           
           <PatientTable 
             patients={filteredPatients}
-            showPhilHealthIds={showPhilHealthIds}
-            togglePhilHealthVisibility={togglePhilHealthVisibility}
-            maskPhilHealthId={maskPhilHealthId}
             handleViewDetails={handleViewDetails}
           />
         </CardContent>

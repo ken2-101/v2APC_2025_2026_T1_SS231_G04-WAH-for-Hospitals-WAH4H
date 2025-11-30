@@ -14,9 +14,6 @@ interface PatientTableProps {
 
 export const PatientTable: React.FC<PatientTableProps> = ({
   patients,
-  showPhilHealthIds,
-  togglePhilHealthVisibility,
-  maskPhilHealthId,
   handleViewDetails
 }) => {
   return (
@@ -25,12 +22,11 @@ export const PatientTable: React.FC<PatientTableProps> = ({
         <thead>
           <tr className="border-b">
             <th className="text-left py-3 px-4 font-medium">Patient ID</th>
-            <th className="text-left py-3 px-4 font-medium">Name</th>
+            <th className="text-left py-3 px-4 font-medium">Full Name</th>
             <th className="text-left py-3 px-4 font-medium">Age</th>
-            <th className="text-left py-3 px-4 font-medium">Gender</th>
-            <th className="text-left py-3 px-4 font-medium">Phone</th>
+            <th className="text-left py-3 px-4 font-medium">Mobile Number</th>
             <th className="text-left py-3 px-4 font-medium">Department</th>
-            <th className="text-left py-3 px-4 font-medium">PhilHealth ID</th>
+            <th className="text-left py-3 px-4 font-medium">Room</th>
             <th className="text-left py-3 px-4 font-medium">Status</th>
             <th className="text-left py-3 px-4 font-medium">Actions</th>
           </tr>
@@ -39,33 +35,11 @@ export const PatientTable: React.FC<PatientTableProps> = ({
           {patients.map((patient) => (
             <tr key={patient.id} className="border-b hover:bg-gray-50">
               <td className="py-4 px-4 font-medium">{patient.id}</td>
-              <td className="py-4 px-4">{patient.name}</td>
-              <td className="py-4 px-4">{patient.age}</td>
-              <td className="py-4 px-4">{patient.gender}</td>
-              <td className="py-4 px-4">{patient.phone}</td>
+              <td className="py-4 px-4">{`${patient.last_name}, ${patient.first_name} ${patient.middle_name || ''} ${patient.suffix || ''}`}</td>
+              <td className="py-4 px-4">{new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear()}</td>
+              <td className="py-4 px-4">{patient.mobile_number}</td>
               <td className="py-4 px-4">{patient.department}</td>
-              <td className="py-4 px-4">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-sm">
-                    {showPhilHealthIds[patient.id] 
-                      ? patient.philhealth_id 
-                      : maskPhilHealthId(patient.philhealth_id)
-                    }
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => togglePhilHealthVisibility(patient.id)}
-                    className="h-6 w-6 p-0"
-                  >
-                    {showPhilHealthIds[patient.id] ? (
-                      <EyeOff className="w-3 h-3" />
-                    ) : (
-                      <Eye className="w-3 h-3" />
-                    )}
-                  </Button>
-                </div>
-              </td>
+              <td className="py-4 px-4">{patient.room}</td>
               <td className="py-4 px-4">
                 <Badge className={patient.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
                   {patient.status}
