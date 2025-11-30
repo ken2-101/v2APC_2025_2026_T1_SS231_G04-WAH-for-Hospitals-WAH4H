@@ -372,7 +372,12 @@ const ModernLayout: React.FC<ModernLayoutProps> = ({
         <div className="animate-fade-in">
           {showNewTabDashboard ? <NewTabDashboard /> : 
            showModulesCategory ? <ModulesCategory /> : 
-           children}
+           React.Children.map(children, child => {
+             if (React.isValidElement(child)) {
+               return React.cloneElement(child, { onNavigate: handleTabClick } as any);
+             }
+             return child;
+           })}
         </div>
       </main>
 

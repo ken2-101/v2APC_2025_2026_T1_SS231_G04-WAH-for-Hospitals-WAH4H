@@ -9,7 +9,11 @@ import { AdmissionTable } from '@/components/admission/AdmissionTable';
 import { AdmitPatientModal } from '@/components/admission/AdmitPatientModal';
 import type { Admission } from '@/types/admission';
 
-const AdmissionPage = () => {
+interface AdmissionPageProps {
+  onNavigate?: (tabId: string) => void;
+}
+
+const AdmissionPage: React.FC<AdmissionPageProps> = ({ onNavigate }) => {
   const [admissions, setAdmissions] = useState<Admission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -143,6 +147,7 @@ const AdmissionPage = () => {
         isOpen={isAdmitModalOpen}
         onClose={() => setIsAdmitModalOpen(false)}
         onAdmit={handleAdmitPatient}
+        onNavigate={onNavigate}
       />
     </div>
   );

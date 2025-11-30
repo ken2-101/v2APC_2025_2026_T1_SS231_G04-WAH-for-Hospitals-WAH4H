@@ -12,9 +12,10 @@ interface AdmitPatientModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAdmit: (data: any) => void;
+  onNavigate?: (tabId: string) => void;
 }
 
-export const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({ isOpen, onClose, onAdmit }) => {
+export const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({ isOpen, onClose, onAdmit, onNavigate }) => {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     patientId: '',
@@ -119,7 +120,14 @@ export const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({ isOpen, on
           {searchResults.length === 0 && formData.patientName && !isSearching && (
             <div className="text-center py-4">
               <p className="text-gray-500 mb-2">No patient found.</p>
-              <Button variant="outline" onClick={() => window.location.href = '/patient-registration'}>
+              <Button variant="outline" onClick={() => {
+                if (onNavigate) {
+                  onNavigate('patients');
+                  onClose();
+                } else {
+                  window.location.href = '/patients';
+                }
+              }}>
                 Create New Patient Record
               </Button>
             </div>
