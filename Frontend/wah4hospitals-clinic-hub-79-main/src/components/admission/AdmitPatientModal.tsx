@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,31 +41,100 @@ export const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({ isOpen, on
     setStep(1); // Reset step
   };
 
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedPatient, setSelectedPatient] = useState<any>(null);
+
+  const handleSearchPatient = async () => {
+    if (!formData.patientName) return;
+    setIsSearching(true);
+    try {
+      // Search by name or ID
+      const response = await axios.get(`http://localhost:8000/api/patients/?search=${formData.patientName}`);
+      setSearchResults(response.data);
+    } catch (error) {
+      console.error('Error searching patient:', error);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleSelectPatient = (patient: any) => {
+    setSelectedPatient(patient);
+    setFormData(prev => ({
+      ...prev,
+      patientId: patient.id,
+      patientName: `${patient.last_name}, ${patient.first_name}`
+    }));
+    setSearchResults([]); // Clear results after selection
+  };
+
   const renderStep1 = () => (
     <div className="space-y-4">
       <h3 className="text-lg font-medium">Patient Identification</h3>
-      <div className="flex gap-2">
-        <div className="flex-1">
-          <Label>Search Patient</Label>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input 
-              placeholder="Search by name or ID..." 
-              className="pl-10"
-              value={formData.patientName}
-              onChange={(e) => handleChange('patientName', e.target.value)}
-            />
+      
+      {!selectedPatient ? (
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <Label>Search Patient</Label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <Input 
+                    placeholder="Search by name or ID..." 
+                    className="pl-10"
+                    value={formData.patientName}
+                    onChange={(e) => handleChange('patientName', e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearchPatient()}
+                  />
+                </div>
+                <Button onClick={handleSearchPatient} disabled={isSearching}>
+                  {isSearching ? 'Searching...' : 'Search'}
+                </Button>
+              </div>
+            </div>
           </div>
+
+          {/* Search Results */}
+          {searchResults.length > 0 && (
+            <div className="border rounded-md p-2 max-h-48 overflow-y-auto">
+              <p className="text-sm text-gray-500 mb-2">Select a patient:</p>
+              {searchResults.map(patient => (
+                <div 
+                  key={patient.id} 
+                  className="p-2 hover:bg-gray-100 cursor-pointer rounded flex justify-between items-center"
+                  onClick={() => handleSelectPatient(patient)}
+                >
+                  <div>
+                    <p className="font-medium">{patient.last_name}, {patient.first_name}</p>
+                    <p className="text-xs text-gray-500">ID: {patient.id} | DOB: {patient.date_of_birth}</p>
+                  </div>
+                  <Button size="sm" variant="ghost">Select</Button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {searchResults.length === 0 && formData.patientName && !isSearching && (
+            <div className="text-center py-4">
+              <p className="text-gray-500 mb-2">No patient found.</p>
+              <Button variant="outline" onClick={() => window.location.href = '/patient-registration'}>
+                Create New Patient Record
+              </Button>
+            </div>
+          )}
         </div>
-        <div className="w-1/3">
-          <Label>Patient ID (PH Core)</Label>
-          <Input 
-            value={formData.patientId} 
-            onChange={(e) => handleChange('patientId', e.target.value)}
-            placeholder="Auto-filled"
-          />
+      ) : (
+        <div className="bg-green-50 border border-green-200 rounded-md p-4 flex justify-between items-center">
+          <div>
+            <p className="font-medium text-green-800">Selected Patient</p>
+            <p className="text-green-700">{selectedPatient.last_name}, {selectedPatient.first_name}</p>
+            <p className="text-sm text-green-600">ID: {selectedPatient.id}</p>
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => setSelectedPatient(null)}>Change</Button>
         </div>
-      </div>
+      )}
     </div>
   );
 
