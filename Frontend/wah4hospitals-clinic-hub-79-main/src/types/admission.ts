@@ -1,18 +1,18 @@
 export interface Admission {
     id: string;
-    patientId: string;
-    patientName: string;
-    admissionDate: string;
-    attendingPhysician: string;
+    patient: string; // ID of the patient
+    patient_details?: any; // Nested patient details
+    admission_date: string;
+    attending_physician: string;
     ward: string;
     room: string;
     bed: string;
     status: 'Active' | 'Discharged' | 'Transferred';
-    encounterType: 'Inpatient';
-    admittingDiagnosis: string;
-    reasonForAdmission: string;
-    admissionCategory: 'Emergency' | 'Regular';
-    modeOfArrival: 'Walk-in' | 'Ambulance' | 'Referral';
+    encounter_type: 'Inpatient';
+    admitting_diagnosis: string;
+    reason_for_admission: string;
+    admission_category: 'Emergency' | 'Regular';
+    mode_of_arrival: 'Walk-in' | 'Ambulance' | 'Referral';
 }
 
 export interface Bed {

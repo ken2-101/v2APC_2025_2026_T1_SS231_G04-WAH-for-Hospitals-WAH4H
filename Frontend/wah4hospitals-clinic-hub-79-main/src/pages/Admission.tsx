@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +9,15 @@ import { AdmissionTable } from '@/components/admission/AdmissionTable';
 import { AdmitPatientModal } from '@/components/admission/AdmitPatientModal';
 import type { Admission } from '@/types/admission';
 
-const AdmissionPage = () => {
+interface AdmissionPageProps {
+  onNavigate?: (tabId: string) => void;
+}
+
+const AdmissionPage: React.FC<AdmissionPageProps> = ({ onNavigate }) => {
+  const [admissions, setAdmissions] = useState<Admission[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilters, setActiveFilters] = useState({
     ward: '',
@@ -16,42 +25,24 @@ const AdmissionPage = () => {
     doctor: '',
   });
   const [isAdmitModalOpen, setIsAdmitModalOpen] = useState(false);
-  
-  // Mock Data
-  const [admissions, setAdmissions] = useState<Admission[]>([
-    {
-      id: 'ADM-2023-001',
-      patientId: 'P-1001',
-      patientName: 'Juan Dela Cruz',
-      admissionDate: '2023-10-25T08:00:00',
-      attendingPhysician: 'Dr. Smith',
-      ward: 'General Ward',
-      room: '101',
-      bed: 'A',
-      status: 'Active',
-      encounterType: 'Inpatient',
-      admittingDiagnosis: 'J18.9 - Pneumonia, unspecified',
-      reasonForAdmission: 'High fever and difficulty breathing',
-      admissionCategory: 'Emergency',
-      modeOfArrival: 'Walk-in'
-    },
-    {
-      id: 'ADM-2023-002',
-      patientId: 'P-1002',
-      patientName: 'Maria Santos',
-      admissionDate: '2023-10-26T10:30:00',
-      attendingPhysician: 'Dr. Johnson',
-      ward: 'ICU',
-      room: '201',
-      bed: '1',
-      status: 'Active',
-      encounterType: 'Inpatient',
-      admittingDiagnosis: 'I21.9 - Acute myocardial infarction',
-      reasonForAdmission: 'Chest pain',
-      admissionCategory: 'Emergency',
-      modeOfArrival: 'Ambulance'
+
+  // Fetch admissions from backend
+  const fetchAdmissions = async () => {
+    try {
+      const response = await axios.get<Admission[]>('http://localhost:8000/api/admissions/');
+      setAdmissions(response.data);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching admissions:', err);
+      setError('Failed to load admissions');
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
+
+  useEffect(() => {
+    fetchAdmissions();
+  }, []);
 
   const handleFilterChange = (key: string, value: string) => {
     setActiveFilters(prev => ({ ...prev, [key]: value }));
@@ -61,37 +52,55 @@ const AdmissionPage = () => {
     setActiveFilters({ ward: '', status: '', doctor: '' });
   };
 
-  const handleAdmitPatient = (data: any) => {
-    const newAdmission: Admission = {
-      id: `ADM-${new Date().getFullYear()}-${String(admissions.length + 1).padStart(3, '0')}`,
-      patientId: data.patientId || 'P-NEW',
-      patientName: data.patientName,
-      admissionDate: data.admissionDate,
-      attendingPhysician: data.attendingPhysician,
-      ward: data.ward,
-      room: data.room,
-      bed: data.bed,
-      status: 'Active',
-      encounterType: 'Inpatient',
-      admittingDiagnosis: data.admittingDiagnosis,
-      reasonForAdmission: data.reasonForAdmission,
-      admissionCategory: data.admissionCategory,
-      modeOfArrival: data.modeOfArrival
-    };
-    setAdmissions([...admissions, newAdmission]);
+  const handleAdmitPatient = async (data: any) => {
+    try {
+      // Transform form data to match backend expected format
+      const payload = {
+        id: `ADM-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`, // Generate ID or let backend handle it if auto-increment
+        patient: data.patientId, // Assuming form provides patient ID
+        admission_date: data.admissionDate,
+        attending_physician: data.attendingPhysician,
+        ward: data.ward,
+        room: data.room,
+        bed: data.bed,
+        status: 'Active',
+        encounter_type: 'Inpatient',
+        admitting_diagnosis: data.admittingDiagnosis,
+        reason_for_admission: data.reasonForAdmission,
+        admission_category: data.admissionCategory,
+        mode_of_arrival: data.modeOfArrival
+      };
+
+      await axios.post('http://localhost:8000/api/admissions/', payload);
+      
+      // Refresh list
+      fetchAdmissions();
+      setIsAdmitModalOpen(false);
+    } catch (err) {
+      console.error('Error admitting patient:', err);
+      // Handle error (show toast, etc.)
+    }
   };
 
   const filteredAdmissions = admissions.filter(admission => {
-    const matchesSearch = admission.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const patientName = admission.patient_details 
+      ? `${admission.patient_details.last_name}, ${admission.patient_details.first_name}`.toLowerCase()
+      : '';
+    
+    const matchesSearch = patientName.includes(searchTerm.toLowerCase()) ||
                           admission.id.toLowerCase().includes(searchTerm.toLowerCase());
+    
     const matchesWard = !activeFilters.ward || admission.ward === activeFilters.ward;
     const matchesStatus = !activeFilters.status || admission.status === activeFilters.status;
-    const matchesDoctor = !activeFilters.doctor || admission.attendingPhysician === activeFilters.doctor;
+    const matchesDoctor = !activeFilters.doctor || admission.attending_physician === activeFilters.doctor;
 
     return matchesSearch && matchesWard && matchesStatus && matchesDoctor;
   });
 
   const hasActiveFilters = Object.values(activeFilters).some(Boolean);
+
+  if (loading) return <div>Loading admissions...</div>;
+  if (error) return <div className="text-red-500">{error}</div>;
 
   return (
     <div className="space-y-6">
@@ -138,6 +147,7 @@ const AdmissionPage = () => {
         isOpen={isAdmitModalOpen}
         onClose={() => setIsAdmitModalOpen(false)}
         onAdmit={handleAdmitPatient}
+        onNavigate={onNavigate}
       />
     </div>
   );

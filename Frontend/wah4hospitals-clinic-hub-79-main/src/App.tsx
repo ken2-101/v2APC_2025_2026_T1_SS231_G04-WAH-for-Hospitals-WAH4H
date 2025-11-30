@@ -106,10 +106,11 @@ const AppContent = () => {
       case 'patients':
         return <PatientRegistration />;
       case 'admission':
-        return <AdmissionPage />;
+        return <AdmissionPage onNavigate={(tabId: string) => setActiveTab(tabId)} />;
       case 'philhealth':
         return <PhilHealthClaims />;
-
+      case 'appointments':
+        return <div className="p-6">Appointments Module (Coming Soon)</div>;
       case 'monitoring':
         return <Monitoring />;
       case 'discharge':
@@ -118,7 +119,10 @@ const AppContent = () => {
         return <Inventory />;
       case 'compliance':
         return <Compliance />;
-
+      case 'statistics':
+        return <div className="p-6">Statistics Module (Coming Soon)</div>;
+      case 'erp':
+        return <div className="p-6">ERP Module (Coming Soon)</div>;
       case 'billing':
         return <Billing />;
       case 'settings':

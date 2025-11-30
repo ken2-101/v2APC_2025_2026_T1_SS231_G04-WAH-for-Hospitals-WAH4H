@@ -8,6 +8,7 @@ urlpatterns = [
 
     # Patient API
     path('api/patients/', include('patients.urls')),  # makes /api/patients/ point to patients.urls
+    path('api/', include('admissions.urls')),
 
     # Root endpoint
     path('', lambda request: JsonResponse({'message': 'Backend is running'})),

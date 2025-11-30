@@ -26,10 +26,14 @@ export const AdmissionTable: React.FC<AdmissionTableProps> = ({ admissions }) =>
         <tbody>
           {admissions.map((admission) => (
             <tr key={admission.id} className="border-b hover:bg-gray-50">
-              <td className="py-4 px-4 font-medium">{admission.patientName}</td>
+              <td className="py-4 px-4 font-medium">
+                {admission.patient_details 
+                  ? `${admission.patient_details.last_name}, ${admission.patient_details.first_name}`
+                  : 'Unknown Patient'}
+              </td>
               <td className="py-4 px-4">{admission.id}</td>
-              <td className="py-4 px-4">{new Date(admission.admissionDate).toLocaleString()}</td>
-              <td className="py-4 px-4">{admission.attendingPhysician}</td>
+              <td className="py-4 px-4">{new Date(admission.admission_date).toLocaleString()}</td>
+              <td className="py-4 px-4">{admission.attending_physician}</td>
               <td className="py-4 px-4">
                 {admission.ward} - {admission.room} / {admission.bed}
               </td>
