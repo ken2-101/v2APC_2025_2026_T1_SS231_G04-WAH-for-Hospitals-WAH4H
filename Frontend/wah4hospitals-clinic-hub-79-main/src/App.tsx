@@ -16,6 +16,7 @@ import Monitoring from "./pages/Monitoring";
 import Discharge from "./pages/Discharge";
 import Inventory from "./pages/Inventory";
 import Compliance from "./pages/Compliance";
+import AdmissionPage from "./pages/Admission";
 
 import Settings from "./pages/Settings";
 import Billing from "./pages/Billing";
@@ -35,7 +36,8 @@ import {
   BarChart3, 
   Building2, 
   Settings as SettingsIcon,
-  Receipt
+  Receipt,
+  Bed
 } from 'lucide-react';
 
 const queryClient = new QueryClient();
@@ -43,6 +45,7 @@ const queryClient = new QueryClient();
 const tabs = [
   { id: 'dashboard', name: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
   { id: 'patients', name: 'Patients', icon: <UserPlus className="w-4 h-4" /> },
+  { id: 'admission', name: 'Admission', icon: <Bed className="w-4 h-4" /> },
   { id: 'philhealth', name: 'PhilHealth', icon: <FileText className="w-4 h-4" /> },
   { id: 'appointments', name: 'Appointments', icon: <Calendar className="w-4 h-4" /> },
   { id: 'monitoring', name: 'Monitoring', icon: <Activity className="w-4 h-4" /> },
@@ -71,6 +74,8 @@ const AppContent = () => {
       setActiveTab('dashboard');
     } else if (path === '/patients' || path === '/patient-registration') {
       setActiveTab('patients');
+    } else if (path === '/admission') {
+      setActiveTab('admission');
     } else if (path === '/philhealth' || path === '/philhealth-claims') {
       setActiveTab('philhealth');
     } else if (path === '/appointments') {
@@ -100,6 +105,8 @@ const AppContent = () => {
         return <ModernDashboard />;
       case 'patients':
         return <PatientRegistration />;
+      case 'admission':
+        return <AdmissionPage />;
       case 'philhealth':
         return <PhilHealthClaims />;
 
@@ -149,6 +156,7 @@ const App = () => (
               <Route path="/dashboard" element={<AppContent />} />
               <Route path="/patients" element={<AppContent />} />
               <Route path="/patient-registration" element={<AppContent />} />
+              <Route path="/admission" element={<AppContent />} />
               <Route path="/philhealth" element={<AppContent />} />
               <Route path="/philhealth-claims" element={<AppContent />} />
               <Route path="/appointments" element={<AppContent />} />

@@ -1,14 +1,11 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Eye, EyeOff, FileText } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import type { Patient } from '../../types/patient';
 
 interface PatientTableProps {
   patients: Patient[];
-  showPhilHealthIds: Record<string, boolean>;
-  togglePhilHealthVisibility: (patientId: string) => void;
-  maskPhilHealthId: (id: string) => string;
   handleViewDetails: (patient: Patient) => void;
 }
 

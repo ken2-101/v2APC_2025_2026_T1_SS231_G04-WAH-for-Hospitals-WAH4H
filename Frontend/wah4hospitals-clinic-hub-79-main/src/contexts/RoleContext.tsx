@@ -24,11 +24,11 @@ export const useRole = () => {
 
 // Role access configuration - strict role-based access
 const roleAccessConfig: Record<UserRole, string[]> = {
-  'doctor': ['dashboard', 'patients', 'monitoring', 'discharge', 'philhealth', 'settings'],
-  'nurse': ['dashboard', 'patients', 'monitoring', 'inventory', 'appointments', 'settings'],
+  'doctor': ['dashboard', 'patients', 'admission', 'monitoring', 'discharge', 'philhealth', 'settings'],
+  'nurse': ['dashboard', 'patients', 'admission', 'monitoring', 'inventory', 'appointments', 'settings'],
   'pharmacist': ['dashboard', 'inventory', 'compliance', 'settings'],
   'lab-technician': ['dashboard', 'monitoring', 'compliance', 'settings'],
-  'administrator': ['dashboard', 'patients', 'philhealth', 'monitoring', 'discharge', 'inventory', 'compliance', 'billing', 'settings'],
+  'administrator': ['dashboard', 'patients', 'admission', 'philhealth', 'monitoring', 'discharge', 'inventory', 'compliance', 'billing', 'settings'],
   'radiologist': ['dashboard', 'monitoring', 'patients', 'settings'],
   'billing-staff': ['dashboard', 'philhealth', 'erp', 'billing', 'settings']
 };
@@ -68,7 +68,7 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
   useEffect(() => {
     if (isAdminMode && currentRole === 'administrator') {
       // Only administrators can enable admin mode for full access
-      setAvailableTabs(['dashboard', 'patients', 'philhealth', 'appointments', 'monitoring', 'discharge', 'inventory', 'compliance', 'statistics', 'erp', 'billing', 'settings']);
+      setAvailableTabs(['dashboard', 'patients', 'admission', 'philhealth', 'appointments', 'monitoring', 'discharge', 'inventory', 'compliance', 'statistics', 'erp', 'billing', 'settings']);
     } else {
       // Always use role-based access
       setAvailableTabs(roleAccessConfig[currentRole] || []);
