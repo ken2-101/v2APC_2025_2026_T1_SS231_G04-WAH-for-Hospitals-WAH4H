@@ -11,6 +11,7 @@ import ModernLayout from "@/components/layout/ModernLayout";
 import ModernDashboard from "@/pages/ModernDashboard";
 import PatientRegistration from "./pages/PatientRegistration";
 import PhilHealthClaims from "./pages/PhilHealthClaims";
+import Pharmacy from "./pages/Pharmacy";
 
 import Monitoring from "./pages/Monitoring";
 import Discharge from "./pages/Discharge";
@@ -24,20 +25,21 @@ import AccountSettings from "./pages/AccountSettings";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import NotFound from "./pages/NotFound";
-import { 
-  LayoutDashboard, 
-  UserPlus, 
-  FileText, 
-  Calendar, 
-  Activity, 
-  UserX, 
-  Package, 
-  Shield, 
-  BarChart3, 
-  Building2, 
+import {
+  LayoutDashboard,
+  UserPlus,
+  FileText,
+  Calendar,
+  Activity,
+  UserX,
+  Package,
+  Shield,
+  BarChart3,
+  Building2,
   Settings as SettingsIcon,
   Receipt,
-  Bed
+  Bed,
+  Pill
 } from 'lucide-react';
 
 const queryClient = new QueryClient();
@@ -47,6 +49,7 @@ const tabs = [
   { id: 'patients', name: 'Patients', icon: <UserPlus className="w-4 h-4" /> },
   { id: 'admission', name: 'Admission', icon: <Bed className="w-4 h-4" /> },
   { id: 'philhealth', name: 'PhilHealth', icon: <FileText className="w-4 h-4" /> },
+  { id: 'pharmacy', name: 'Pharmacy', icon: <Pill className="w-4 h-4" /> },
   { id: 'appointments', name: 'Appointments', icon: <Calendar className="w-4 h-4" /> },
   { id: 'monitoring', name: 'Monitoring', icon: <Activity className="w-4 h-4" /> },
   { id: 'discharge', name: 'Discharge', icon: <UserX className="w-4 h-4" /> },
@@ -78,6 +81,8 @@ const AppContent = () => {
       setActiveTab('admission');
     } else if (path === '/philhealth' || path === '/philhealth-claims') {
       setActiveTab('philhealth');
+    } else if (path === '/pharmacy') {
+      setActiveTab('pharmacy');
     } else if (path === '/appointments') {
       setActiveTab('appointments');
     } else if (path === '/monitoring') {
@@ -109,6 +114,8 @@ const AppContent = () => {
         return <AdmissionPage onNavigate={(tabId: string) => setActiveTab(tabId)} />;
       case 'philhealth':
         return <PhilHealthClaims />;
+      case 'pharmacy':
+        return <Pharmacy />;
       case 'appointments':
         return <div className="p-6">Appointments Module (Coming Soon)</div>;
       case 'monitoring':
@@ -134,9 +141,9 @@ const AppContent = () => {
 
   return (
     <ProtectedRoute>
-      <ModernLayout 
-        activeTab={activeTab} 
-        tabs={tabs} 
+      <ModernLayout
+        activeTab={activeTab}
+        tabs={tabs}
         onTabChange={setActiveTab}
       >
         {renderContent()}
@@ -163,6 +170,7 @@ const App = () => (
               <Route path="/admission" element={<AppContent />} />
               <Route path="/philhealth" element={<AppContent />} />
               <Route path="/philhealth-claims" element={<AppContent />} />
+              <Route path="/pharmacy" element={<AppContent />} />
               <Route path="/appointments" element={<AppContent />} />
               <Route path="/monitoring" element={<AppContent />} />
               <Route path="/discharge" element={<AppContent />} />
