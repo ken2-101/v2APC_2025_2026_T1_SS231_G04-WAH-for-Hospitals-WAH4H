@@ -3,7 +3,8 @@ import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { FileText, User, Building2, Calendar, DollarSign, Check, Clock, X } from 'lucide-react';
+import { FileText, User, Building2, Calendar, DollarSign, Check, Clock, X, AlertCircle, Upload } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface ClaimDetailsModalProps {
   isOpen: boolean;
@@ -36,7 +37,7 @@ export const ClaimDetailsModal: React.FC<ClaimDetailsModalProps> = ({ isOpen, on
             Claim Details
           </DialogTitle>
         </DialogHeader>
-        
+
         <div className="space-y-6">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-green-600 rounded-full flex items-center justify-center">
@@ -44,10 +45,25 @@ export const ClaimDetailsModal: React.FC<ClaimDetailsModalProps> = ({ isOpen, on
             </div>
             <div>
               <h3 className="text-xl font-semibold">{claim.id}</h3>
+              <p className="text-sm text-gray-500">Ref: {claim.claimReferenceNumber || 'N/A'}</p>
               <p className="text-gray-600">{claim.patientName}</p>
               {getStatusBadge(claim.status)}
             </div>
           </div>
+
+          {claim.returnToHospitalRemarks && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
+              <div>
+                <h4 className="font-semibold text-red-900">Return to Hospital / Rejected</h4>
+                <p className="text-red-800 text-sm mt-1">{claim.returnToHospitalRemarks}</p>
+                <Button size="sm" className="mt-3 bg-red-600 hover:bg-red-700 text-white">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Resubmit Documents
+                </Button>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
@@ -68,6 +84,18 @@ export const ClaimDetailsModal: React.FC<ClaimDetailsModalProps> = ({ isOpen, on
                   <div className="flex justify-between">
                     <span className="text-gray-600">Procedure:</span>
                     <span className="font-medium">{claim.procedure}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Final Diagnosis:</span>
+                    <span className="font-medium">{claim.finalDiagnosis || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">ICD-10 Code:</span>
+                    <span className="font-medium">{claim.icd10Code || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">RVS Code:</span>
+                    <span className="font-medium">{claim.rvsCode || 'N/A'}</span>
                   </div>
                 </div>
               </CardContent>
@@ -107,6 +135,14 @@ export const ClaimDetailsModal: React.FC<ClaimDetailsModalProps> = ({ isOpen, on
                     <span className="text-gray-600">Date Processed:</span>
                     <span className="font-medium">{claim.dateProcessed || 'Pending'}</span>
                   </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Admission Date:</span>
+                    <span className="font-medium">{claim.admissionDate || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Discharge Date:</span>
+                    <span className="font-medium">{claim.dischargeDate || 'N/A'}</span>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -125,7 +161,7 @@ export const ClaimDetailsModal: React.FC<ClaimDetailsModalProps> = ({ isOpen, on
                   <div className="flex justify-between">
                     <span className="text-gray-600">Processing Time:</span>
                     <span className="font-medium">
-                      {claim.dateProcessed 
+                      {claim.dateProcessed
                         ? `${Math.ceil((new Date(claim.dateProcessed).getTime() - new Date(claim.dateSubmitted).getTime()) / (1000 * 60 * 60 * 24))} days`
                         : 'In progress'
                       }
@@ -135,6 +171,34 @@ export const ClaimDetailsModal: React.FC<ClaimDetailsModalProps> = ({ isOpen, on
               </CardContent>
             </Card>
           </div>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <FileText className="w-4 h-4 text-gray-600" />
+                <h4 className="font-semibold">Submitted Documents</h4>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                {claim.documents && Object.entries(claim.documents).map(([key, value]) => (
+                  <div key={key} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                    <span className="uppercase text-gray-600">{key}</span>
+                    {value ? (
+                      <span className="text-green-600 flex items-center text-xs">
+                        <Check className="w-3 h-3 mr-1" /> Submitted
+                      </span>
+                    ) : (
+                      <span className="text-red-500 flex items-center text-xs">
+                        <X className="w-3 h-3 mr-1" /> Missing
+                      </span>
+                    )}
+                  </div>
+                ))}
+                {(!claim.documents || Object.keys(claim.documents).length === 0) && (
+                  <p className="text-gray-500 italic">No documents recorded.</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
           {claim.status === 'rejected' && (
             <Card>
