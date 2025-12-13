@@ -1,0 +1,192 @@
+import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { X, Plus, Trash2 } from 'lucide-react';
+import { LabRequest, LabResult } from '../../types/laboratory';
+
+interface LabResultEncodingModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    request: LabRequest | null;
+    onSubmit: (requestId: string, results: LabResult[], metadata: any) => void;
+}
+
+export const LabResultEncodingModal: React.FC<LabResultEncodingModalProps> = ({ isOpen, onClose, request, onSubmit }) => {
+    const [results, setResults] = useState<LabResult[]>([
+        { testName: '', resultValue: '', unit: '', referenceRange: '', interpretation: '' }
+    ]);
+    const [medTech, setMedTech] = useState('');
+    const [prcNumber, setPrcNumber] = useState('');
+    const [overallRemarks, setOverallRemarks] = useState('');
+
+    if (!isOpen || !request) return null;
+
+    const handleAddRow = () => {
+        setResults([...results, { testName: '', resultValue: '', unit: '', referenceRange: '', interpretation: '' }]);
+    };
+
+    const handleRemoveRow = (index: number) => {
+        if (results.length > 1) {
+            const newResults = [...results];
+            newResults.splice(index, 1);
+            setResults(newResults);
+        }
+    };
+
+    const updateRow = (index: number, field: keyof LabResult, value: string) => {
+        const newResults = [...results];
+        newResults[index] = { ...newResults[index], [field]: value };
+        setResults(newResults);
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onSubmit(request.id, results, {
+            medTech,
+            prcNumber,
+            dateCompleted: new Date().toISOString(),
+            remarks: overallRemarks
+        });
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                <div className="border-b px-6 py-4 flex justify-between items-center sticky top-0 bg-white z-10">
+                    <div>
+                        <h2 className="text-xl font-bold text-gray-900">Encode Lab Results</h2>
+                        <div className="flex items-center gap-2 mt-1">
+                            <span className="text-sm text-gray-500">Request ID: {request.id}</span>
+                            <Badge variant="secondary">{request.testType}</Badge>
+                        </div>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={onClose}><X className="w-5 h-5" /></Button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                    <div className="bg-gray-50 p-4 rounded-md grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <span className="text-gray-500 block">Patient</span>
+                            <span className="font-medium">{request.patientName}</span>
+                        </div>
+                        <div>
+                            <span className="text-gray-500 block">Doctor</span>
+                            <span className="font-medium">{request.doctorName}</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div className="flex justify-between items-center mb-2">
+                            <h3 className="text-lg font-medium">Test Results</h3>
+                            <Button type="button" size="sm" variant="outline" onClick={handleAddRow}>
+                                <Plus className="w-4 h-4 mr-1" /> Add Parameter
+                            </Button>
+                        </div>
+
+                        <div className="space-y-3">
+                            {results.map((row, index) => (
+                                <div key={index} className="grid grid-cols-12 gap-2 items-start bg-gray-50 p-3 rounded-md">
+                                    <div className="col-span-3">
+                                        <label className="text-xs font-medium text-gray-500 mb-1 block">Parameter / Test Name</label>
+                                        <Input
+                                            value={row.testName}
+                                            onChange={e => updateRow(index, 'testName', e.target.value)}
+                                            placeholder="e.g. Hemoglobin"
+                                            required
+                                        />
+                                    </div>
+                                    <div className="col-span-2">
+                                        <label className="text-xs font-medium text-gray-500 mb-1 block">Result</label>
+                                        <Input
+                                            value={row.resultValue}
+                                            onChange={e => updateRow(index, 'resultValue', e.target.value)}
+                                            placeholder="Value"
+                                            required
+                                        />
+                                    </div>
+                                    <div className="col-span-2">
+                                        <label className="text-xs font-medium text-gray-500 mb-1 block">Unit</label>
+                                        <Input
+                                            value={row.unit}
+                                            onChange={e => updateRow(index, 'unit', e.target.value)}
+                                            placeholder="e.g. g/dL"
+                                            required
+                                        />
+                                    </div>
+                                    <div className="col-span-2">
+                                        <label className="text-xs font-medium text-gray-500 mb-1 block">Ref. Range</label>
+                                        <Input
+                                            value={row.referenceRange}
+                                            onChange={e => updateRow(index, 'referenceRange', e.target.value)}
+                                            placeholder="Min - Max"
+                                            required
+                                        />
+                                    </div>
+                                    <div className="col-span-2">
+                                        <label className="text-xs font-medium text-gray-500 mb-1 block">Interpretation</label>
+                                        <Input
+                                            value={row.interpretation}
+                                            onChange={e => updateRow(index, 'interpretation', e.target.value)}
+                                            placeholder="Normal/High"
+                                            required
+                                        />
+                                    </div>
+                                    <div className="col-span-1 pt-6 text-center">
+                                        {results.length > 1 && (
+                                            <Button type="button" variant="ghost" size="sm" className="text-red-500" onClick={() => handleRemoveRow(index)}>
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-6">
+                        <div>
+                            <h3 className="text-lg font-medium mb-2">Technician Details</h3>
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Medical Technologist *</label>
+                                    <Input
+                                        required
+                                        value={medTech}
+                                        onChange={e => setMedTech(e.target.value)}
+                                        placeholder="Name of MedTech"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">PRC Number *</label>
+                                    <Input
+                                        required
+                                        value={prcNumber}
+                                        onChange={e => setPrcNumber(e.target.value)}
+                                        placeholder="License Number"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-medium mb-2">Remarks / Conclusion</h3>
+                            <Textarea
+                                className="h-32"
+                                value={overallRemarks}
+                                onChange={e => setOverallRemarks(e.target.value)}
+                                placeholder="Overall clinical interpretation or remarks..."
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-4 border-t">
+                        <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+                        <Button type="submit" className="bg-green-600 hover:bg-green-700">Finalize & Submit Results</Button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
