@@ -15,7 +15,7 @@ import Pharmacy from "./pages/Pharmacy";
 
 import Monitoring from "./pages/Monitoring";
 import Discharge from "./pages/Discharge";
-import Inventory from "./pages/Inventory";
+
 
 import AdmissionPage from "./pages/Admission";
 
@@ -53,7 +53,7 @@ const tabs = [
   { id: 'appointments', name: 'Appointments', icon: <Calendar className="w-4 h-4" /> },
   { id: 'monitoring', name: 'Monitoring', icon: <Activity className="w-4 h-4" /> },
   { id: 'discharge', name: 'Discharge', icon: <UserX className="w-4 h-4" /> },
-  { id: 'inventory', name: 'Inventory', icon: <Package className="w-4 h-4" /> },
+
 
   { id: 'statistics', name: 'Statistics', icon: <BarChart3 className="w-4 h-4" /> },
   { id: 'erp', name: 'ERP', icon: <Building2 className="w-4 h-4" /> },
@@ -89,8 +89,7 @@ const AppContent = () => {
       setActiveTab('monitoring');
     } else if (path === '/discharge') {
       setActiveTab('discharge');
-    } else if (path === '/inventory') {
-      setActiveTab('inventory');
+
 
     } else if (path === '/statistics') {
       setActiveTab('statistics');
@@ -121,8 +120,7 @@ const AppContent = () => {
         return <Monitoring />;
       case 'discharge':
         return <Discharge />;
-      case 'inventory':
-        return <Inventory />;
+
 
       case 'statistics':
         return <div className="p-6">Statistics Module (Coming Soon)</div>;
@@ -172,7 +170,7 @@ const App = () => (
               <Route path="/appointments" element={<AppContent />} />
               <Route path="/monitoring" element={<AppContent />} />
               <Route path="/discharge" element={<AppContent />} />
-              <Route path="/inventory" element={<AppContent />} />
+
 
               <Route path="/statistics" element={<AppContent />} />
               <Route path="/erp" element={<AppContent />} />

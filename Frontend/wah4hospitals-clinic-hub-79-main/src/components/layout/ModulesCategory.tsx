@@ -83,9 +83,9 @@ const ModulesCategory = () => {
       ]
     },
     {
-      name: "Inventory & Billing",
+      name: "Financial",
       modules: [
-        { id: 'inventory', name: 'Inventory', icon: <Package className="w-4 h-4" />, description: "Supplies management" },
+
         { id: 'billing', name: 'Billing', icon: <FileText className="w-4 h-4" />, description: "Financial management" }
       ]
     },

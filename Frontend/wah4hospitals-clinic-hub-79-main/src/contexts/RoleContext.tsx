@@ -25,10 +25,10 @@ export const useRole = () => {
 // Role access configuration - strict role-based access
 const roleAccessConfig: Record<UserRole, string[]> = {
   'doctor': ['dashboard', 'patients', 'admission', 'monitoring', 'discharge', 'philhealth', 'settings'],
-  'nurse': ['dashboard', 'patients', 'admission', 'monitoring', 'inventory', 'appointments', 'settings'],
-  'pharmacist': ['dashboard', 'pharmacy', 'inventory', 'settings'],
+  'nurse': ['dashboard', 'patients', 'admission', 'monitoring', 'appointments', 'settings'],
+  'pharmacist': ['dashboard', 'pharmacy', 'settings'],
   'lab-technician': ['dashboard', 'monitoring', 'settings'],
-  'administrator': ['dashboard', 'patients', 'admission', 'philhealth', 'pharmacy', 'appointments', 'monitoring', 'discharge', 'inventory', 'billing', 'settings'],
+  'administrator': ['dashboard', 'patients', 'admission', 'philhealth', 'pharmacy', 'appointments', 'monitoring', 'discharge', 'billing', 'settings'],
   'radiologist': ['dashboard', 'monitoring', 'patients', 'settings'],
   'billing-staff': ['dashboard', 'philhealth', 'erp', 'billing', 'settings']
 };
