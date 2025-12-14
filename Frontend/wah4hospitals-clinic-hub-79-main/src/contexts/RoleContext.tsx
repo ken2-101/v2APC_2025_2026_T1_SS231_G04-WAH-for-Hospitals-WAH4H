@@ -24,11 +24,11 @@ export const useRole = () => {
 
 // Role access configuration - strict role-based access
 const roleAccessConfig: Record<UserRole, string[]> = {
-  'doctor': ['dashboard', 'patients', 'admission', 'monitoring', 'discharge', 'philhealth', 'settings'],
-  'nurse': ['dashboard', 'patients', 'admission', 'monitoring', 'appointments', 'settings'],
-  'pharmacist': ['dashboard', 'pharmacy', 'settings'],
-  'lab-technician': ['dashboard', 'monitoring', 'settings'],
-  'administrator': ['dashboard', 'patients', 'admission', 'philhealth', 'pharmacy', 'appointments', 'monitoring', 'discharge', 'billing', 'settings'],
+  'doctor': ['dashboard', 'patients', 'admission', 'laboratory', 'monitoring', 'discharge', 'philhealth', 'settings'],
+  'nurse': ['dashboard', 'patients', 'admission', 'laboratory', 'monitoring', 'inventory', 'appointments', 'settings'],
+  'pharmacist': ['dashboard', 'pharmacy', 'inventory', 'compliance', 'settings'],
+  'lab-technician': ['dashboard', 'laboratory', 'monitoring', 'compliance', 'settings'],
+  'administrator': ['dashboard', 'patients', 'admission', 'laboratory', 'philhealth', 'pharmacy', 'appointments', 'monitoring', 'discharge', 'inventory', 'compliance', 'billing', 'settings'],
   'radiologist': ['dashboard', 'monitoring', 'patients', 'settings'],
   'billing-staff': ['dashboard', 'philhealth', 'erp', 'billing', 'settings']
 };
@@ -68,7 +68,7 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
   useEffect(() => {
     if (isAdminMode && currentRole === 'administrator') {
       // Only administrators can enable admin mode for full access
-      setAvailableTabs(['dashboard', 'patients', 'admission', 'philhealth', 'pharmacy', 'appointments', 'monitoring', 'discharge', 'inventory', 'compliance', 'statistics', 'erp', 'billing', 'settings']);
+      setAvailableTabs(['dashboard', 'patients', 'admission', 'laboratory', 'philhealth', 'pharmacy', 'appointments', 'monitoring', 'discharge', 'inventory', 'compliance', 'statistics', 'erp', 'billing', 'settings']);
     } else {
       // Always use role-based access
       setAvailableTabs(roleAccessConfig[currentRole] || []);

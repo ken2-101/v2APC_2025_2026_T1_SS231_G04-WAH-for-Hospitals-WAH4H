@@ -12,6 +12,7 @@ import ModernDashboard from "@/pages/ModernDashboard";
 import PatientRegistration from "./pages/PatientRegistration";
 import PhilHealthClaims from "./pages/PhilHealthClaims";
 import Pharmacy from "./pages/Pharmacy";
+import Laboratory from "./pages/Laboratory";
 
 import Monitoring from "./pages/Monitoring";
 import Discharge from "./pages/Discharge";
@@ -39,7 +40,8 @@ import {
   Settings as SettingsIcon,
   Receipt,
   Bed,
-  Pill
+  Pill,
+  TestTube
 } from 'lucide-react';
 
 const queryClient = new QueryClient();
@@ -50,6 +52,7 @@ const tabs = [
   { id: 'admission', name: 'Admission', icon: <Bed className="w-4 h-4" /> },
   { id: 'philhealth', name: 'PhilHealth', icon: <FileText className="w-4 h-4" /> },
   { id: 'pharmacy', name: 'Pharmacy', icon: <Pill className="w-4 h-4" /> },
+  { id: 'laboratory', name: 'Laboratory', icon: <TestTube className="w-4 h-4" /> },
   { id: 'appointments', name: 'Appointments', icon: <Calendar className="w-4 h-4" /> },
   { id: 'monitoring', name: 'Monitoring', icon: <Activity className="w-4 h-4" /> },
   { id: 'discharge', name: 'Discharge', icon: <UserX className="w-4 h-4" /> },
@@ -83,6 +86,8 @@ const AppContent = () => {
       setActiveTab('philhealth');
     } else if (path === '/pharmacy') {
       setActiveTab('pharmacy');
+    } else if (path === '/laboratory') {
+      setActiveTab('laboratory');
     } else if (path === '/appointments') {
       setActiveTab('appointments');
     } else if (path === '/monitoring') {
@@ -114,6 +119,8 @@ const AppContent = () => {
         return <PhilHealthClaims />;
       case 'pharmacy':
         return <Pharmacy />;
+      case 'laboratory':
+        return <Laboratory />;
       case 'appointments':
         return <div className="p-6">Appointments Module (Coming Soon)</div>;
       case 'monitoring':
@@ -167,6 +174,7 @@ const App = () => (
               <Route path="/philhealth" element={<AppContent />} />
               <Route path="/philhealth-claims" element={<AppContent />} />
               <Route path="/pharmacy" element={<AppContent />} />
+              <Route path="/laboratory" element={<AppContent />} />
               <Route path="/appointments" element={<AppContent />} />
               <Route path="/monitoring" element={<AppContent />} />
               <Route path="/discharge" element={<AppContent />} />
