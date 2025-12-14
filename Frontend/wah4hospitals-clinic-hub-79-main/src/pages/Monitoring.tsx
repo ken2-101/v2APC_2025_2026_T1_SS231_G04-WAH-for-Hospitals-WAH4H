@@ -1,242 +1,161 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Activity, Heart, Thermometer, Droplet, Plus, Edit, Eye } from 'lucide-react';
-import { PatientMonitoringForm } from '@/components/monitoring/PatientMonitoringForm';
+import { MonitoringPatient, VitalSign, ClinicalNote, DietaryOrder, HistoryEvent } from '../types/monitoring';
+import { MonitoringDashboard } from '@/components/monitoring/MonitoringDashboard';
+import { PatientMonitoringPage } from '@/components/monitoring/PatientMonitoringPage';
 
 const Monitoring = () => {
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [formMode, setFormMode] = useState<'view' | 'edit' | 'add'>('add');
-  const [selectedPatient, setSelectedPatient] = useState<any>(null);
-  const [monitoringData, setMonitoringData] = useState([
+  const [currentView, setCurrentView] = useState<'dashboard' | 'patient'>('dashboard');
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+
+  // --- Mock Data Store ---
+
+  const [patients, setPatients] = useState<MonitoringPatient[]>([
     {
-      id: '1',
+      id: 'P-101',
       patientName: 'Juan Dela Cruz',
-      room: '201A',
-      heartRate: '75',
-      bloodPressure: '130/85',
-      temperature: '36.8',
-      oxygenSat: '98',
-      lastUpdated: '10:30 AM',
-      // Full monitoring data for view/edit
-      patientId: 'P001',
-      dateTime: '2024-06-11T10:30',
-      patientIdentification: {
-        id: 'P001',
-        name: 'Juan Dela Cruz',
-        age: '45',
-        gender: 'Male'
-      },
-      vitalSigns: {
-        heartRate: '75',
-        bloodPressure: '130/85',
-        temperature: '36.8',
-        respiratoryRate: '18'
-      },
-      painScore: '3',
-      intakeOutput: {
-        intake: '1200',
-        output: '800'
-      },
-      levelOfConsciousness: 'alert',
-      oxygenSaturation: '98',
-      respiratoryPattern: 'Regular',
-      ivLineStatus: {
-        status: 'patent',
-        siteCondition: 'Good'
-      },
-      medicationIntake: 'Paracetamol 500mg taken at 8:00 AM',
-      dietaryIntake: 'Full breakfast consumed',
-      nursingNotes: 'Patient is stable and cooperative. Vital signs within normal limits.',
-      staffSignature: 'Nurse Maria Santos'
+      room: '201-A',
+      doctorName: 'Dr. Santos',
+      nurseName: 'Nurse Joy',
+      status: 'Stable',
+      lastVitals: { id: 'v1', dateTime: '2024-06-12T08:00:00', bloodPressure: '120/80', heartRate: 72, respiratoryRate: 16, temperature: 36.5, oxygenSaturation: 98, staffName: 'Nurse Joy' },
+      lastNote: { id: 'n1', dateTime: '2024-06-12T09:00:00', type: 'Progress', subjective: '', objective: '', assessment: 'Stable condition', plan: '', providerName: 'Dr. Santos' }
+    },
+    {
+      id: 'P-102',
+      patientName: 'Maria Clara',
+      room: 'ICU-05',
+      doctorName: 'Dr. Rizal',
+      nurseName: 'Nurse Glaiza',
+      status: 'Critical',
+      lastVitals: { id: 'v2', dateTime: '2024-06-12T10:30:00', bloodPressure: '160/95', heartRate: 105, respiratoryRate: 24, temperature: 38.2, oxygenSaturation: 92, staffName: 'Nurse Glaiza' },
+      lastNote: { id: 'n2', dateTime: '2024-06-12T11:00:00', type: 'SOAP', subjective: 'Difficulty breathing', objective: 'Low O2, High Feber', assessment: 'Sepsis alert', plan: 'Start antibiotics', providerName: 'Dr. Rizal' }
     }
   ]);
 
-  const handleAddPatient = () => {
-    setSelectedPatient(null);
-    setFormMode('add');
-    setIsFormOpen(true);
+  const [vitalsMap, setVitalsMap] = useState<Record<string, VitalSign[]>>({
+    'P-101': [
+      { id: 'v1', dateTime: '2024-06-12T08:00:00', bloodPressure: '120/80', heartRate: 72, respiratoryRate: 16, temperature: 36.5, oxygenSaturation: 98, staffName: 'Nurse Joy' },
+      { id: 'v0', dateTime: '2024-06-11T20:00:00', bloodPressure: '118/78', heartRate: 70, respiratoryRate: 15, temperature: 36.6, oxygenSaturation: 99, staffName: 'Nurse Night' }
+    ],
+    'P-102': [
+      { id: 'v2', dateTime: '2024-06-12T10:30:00', bloodPressure: '160/95', heartRate: 105, respiratoryRate: 24, temperature: 38.2, oxygenSaturation: 92, staffName: 'Nurse Glaiza' }
+    ]
+  });
+
+  const [notesMap, setNotesMap] = useState<Record<string, ClinicalNote[]>>({
+    'P-101': [
+      { id: 'n1', dateTime: '2024-06-12T09:00:00', type: 'Progress', subjective: '', objective: '', assessment: 'Stable condition', plan: 'Continue meds', providerName: 'Dr. Santos' }
+    ],
+    'P-102': [
+      { id: 'n2', dateTime: '2024-06-12T11:00:00', type: 'SOAP', subjective: 'Difficulty breathing', objective: 'Low O2, High Fever', assessment: 'Sepsis alert', plan: 'Start antibiotics', providerName: 'Dr. Rizal' }
+    ]
+  });
+
+  const [dietaryMap, setDietaryMap] = useState<Record<string, DietaryOrder>>({
+    'P-101': { dietType: 'Regular', allergies: [], npoResponse: false, activityLevel: 'Ad Lib', lastUpdated: '2024-06-10T10:00:00', orderedBy: 'Dr. Santos' },
+    'P-102': { dietType: 'N/A', allergies: ['Penicillin'], npoResponse: true, activityLevel: 'Bed Rest', lastUpdated: '2024-06-12T08:00:00', orderedBy: 'Dr. Rizal' }
+  });
+
+  const [historyMap, setHistoryMap] = useState<Record<string, HistoryEvent[]>>({
+    'P-101': [
+      { id: 'h1', dateTime: '2024-06-10T08:00:00', category: 'Admission', description: 'Patient admitted for observation', details: 'Room 201-A' },
+      { id: 'h2', dateTime: '2024-06-12T08:00:00', category: 'Vitals', description: 'Routine Vitals Check' },
+      { id: 'h3', dateTime: '2024-06-12T09:00:00', category: 'Note', description: 'Dr. Santos Rounds' }
+    ]
+  });
+
+  // --- Handlers ---
+
+  const handleSelectPatient = (p: MonitoringPatient) => {
+    setSelectedPatientId(p.id);
+    setCurrentView('patient');
   };
 
-  const handleViewPatient = (patient: any) => {
-    setSelectedPatient(patient);
-    setFormMode('view');
-    setIsFormOpen(true);
+  const handleAddVital = (newVital: VitalSign) => {
+    if (!selectedPatientId) return;
+
+    // Update local map
+    const currentList = vitalsMap[selectedPatientId] || [];
+    const newList = [...currentList, newVital];
+    setVitalsMap({ ...vitalsMap, [selectedPatientId]: newList });
+
+    // Update Patient List Summary
+    setPatients(prev => prev.map(p =>
+      p.id === selectedPatientId ? { ...p, lastVitals: newVital } : p
+    ));
+
+    // Add to history
+    handleAddHistory(selectedPatientId, {
+      id: Date.now().toString(),
+      dateTime: newVital.dateTime,
+      category: 'Vitals',
+      description: `Vitals Recorded: BP ${newVital.bloodPressure}`,
+      details: `Recorded by ${newVital.staffName}`
+    });
   };
 
-  const handleEditPatient = (patient: any) => {
-    setSelectedPatient(patient);
-    setFormMode('edit');
-    setIsFormOpen(true);
+  const handleAddNote = (newNote: ClinicalNote) => {
+    if (!selectedPatientId) return;
+
+    const currentList = notesMap[selectedPatientId] || [];
+    setNotesMap({ ...notesMap, [selectedPatientId]: [...currentList, newNote] });
+
+    setPatients(prev => prev.map(p =>
+      p.id === selectedPatientId ? { ...p, lastNote: newNote } : p
+    ));
+
+    handleAddHistory(selectedPatientId, {
+      id: Date.now().toString(),
+      dateTime: newNote.dateTime,
+      category: 'Note',
+      description: `${newNote.type} Note Added`,
+      details: `By ${newNote.providerName}`
+    });
   };
 
-  const handleSaveMonitoring = (data: any) => {
-    if (formMode === 'add') {
-      const newPatient = {
-        ...data,
-        id: Date.now().toString(),
-        // Sync quick view values with detailed data
-        heartRate: data.vitalSigns.heartRate,
-        bloodPressure: data.vitalSigns.bloodPressure,
-        temperature: data.vitalSigns.temperature,
-        oxygenSat: data.oxygenSaturation,
-        lastUpdated: new Date().toLocaleTimeString('en-US', {
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true
-        })
-      };
-      setMonitoringData(prev => [...prev, newPatient]);
-    } else if (formMode === 'edit') {
-      setMonitoringData(prev => prev.map(item => {
-        if (item.id === selectedPatient?.id) {
-          return {
-            ...item,
-            ...data,
-            // Sync quick view values with detailed data
-            heartRate: data.vitalSigns.heartRate,
-            bloodPressure: data.vitalSigns.bloodPressure,
-            temperature: data.vitalSigns.temperature,
-            oxygenSat: data.oxygenSaturation,
-            lastUpdated: new Date().toLocaleTimeString('en-US', {
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true
-            })
-          };
-        }
-        return item;
-      }));
+  const handleUpdateDietary = (order: DietaryOrder) => {
+    if (!selectedPatientId) return;
+    setDietaryMap({ ...dietaryMap, [selectedPatientId]: order });
+
+    handleAddHistory(selectedPatientId, {
+      id: Date.now().toString(),
+      dateTime: order.lastUpdated,
+      category: 'Procedure', // Using procedure icon for generic updates or create new category
+      description: 'Dietary Orders Updated',
+      details: `Diet: ${order.dietType}, NPO: ${order.npoResponse ? 'Yes' : 'No'}`
+    });
+  };
+
+  const handleAddHistory = (pid: string, event: HistoryEvent) => {
+    const currentHistory = historyMap[pid] || [];
+    setHistoryMap({ ...historyMap, [pid]: [...currentHistory, event] });
+  };
+
+
+  if (currentView === 'patient' && selectedPatientId) {
+    const patient = patients.find(p => p.id === selectedPatientId);
+    if (patient) {
+      return (
+        <PatientMonitoringPage
+          patient={patient}
+          vitals={vitalsMap[selectedPatientId] || []}
+          notes={notesMap[selectedPatientId] || []}
+          history={historyMap[selectedPatientId] || []}
+          dietaryOrder={dietaryMap[selectedPatientId]}
+          onBack={() => setCurrentView('dashboard')}
+          onAddVital={handleAddVital}
+          onAddNote={handleAddNote}
+          onUpdateDietary={handleUpdateDietary}
+        />
+      );
     }
-    setIsFormOpen(false);
-  };
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Patient Monitoring</h1>
-          <p className="text-gray-600">Monitor patient vital signs and health metrics</p>
-        </div>
-        <Button onClick={handleAddPatient} className="bg-blue-600 hover:bg-blue-700">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Patient to Monitoring
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                <Heart className="w-6 h-6 text-red-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Heart Rate</p>
-                <p className="text-2xl font-bold text-gray-900">72 BPM</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Activity className="w-6 h-6 text-blue-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Blood Pressure</p>
-                <p className="text-2xl font-bold text-gray-900">120/80</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                <Thermometer className="w-6 h-6 text-orange-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Temperature</p>
-                <p className="text-2xl font-bold text-gray-900">36.5°C</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <Droplet className="w-6 h-6 text-green-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Oxygen Sat</p>
-                <p className="text-2xl font-bold text-gray-900">98%</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Active Patients</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4 overflow-x-auto sm:overflow-visible">
-            {monitoringData.map((patient) => (
-              <div 
-                key={patient.id}
-                className="flex items-center justify-between p-4 border rounded-lg
-                  hover:bg-gray-50 min-w-[600px] sm:win-w-0">
-                <div>
-                  <p className="font-medium">{patient.patientName} - Room {patient.room}</p>
-                  <p className="text-sm text-gray-500">Last updated: {patient.lastUpdated}</p>
-                </div>
-                <div className="flex items-center space-x-4">
-                  <div className="flex space-x-4 text-sm">
-                    <span>HR: {patient.heartRate}</span>
-                    <span>BP: {patient.bloodPressure}</span>
-                    <span>Temp: {patient.temperature}°C</span>
-                    <span>O2: {patient.oxygenSat}%</span>
-                  </div>
-                  <div className="flex space-x-2">
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => handleViewPatient(patient)}
-                    >
-                      <Eye className="w-4 h-4 mr-1" />
-                      View
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => handleEditPatient(patient)}
-                    >
-                      <Edit className="w-4 h-4 mr-1" />
-                      Edit
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <PatientMonitoringForm
-        isOpen={isFormOpen}
-        onClose={() => setIsFormOpen(false)}
-        mode={formMode}
-        data={selectedPatient}
-        onSave={handleSaveMonitoring}
-      />
-    </div>
+    <MonitoringDashboard
+      patients={patients}
+      onSelectPatient={handleSelectPatient}
+    />
   );
 };
 
