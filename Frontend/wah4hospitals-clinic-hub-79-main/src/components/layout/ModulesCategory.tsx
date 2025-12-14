@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { 
+import {
   NavigationMenu,
   NavigationMenuContent,
   NavigationMenuItem,
@@ -9,17 +9,17 @@ import {
   NavigationMenuTrigger,
 } from "@/components/ui/navigation-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  LayoutDashboard, 
-  UserPlus, 
-  FileText, 
-  Calendar, 
-  Activity, 
-  UserX, 
-  Package, 
-  Shield, 
-  BarChart3, 
-  Building2, 
+import {
+  LayoutDashboard,
+  UserPlus,
+  FileText,
+  Calendar,
+  Activity,
+  UserX,
+  Package,
+  Shield,
+  BarChart3,
+  Building2,
   Settings,
   Users,
   HeartPulse,
@@ -42,7 +42,7 @@ interface ModuleCardProps {
 }
 
 const ModuleCard: React.FC<ModuleCardProps> = ({ id, name, icon, description, onClick }) => (
-  <Card 
+  <Card
     className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105"
     onClick={onClick}
   >
@@ -83,10 +83,9 @@ const ModulesCategory = () => {
       ]
     },
     {
-      name: "Inventory & Compliance",
+      name: "Inventory & Billing",
       modules: [
         { id: 'inventory', name: 'Inventory', icon: <Package className="w-4 h-4" />, description: "Supplies management" },
-        { id: 'compliance', name: 'Compliance', icon: <Shield className="w-4 h-4" />, description: "Regulatory compliance" },
         { id: 'billing', name: 'Billing', icon: <FileText className="w-4 h-4" />, description: "Financial management" }
       ]
     },
@@ -112,14 +111,14 @@ const ModulesCategory = () => {
           <TabsTrigger value="by-category">By Category</TabsTrigger>
           <TabsTrigger value="all-modules">All Modules</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="by-category" className="mt-6">
           <div className="space-y-8">
             {moduleCategories.map((category) => {
               const filteredModules = category.modules.filter(module => availableTabs.includes(module.id));
-                
+
               if (filteredModules.length === 0) return null;
-              
+
               return (
                 <div key={category.name}>
                   <h3 className="text-lg font-semibold text-primary mb-4 flex items-center">
@@ -145,7 +144,7 @@ const ModulesCategory = () => {
             })}
           </div>
         </TabsContent>
-        
+
         <TabsContent value="all-modules" className="mt-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {moduleCategories.flatMap(category => {

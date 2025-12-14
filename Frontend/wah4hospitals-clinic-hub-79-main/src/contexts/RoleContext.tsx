@@ -26,9 +26,9 @@ export const useRole = () => {
 const roleAccessConfig: Record<UserRole, string[]> = {
   'doctor': ['dashboard', 'patients', 'admission', 'monitoring', 'discharge', 'philhealth', 'settings'],
   'nurse': ['dashboard', 'patients', 'admission', 'monitoring', 'inventory', 'appointments', 'settings'],
-  'pharmacist': ['dashboard', 'pharmacy', 'inventory', 'compliance', 'settings'],
-  'lab-technician': ['dashboard', 'monitoring', 'compliance', 'settings'],
-  'administrator': ['dashboard', 'patients', 'admission', 'philhealth', 'pharmacy', 'appointments', 'monitoring', 'discharge', 'inventory', 'compliance', 'billing', 'settings'],
+  'pharmacist': ['dashboard', 'pharmacy', 'inventory', 'settings'],
+  'lab-technician': ['dashboard', 'monitoring', 'settings'],
+  'administrator': ['dashboard', 'patients', 'admission', 'philhealth', 'pharmacy', 'appointments', 'monitoring', 'discharge', 'inventory', 'billing', 'settings'],
   'radiologist': ['dashboard', 'monitoring', 'patients', 'settings'],
   'billing-staff': ['dashboard', 'philhealth', 'erp', 'billing', 'settings']
 };
