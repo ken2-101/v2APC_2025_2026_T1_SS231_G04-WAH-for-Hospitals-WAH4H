@@ -118,3 +118,6 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.AllowAny",  # adjust for production
     ]
 }
+
+# Use custom user model
+AUTH_USER_MODEL = "accounts.User"

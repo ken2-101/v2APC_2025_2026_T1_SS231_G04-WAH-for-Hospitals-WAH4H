@@ -2,9 +2,12 @@ from rest_framework import generics, status
 from rest_framework.response import Response
 from .serializers import RegisterSerializer, LoginSerializer
 from django.contrib.auth import login as django_login
+from django.contrib.auth import get_user_model
 
+User = get_user_model() 
 # Registration API
 class RegisterAPIView(generics.CreateAPIView):
+    queryset = User.objects.all()
     serializer_class = RegisterSerializer
 
     def create(self, request, *args, **kwargs):

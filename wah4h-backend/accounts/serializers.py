@@ -1,50 +1,64 @@
-from rest_framework import generics, status
-from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
-from django.contrib.auth import get_user_model
-
-from .serializers import RegisterSerializer, LoginSerializer
+from rest_framework import serializers
+from django.contrib.auth import get_user_model, authenticate
 
 User = get_user_model()
 
-# Registration API
-class RegisterAPIView(generics.CreateAPIView):
-    serializer_class = RegisterSerializer
-    permission_classes = [AllowAny]
 
-    def post(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
-        return Response({
-            "message": "User registered successfully",
-            "user": {
-                "id": user.id,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "email": user.email,
-                "role": getattr(user, "role", None)
-            }
-        }, status=status.HTTP_201_CREATED)
+class RegisterSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
+    confirm_password = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = User
+        fields = [
+            "email",
+            "password",
+            "confirm_password",
+            "first_name",
+            "last_name",
+            "role",
+        ]
+
+    def validate(self, attrs):
+        if attrs["password"] != attrs["confirm_password"]:
+            raise serializers.ValidationError(
+                {"password": "Passwords must match."}
+            )
+        return attrs
+
+    def create(self, validated_data):
+        validated_data.pop("confirm_password")
+
+        user = User.objects.create_user(
+            email=validated_data["email"],
+            password=validated_data["password"],
+            first_name=validated_data.get("first_name", ""),
+            last_name=validated_data.get("last_name", ""),
+            role=validated_data.get("role", "admin"),
+        )
+
+        return user
 
 
-# Login API
-class LoginAPIView(generics.GenericAPIView):
-    serializer_class = LoginSerializer
-    permission_classes = [AllowAny]
+class LoginSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
 
-    def post(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.validated_data['user']
-        # Optionally generate a token here if you are using DRF TokenAuthentication or JWT
-        return Response({
-            "message": "Login successful",
-            "user": {
-                "id": user.id,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "email": user.email,
-                "role": getattr(user, "role", None)
-            }
-        }, status=status.HTTP_200_OK)
+    def validate(self, attrs):
+        email = attrs.get("email")
+        password = attrs.get("password")
+
+        # IMPORTANT FIX: use username=email
+        user = authenticate(
+            username=email,
+            password=password
+        )
+
+        if not user:
+            raise serializers.ValidationError("Invalid credentials")
+
+        if not user.is_active:
+            raise serializers.ValidationError("User account is disabled")
+
+        attrs["user"] = user
+        return attrs
