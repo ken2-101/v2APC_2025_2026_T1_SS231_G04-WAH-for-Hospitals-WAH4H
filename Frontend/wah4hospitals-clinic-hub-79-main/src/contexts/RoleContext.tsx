@@ -1,8 +1,14 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 
-export type UserRole = 'doctor' | 'nurse' | 'pharmacist' | 'lab-technician' | 'administrator' | 'radiologist' | 'billing-staff';
+export type UserRole =
+  | 'doctor'
+  | 'nurse'
+  | 'pharmacist'
+  | 'lab-technician'
+  | 'administrator'
+  | 'radiologist'
+  | 'billing-staff';
 
 export interface RoleContextType {
   isAdminMode: boolean;
@@ -16,21 +22,22 @@ const RoleContext = createContext<RoleContextType | undefined>(undefined);
 
 export const useRole = () => {
   const context = useContext(RoleContext);
-  if (!context) {
-    throw new Error('useRole must be used within a RoleProvider');
-  }
+  if (!context) throw new Error('useRole must be used within a RoleProvider');
   return context;
 };
 
-// Role access configuration - strict role-based access
+// Role-based access configuration
 const roleAccessConfig: Record<UserRole, string[]> = {
-  'doctor': ['dashboard', 'patients', 'admission', 'laboratory', 'monitoring', 'discharge', 'philhealth', 'settings'],
-  'nurse': ['dashboard', 'patients', 'admission', 'laboratory', 'monitoring', 'inventory', 'appointments', 'settings'],
-  'pharmacist': ['dashboard', 'pharmacy', 'inventory', 'compliance', 'settings'],
+  doctor: ['dashboard', 'patients', 'admission', 'laboratory', 'monitoring', 'discharge', 'philhealth', 'settings'],
+  nurse: ['dashboard', 'patients', 'admission', 'laboratory', 'monitoring', 'inventory', 'appointments', 'settings'],
+  pharmacist: ['dashboard', 'pharmacy', 'inventory', 'compliance', 'settings'],
   'lab-technician': ['dashboard', 'laboratory', 'monitoring', 'compliance', 'settings'],
-  'administrator': ['dashboard', 'patients', 'admission', 'laboratory', 'philhealth', 'pharmacy', 'appointments', 'monitoring', 'discharge', 'inventory', 'compliance', 'billing', 'settings'],
-  'radiologist': ['dashboard', 'monitoring', 'patients', 'settings'],
-  'billing-staff': ['dashboard', 'philhealth', 'erp', 'billing', 'settings']
+  administrator: [
+    'dashboard', 'patients', 'admission', 'laboratory', 'philhealth', 'pharmacy',
+    'appointments', 'monitoring', 'discharge', 'inventory', 'compliance', 'billing', 'settings'
+  ],
+  radiologist: ['dashboard', 'monitoring', 'patients', 'settings'],
+  'billing-staff': ['dashboard', 'philhealth', 'erp', 'billing', 'settings'],
 };
 
 interface RoleProviderProps {
@@ -46,12 +53,7 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
   });
 
   const [currentRole, setCurrentRoleState] = useState<UserRole>(() => {
-    // Get role from authenticated user or fallback to localStorage
-    if (user?.role) {
-      return user.role;
-    }
-    const saved = localStorage.getItem('userRole');
-    return (saved as UserRole) || 'doctor';
+    return (user?.role as UserRole) || (localStorage.getItem('userRole') as UserRole) || 'doctor';
   });
 
   const [availableTabs, setAvailableTabs] = useState<string[]>([]);
@@ -64,47 +66,46 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
     }
   }, [user]);
 
-  // Update available tabs when role or admin mode changes
+  // Update available tabs whenever role or admin mode changes
   useEffect(() => {
     if (isAdminMode && currentRole === 'administrator') {
-      // Only administrators can enable admin mode for full access
-      setAvailableTabs(['dashboard', 'patients', 'admission', 'laboratory', 'philhealth', 'pharmacy', 'appointments', 'monitoring', 'discharge', 'inventory', 'compliance', 'statistics', 'erp', 'billing', 'settings']);
+      setAvailableTabs([
+        'dashboard', 'patients', 'admission', 'laboratory', 'philhealth', 'pharmacy',
+        'appointments', 'monitoring', 'discharge', 'inventory', 'compliance', 'statistics', 'erp', 'billing', 'settings'
+      ]);
     } else {
-      // Always use role-based access
       setAvailableTabs(roleAccessConfig[currentRole] || []);
     }
   }, [isAdminMode, currentRole]);
 
   const setAdminMode = (enabled: boolean) => {
-    // Only administrators can enable admin mode
     if (enabled && currentRole !== 'administrator') {
       console.warn('Only administrators can enable admin mode');
       return;
     }
-
     setIsAdminMode(enabled);
     localStorage.setItem('adminMode', JSON.stringify(enabled));
   };
 
   const setCurrentRole = (role: UserRole) => {
-    // Users cannot change their role - it's determined by their account
     if (user?.role && role !== user.role) {
       console.warn('Cannot change role - role is determined by user account');
       return;
     }
-
     setCurrentRoleState(role);
     localStorage.setItem('userRole', role);
   };
 
   return (
-    <RoleContext.Provider value={{
-      isAdminMode,
-      currentRole,
-      availableTabs,
-      setAdminMode,
-      setCurrentRole
-    }}>
+    <RoleContext.Provider
+      value={{
+        isAdminMode,
+        currentRole,
+        availableTabs,
+        setAdminMode,
+        setCurrentRole
+      }}
+    >
       {children}
     </RoleContext.Provider>
   );

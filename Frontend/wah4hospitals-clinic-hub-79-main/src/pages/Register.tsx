@@ -22,14 +22,14 @@ const Register = () => {
   const navigate = useNavigate();
   const { register, isLoading } = useAuth();
 
-  const roleOptions = [
+  const roleOptions: { value: UserRole; label: string }[] = [
     { value: 'doctor', label: 'Doctor' },
     { value: 'nurse', label: 'Nurse' },
     { value: 'pharmacist', label: 'Pharmacist' },
     { value: 'lab-technician', label: 'Lab Technician' },
     { value: 'radiologist', label: 'Radiologist' },
     { value: 'billing-staff', label: 'Billing Staff' },
-    { value: 'administrator', label: 'Administrator' }
+    { value: 'administrator', label: 'Administrator' },
   ];
 
   const handleRoleChange = (value: string) => {
@@ -38,48 +38,38 @@ const Register = () => {
 
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {};
-    
+
     if (!firstName.trim()) newErrors.firstName = 'First name is required';
     if (!lastName.trim()) newErrors.lastName = 'Last name is required';
-    if (!email) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(email)) {
-      newErrors.email = 'Please enter a valid email';
-    }
-    if (!password) {
-      newErrors.password = 'Password is required';
-    } else if (password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
-    }
-    if (!confirmPassword) {
-      newErrors.confirmPassword = 'Please confirm your password';
-    } else if (password !== confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
-    }
-    if (!role) {
-      newErrors.role = 'Please select your role';
-    }
-    
+    if (!email) newErrors.email = 'Email is required';
+    else if (!/\S+@\S+\.\S+/.test(email)) newErrors.email = 'Please enter a valid email';
+    if (!password) newErrors.password = 'Password is required';
+    else if (password.length < 6) newErrors.password = 'Password must be at least 6 characters';
+    if (!confirmPassword) newErrors.confirmPassword = 'Please confirm your password';
+    else if (password !== confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
+    if (!role) newErrors.role = 'Please select your role';
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
-    
+
+    // Call backend register API
     const success = await register({
       firstName,
       lastName,
       email,
       password,
       confirmPassword,
-      role: role as UserRole
+      role: role as UserRole,
     });
-    
+
     if (success) {
-      navigate('/login');
+      navigate('/login'); // Redirect to login after successful registration
     }
   };
 
@@ -91,7 +81,7 @@ const Register = () => {
             <UserPlus className="text-white w-8 h-8" />
           </div>
           <CardTitle className="text-2xl">Create Account</CardTitle>
-          <p className="text-gray-600">Join WAH4</p>
+          <p className="text-gray-600">Join WAH4H</p>
         </CardHeader>
         <CardContent className="space-y-4">
           <form onSubmit={handleRegister} className="space-y-4">
@@ -106,9 +96,7 @@ const Register = () => {
                   className={errors.firstName ? 'border-red-500' : ''}
                   placeholder="First name"
                 />
-                {errors.firstName && (
-                  <p className="text-sm text-red-500">{errors.firstName}</p>
-                )}
+                {errors.firstName && <p className="text-sm text-red-500">{errors.firstName}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="lastName">Last Name</Label>
@@ -120,9 +108,7 @@ const Register = () => {
                   className={errors.lastName ? 'border-red-500' : ''}
                   placeholder="Last name"
                 />
-                {errors.lastName && (
-                  <p className="text-sm text-red-500">{errors.lastName}</p>
-                )}
+                {errors.lastName && <p className="text-sm text-red-500">{errors.lastName}</p>}
               </div>
             </div>
 
@@ -136,9 +122,7 @@ const Register = () => {
                 className={errors.email ? 'border-red-500' : ''}
                 placeholder="Enter email"
               />
-              {errors.email && (
-                <p className="text-sm text-red-500">{errors.email}</p>
-              )}
+              {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
             </div>
 
             <div className="space-y-2">
@@ -155,9 +139,7 @@ const Register = () => {
                   ))}
                 </SelectContent>
               </Select>
-              {errors.role && (
-                <p className="text-sm text-red-500">{errors.role}</p>
-              )}
+              {errors.role && <p className="text-sm text-red-500">{errors.role}</p>}
             </div>
 
             <div className="space-y-2">
@@ -178,16 +160,10 @@ const Register = () => {
                   className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                   onClick={() => setShowPassword(!showPassword)}
                 >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4 text-gray-400" />
-                  ) : (
-                    <Eye className="h-4 w-4 text-gray-400" />
-                  )}
+                  {showPassword ? <EyeOff className="h-4 w-4 text-gray-400" /> : <Eye className="h-4 w-4 text-gray-400" />}
                 </Button>
               </div>
-              {errors.password && (
-                <p className="text-sm text-red-500">{errors.password}</p>
-              )}
+              {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
             </div>
 
             <div className="space-y-2">
@@ -208,23 +184,13 @@ const Register = () => {
                   className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                 >
-                  {showConfirmPassword ? (
-                    <EyeOff className="h-4 w-4 text-gray-400" />
-                  ) : (
-                    <Eye className="h-4 w-4 text-gray-400" />
-                  )}
+                  {showConfirmPassword ? <EyeOff className="h-4 w-4 text-gray-400" /> : <Eye className="h-4 w-4 text-gray-400" />}
                 </Button>
               </div>
-              {errors.confirmPassword && (
-                <p className="text-sm text-red-500">{errors.confirmPassword}</p>
-              )}
+              {errors.confirmPassword && <p className="text-sm text-red-500">{errors.confirmPassword}</p>}
             </div>
 
-            <Button 
-              type="submit" 
-              className="w-full bg-blue-600 hover:bg-blue-700"
-              disabled={isLoading}
-            >
+            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={isLoading}>
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -235,7 +201,7 @@ const Register = () => {
               )}
             </Button>
           </form>
-          
+
           <div className="text-center">
             <Button variant="link" onClick={() => navigate('/login')}>
               Already have an account? Sign in here
