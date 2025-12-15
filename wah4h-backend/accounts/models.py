@@ -3,9 +3,18 @@ from django.db import models
 
 class User(AbstractUser):
     email = models.EmailField(unique=True)
-    role = models.CharField(max_length=50, default="user")  # added role field
 
-    # Override groups to customize related_name
+    # Define roles
+    ROLE_CHOICES = [
+        ("admin", "Admin"),
+        ("doctor", "Doctor"),
+        ("nurse", "Nurse"),
+        ("lab_technician", "Lab Technician"),
+        ("pharmacist", "Pharmacist"),
+        ("billing_clerk", "Billing Clerk"),
+    ]
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="admin")
+
     groups = models.ManyToManyField(
         Group,
         related_name="accounts_users",
@@ -14,7 +23,6 @@ class User(AbstractUser):
         verbose_name="groups",
     )
 
-    # Override user_permissions to customize related_name
     user_permissions = models.ManyToManyField(
         Permission,
         related_name="accounts_users_permissions",
@@ -24,4 +32,4 @@ class User(AbstractUser):
     )
 
     def __str__(self):
-        return f"{self.username} ({self.email})"
+        return f"{self.username} ({self.role})"

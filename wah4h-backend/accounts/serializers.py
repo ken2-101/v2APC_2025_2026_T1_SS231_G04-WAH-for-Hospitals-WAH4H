@@ -1,39 +1,50 @@
-from rest_framework import serializers
-from django.contrib.auth import get_user_model, authenticate
-from django.contrib.auth.password_validation import validate_password
+from rest_framework import generics, status
+from rest_framework.response import Response
+from rest_framework.permissions import AllowAny
+from django.contrib.auth import get_user_model
+
+from .serializers import RegisterSerializer, LoginSerializer
 
 User = get_user_model()
 
-# Registration serializer
-class RegisterSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, min_length=6, validators=[validate_password])
-    confirm_password = serializers.CharField(write_only=True, min_length=6)
+# Registration API
+class RegisterAPIView(generics.CreateAPIView):
+    serializer_class = RegisterSerializer
+    permission_classes = [AllowAny]
 
-    class Meta:
-        model = User
-        fields = ['first_name', 'last_name', 'email', 'password', 'confirm_password', 'role']
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        return Response({
+            "message": "User registered successfully",
+            "user": {
+                "id": user.id,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "email": user.email,
+                "role": getattr(user, "role", None)
+            }
+        }, status=status.HTTP_201_CREATED)
 
-    def validate(self, attrs):
-        if attrs['password'] != attrs['confirm_password']:
-            raise serializers.ValidationError({"confirm_password": "Passwords do not match"})
-        return attrs
 
-    def create(self, validated_data):
-        validated_data.pop('confirm_password')
-        password = validated_data.pop('password')
-        user = User(**validated_data)
-        user.set_password(password)  # hash the password
-        user.save()
-        return user
+# Login API
+class LoginAPIView(generics.GenericAPIView):
+    serializer_class = LoginSerializer
+    permission_classes = [AllowAny]
 
-# Login serializer
-class LoginSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-    password = serializers.CharField(write_only=True)
-
-    def validate(self, attrs):
-        user = authenticate(email=attrs['email'], password=attrs['password'])
-        if not user:
-            raise serializers.ValidationError({"non_field_errors": "Invalid credentials"})
-        attrs['user'] = user
-        return attrs
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.validated_data['user']
+        # Optionally generate a token here if you are using DRF TokenAuthentication or JWT
+        return Response({
+            "message": "Login successful",
+            "user": {
+                "id": user.id,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "email": user.email,
+                "role": getattr(user, "role", None)
+            }
+        }, status=status.HTTP_200_OK)
