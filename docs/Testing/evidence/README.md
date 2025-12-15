@@ -1,0 +1,1 @@
+For this folder, photo evidences of the bugs or problems to be fixed with the system. 

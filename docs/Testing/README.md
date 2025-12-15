@@ -1,0 +1,1 @@
+This folder includes all the information one needed regarding the testing of the system WAH4Hospital. 
