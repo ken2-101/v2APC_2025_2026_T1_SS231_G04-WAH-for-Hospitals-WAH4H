@@ -1,11 +1,12 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model, authenticate
+from django.contrib.auth.password_validation import validate_password
 
 User = get_user_model()
 
 # Registration serializer
 class RegisterSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, min_length=6)
+    password = serializers.CharField(write_only=True, min_length=6, validators=[validate_password])
     confirm_password = serializers.CharField(write_only=True, min_length=6)
 
     class Meta:
@@ -19,7 +20,10 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data.pop('confirm_password')
-        user = User.objects.create_user(**validated_data)
+        password = validated_data.pop('password')
+        user = User(**validated_data)
+        user.set_password(password)  # hash the password
+        user.save()
         return user
 
 # Login serializer
@@ -30,6 +34,6 @@ class LoginSerializer(serializers.Serializer):
     def validate(self, attrs):
         user = authenticate(email=attrs['email'], password=attrs['password'])
         if not user:
-            raise serializers.ValidationError("Invalid credentials")
+            raise serializers.ValidationError({"non_field_errors": "Invalid credentials"})
         attrs['user'] = user
         return attrs
