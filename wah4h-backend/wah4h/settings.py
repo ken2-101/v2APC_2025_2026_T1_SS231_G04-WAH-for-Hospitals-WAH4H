@@ -16,13 +16,19 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Quick-start development settings - unsuitable for production
+# See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
+
+# SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = "django-insecure-rz74s8wlt7x+-10!5ky61@n4%7v*_o!$)fxe$e5@@8vh0kxo53"
+
+# SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
+
 ALLOWED_HOSTS = []
+
 
 # Application definition
 INSTALLED_APPS = [
-    # Django apps
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -30,7 +36,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
 
-    # Project apps
+    # Your apps
     "patients",
     "admissions",
     "monitoring",
@@ -73,6 +79,7 @@ TEMPLATES = [
 WSGI_APPLICATION = "wah4h.wsgi.application"
 
 # Database
+# Using SQLite for now; can switch to PostgreSQL for production
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
@@ -88,27 +95,26 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-# Custom User Model
-AUTH_USER_MODEL = "accounts.User"
-
 # Internationalization
 LANGUAGE_CODE = "en-us"
-TIME_ZONE = "Asia/Manila"
+TIME_ZONE = "Asia/Manila"  # Philippines timezone
 USE_I18N = True
 USE_TZ = True
 
-# Static & Media files
+# Static files (CSS, JavaScript, Images)
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Media files (uploads)
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 # CORS settings for React frontend
-CORS_ALLOW_ALL_ORIGINS = True  # Only for development
+CORS_ALLOW_ALL_ORIGINS = True  # only for development
 
-# Django REST Framework settings
+# Django REST Framework (you can customize as needed)
 REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.AllowAny",  # adjust in production
+        "rest_framework.permissions.AllowAny",  # adjust for production
     ]
 }
