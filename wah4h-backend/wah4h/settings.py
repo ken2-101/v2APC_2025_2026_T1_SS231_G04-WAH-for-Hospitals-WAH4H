@@ -95,8 +95,8 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 # CORS (development only)
 CORS_ALLOWED_ORIGINS = [
-    "https://crispy-system-px6qj9j4w5p2rj7-8080.app.github.dev",  # Frontend Codespace
-    "https://crispy-system-px6qj9j4w5p2rj7-8000.app.github.dev",  # Backend Codespace
+    "https://supreme-memory-5w9pg5gjv59379g7-8080.app.github.dev",  # Frontend Codespace
+    "https://supreme-memory-5w9pg5gjv59379g7-8000.app.github.dev",  # Backend Codespace
 ]
 CORS_ALLOW_CREDENTIALS = True  # Allow cookies if needed
 
