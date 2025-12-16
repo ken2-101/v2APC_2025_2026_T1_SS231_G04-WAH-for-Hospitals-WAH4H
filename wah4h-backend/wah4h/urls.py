@@ -6,4 +6,5 @@ urlpatterns = [
 
     # Include accounts app URLs
     path('accounts/', include('accounts.urls')),
+    path('api/', include('patients.urls')),
 ]
