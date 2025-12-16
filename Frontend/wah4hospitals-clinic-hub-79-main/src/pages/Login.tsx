@@ -17,50 +17,29 @@ const Login = () => {
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
-
-    if (!email) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(email)) {
-      newErrors.email = 'Please enter a valid email';
-    }
-
-    if (!password) {
-      newErrors.password = 'Password is required';
-    }
-
+    if (!email) newErrors.email = 'Email is required';
+    else if (!/\S+@\S+\.\S+/.test(email)) newErrors.email = 'Please enter a valid email';
+    if (!password) newErrors.password = 'Password is required';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isLoading) return;
-    if (!validateForm()) return;
+    if (!validateForm() || isLoading) return;
 
-    try {
-      const success = await login(email, password);
-      if (success) {
-        navigate('/dashboard');
-      }
-    } catch (err) {
-      console.error('Login error:', err);
-    }
+    const success = await login(email, password);
+    if (success) navigate('/dashboard');
   };
 
   const handleDemoLogin = async () => {
     if (isLoading) return;
-
-    try {
-      setEmail('demo@hospital.com');
-      setPassword('demo123');
-
-      const success = await login('demo@hospital.com', 'demo123');
-      if (success) {
-        navigate('/dashboard');
-      }
-    } catch (err) {
-      console.error('Demo login error:', err);
-    }
+    const demoEmail = 'demo@hospital.com';
+    const demoPassword = 'demo123';
+    setEmail(demoEmail);
+    setPassword(demoPassword);
+    const success = await login(demoEmail, demoPassword);
+    if (success) navigate('/dashboard');
   };
 
   const handleForgotPassword = () => {
@@ -135,12 +114,12 @@ const Login = () => {
             </Button>
           </form>
 
-          <div className="relative">
+          <div className="relative my-2">
             <div className="absolute inset-0 flex items-center">
               <span className="w-full border-t" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">Or</span>
+              <span className="bg-white px-2 text-gray-500">Or</span>
             </div>
           </div>
 
@@ -148,7 +127,7 @@ const Login = () => {
             Try Demo Account
           </Button>
 
-          <div className="text-center">
+          <div className="text-center mt-2">
             <Button variant="link" onClick={() => navigate('/register')}>
               Don't have an account? Register here
             </Button>
