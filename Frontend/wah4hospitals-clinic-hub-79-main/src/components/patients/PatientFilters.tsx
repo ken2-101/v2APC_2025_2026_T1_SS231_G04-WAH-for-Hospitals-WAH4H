@@ -24,12 +24,30 @@ interface PatientFiltersProps {
   hasActiveFilters: boolean;
 }
 
+// Predefined options for easier mapping
+const STATUS_OPTIONS = ['Active', 'Inactive'];
+const GENDER_OPTIONS = ['M', 'F'];
+const DEPARTMENT_OPTIONS = ['General Medicine', 'Cardiology', 'Pediatrics', 'Emergency'];
+const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Divorced', 'Widowed'];
+
 export const PatientFilters: React.FC<PatientFiltersProps> = ({
   activeFilters,
   handleFilterChange,
   clearFilters,
   hasActiveFilters
 }) => {
+  const renderCheckboxItems = (filterType: string, options: string[]) => {
+    return options.map(option => (
+      <DropdownMenuCheckboxItem
+        key={option}
+        checked={activeFilters[filterType as keyof typeof activeFilters].includes(option)}
+        onCheckedChange={() => handleFilterChange(filterType, option)}
+      >
+        {filterType === 'gender' ? (option === 'M' ? 'Male' : 'Female') : option}
+      </DropdownMenuCheckboxItem>
+    ));
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -43,86 +61,23 @@ export const PatientFilters: React.FC<PatientFiltersProps> = ({
           )}
         </Button>
       </DropdownMenuTrigger>
+
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel>Filter by Status</DropdownMenuLabel>
-        <DropdownMenuCheckboxItem
-          checked={activeFilters.status.includes('Active')}
-          onCheckedChange={() => handleFilterChange('status', 'Active')}
-        >
-          Active
-        </DropdownMenuCheckboxItem>
-        <DropdownMenuCheckboxItem
-          checked={activeFilters.status.includes('Inactive')}
-          onCheckedChange={() => handleFilterChange('status', 'Inactive')}
-        >
-          Inactive
-        </DropdownMenuCheckboxItem>
+        {renderCheckboxItems('status', STATUS_OPTIONS)}
         <DropdownMenuSeparator />
+
         <DropdownMenuLabel>Filter by Sex</DropdownMenuLabel>
-        <DropdownMenuCheckboxItem
-          checked={activeFilters.gender.includes('M')}
-          onCheckedChange={() => handleFilterChange('gender', 'M')}
-        >
-          Male
-        </DropdownMenuCheckboxItem>
-        <DropdownMenuCheckboxItem
-          checked={activeFilters.gender.includes('F')}
-          onCheckedChange={() => handleFilterChange('gender', 'F')}
-        >
-          Female
-        </DropdownMenuCheckboxItem>
+        {renderCheckboxItems('gender', GENDER_OPTIONS)}
         <DropdownMenuSeparator />
+
         <DropdownMenuLabel>Filter by Department</DropdownMenuLabel>
-        <DropdownMenuCheckboxItem
-          checked={activeFilters.department.includes('General Medicine')}
-          onCheckedChange={() => handleFilterChange('department', 'General Medicine')}
-        >
-          General Medicine
-        </DropdownMenuCheckboxItem>
-        <DropdownMenuCheckboxItem
-          checked={activeFilters.department.includes('Cardiology')}
-          onCheckedChange={() => handleFilterChange('department', 'Cardiology')}
-        >
-          Cardiology
-        </DropdownMenuCheckboxItem>
-        <DropdownMenuCheckboxItem
-          checked={activeFilters.department.includes('Pediatrics')}
-          onCheckedChange={() => handleFilterChange('department', 'Pediatrics')}
-        >
-          Pediatrics
-        </DropdownMenuCheckboxItem>
-        <DropdownMenuCheckboxItem
-          checked={activeFilters.department.includes('Emergency')}
-          onCheckedChange={() => handleFilterChange('department', 'Emergency')}
-        >
-          Emergency
-        </DropdownMenuCheckboxItem>
+        {renderCheckboxItems('department', DEPARTMENT_OPTIONS)}
         <DropdownMenuSeparator />
+
         <DropdownMenuLabel>Filter by Civil Status</DropdownMenuLabel>
-        <DropdownMenuCheckboxItem
-          checked={activeFilters.civilStatus.includes('Single')}
-          onCheckedChange={() => handleFilterChange('civilStatus', 'Single')}
-        >
-          Single
-        </DropdownMenuCheckboxItem>
-        <DropdownMenuCheckboxItem
-          checked={activeFilters.civilStatus.includes('Married')}
-          onCheckedChange={() => handleFilterChange('civilStatus', 'Married')}
-        >
-          Married
-        </DropdownMenuCheckboxItem>
-        <DropdownMenuCheckboxItem
-          checked={activeFilters.civilStatus.includes('Divorced')}
-          onCheckedChange={() => handleFilterChange('civilStatus', 'Divorced')}
-        >
-          Divorced
-        </DropdownMenuCheckboxItem>
-        <DropdownMenuCheckboxItem
-          checked={activeFilters.civilStatus.includes('Widowed')}
-          onCheckedChange={() => handleFilterChange('civilStatus', 'Widowed')}
-        >
-          Widowed
-        </DropdownMenuCheckboxItem>
+        {renderCheckboxItems('civilStatus', CIVIL_STATUS_OPTIONS)}
+
         {hasActiveFilters && (
           <>
             <DropdownMenuSeparator />

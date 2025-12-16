@@ -9,7 +9,7 @@ import { RoleProvider } from "@/contexts/RoleContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import ModernLayout from "@/components/layout/ModernLayout";
 import ModernDashboard from "@/pages/ModernDashboard";
-import PatientRegistration from "./pages/PatientRegistration";
+import { PatientRegistration } from './pages/PatientRegistration';
 import PhilHealthClaims from "./pages/PhilHealthClaims";
 import Pharmacy from "./pages/Pharmacy";
 import Laboratory from "./pages/Laboratory";

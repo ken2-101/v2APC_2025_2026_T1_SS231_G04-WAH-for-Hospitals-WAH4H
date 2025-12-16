@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { UserPlus, Search, X } from 'lucide-react';
+import { UserPlus, Search } from 'lucide-react';
 import { PatientDetailsModal } from '@/components/patients/PatientDetailsModal';
 import { PatientRegistrationModal } from '@/components/patients/PatientRegistrationModal';
 import { PatientTable } from '@/components/patients/PatientTable';
@@ -11,30 +10,23 @@ import { PatientFilters } from '@/components/patients/PatientFilters';
 import type { Patient, PatientFormData } from '../types/patient';
 import axios from 'axios';
 
-const PatientRegistration = () => {
+export const PatientRegistration: React.FC = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
+  const [filteredPatients, setFilteredPatients] = useState<Patient[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showRegistrationModal, setShowRegistrationModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
-  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
-  const [isRegistrationModalOpen, setIsRegistrationModalOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [activeFilters, setActiveFilters] = useState({
-    status: [] as string[],
-    gender: [] as string[],
-    department: [] as string[],
-    civilStatus: [] as string[],
-  });
 
   const [formData, setFormData] = useState<PatientFormData>({
     id: '',
     philhealth_id: '',
+    national_id: '',
     last_name: '',
     first_name: '',
     middle_name: '',
     suffix: '',
-    sex: 'M',
+    sex: '',
     date_of_birth: '',
     civil_status: '',
     nationality: '',
@@ -47,102 +39,92 @@ const PatientRegistration = () => {
     barangay: '',
     house_no_street: '',
     status: 'Active',
-    admission_date: new Date().toISOString().split('T')[0],
+    admission_date: '',
     department: '',
     room: '',
     physician: '',
     condition: '',
     occupation: '',
-    national_id: '',
     passport_number: '',
     drivers_license: '',
     senior_citizen_id: '',
-    pwd_id: '',
+    pwd_id: ''
   });
+
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [formSuccess, setFormSuccess] = useState('');
 
-  // Fetch patients from the Django backend
+  const [activeFilters, setActiveFilters] = useState({
+    status: [] as string[],
+    gender: [] as string[],
+    department: [] as string[],
+    civilStatus: [] as string[],
+  });
+
+  // Fetch patients on mount
   useEffect(() => {
-    const fetchPatients = async () => {
-      try {
-        const response = await axios.get<Patient[]>('http://localhost:8000/api/patients/');
-        setPatients(response.data);
-      } catch (err: any) {
-        console.error('Error fetching patients:', err);
-        setError('Failed to load patients');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchPatients();
   }, []);
 
-  const handleViewDetails = (patient: Patient) => {
-    setSelectedPatient(patient);
-    setIsDetailsModalOpen(true);
+  const fetchPatients = async () => {
+    try {
+      const res = await axios.get<Patient[]>('/api/patients');
+      // Defensive: ensure res.data is always an array
+      const patientList = Array.isArray(res.data) ? res.data : [];
+      setPatients(patientList);
+      setFilteredPatients(patientList);
+    } catch (err) {
+      console.error(err);
+      setPatients([]);
+      setFilteredPatients([]);
+    }
   };
 
-  const handleFilterChange = (filterType: string, value: string) => {
-    // @ts-ignore
-    setActiveFilters(prev => ({
-      ...prev,
-      // @ts-ignore
-      [filterType]: prev[filterType].includes(value)
-        // @ts-ignore
-        ? prev[filterType].filter(item => item !== value)
-        // @ts-ignore
-        : [...prev[filterType], value]
-    }));
-  };
+  // Filter & Search
+  useEffect(() => {
+    let temp = [...patients];
 
-  const clearFilters = () => {
-    setActiveFilters({
-      status: [],
-      gender: [],
-      department: [],
-      civilStatus: []
-    });
-  };
+    if (activeFilters.status.length) temp = temp.filter(p => activeFilters.status.includes(p.status));
+    if (activeFilters.gender.length) temp = temp.filter(p => activeFilters.gender.includes(p.sex));
+    if (activeFilters.department.length) temp = temp.filter(p => activeFilters.department.includes(p.department));
+    if (activeFilters.civilStatus.length) temp = temp.filter(p => activeFilters.civilStatus.includes(p.civil_status));
 
-  // Handle form changes
-  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    if (searchQuery) {
+      temp = temp.filter(p =>
+        `${p.last_name} ${p.first_name} ${p.middle_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.mobile_number.includes(searchQuery)
+      );
+    }
+
+    setFilteredPatients(temp);
+  }, [patients, activeFilters, searchQuery]);
+
+  const handleFormChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // Handle form submission
-  const handleRegisterPatient = async (e: React.FormEvent) => {
+  const handleRegisterPatient = async (e: FormEvent) => {
     e.preventDefault();
     setFormLoading(true);
     setFormError('');
-    setSuccess('');
+    setFormSuccess('');
 
     try {
-      const payload = {
-        ...formData,
-      };
-
-      const response = await axios.post<Patient>('http://localhost:8000/api/patients/', payload);
-      setSuccess('Patient created successfully!');
-      
-      // Add new patient to the list
-      setPatients(prev => [...prev, response.data]);
-      
-      // Reset form
+      await axios.post('/api/patients', formData);
+      setFormSuccess('Patient registered successfully!');
+      setShowRegistrationModal(false);
       setFormData({
         id: '',
         philhealth_id: '',
+        national_id: '',
         last_name: '',
         first_name: '',
         middle_name: '',
         suffix: '',
-        sex: 'M',
+        sex: '',
         date_of_birth: '',
         civil_status: '',
         nationality: '',
@@ -155,145 +137,100 @@ const PatientRegistration = () => {
         barangay: '',
         house_no_street: '',
         status: 'Active',
-        admission_date: new Date().toISOString().split('T')[0],
+        admission_date: '',
         department: '',
         room: '',
         physician: '',
         condition: '',
         occupation: '',
-        national_id: '',
         passport_number: '',
         drivers_license: '',
         senior_citizen_id: '',
-        pwd_id: '',
+        pwd_id: ''
       });
-      
-      // Close modal after successful registration
-      setTimeout(() => {
-        setIsRegistrationModalOpen(false);
-        setSuccess('');
-      }, 1500);
+      fetchPatients();
     } catch (err: any) {
-      setFormError(err.response?.data?.message || err.response?.data || 'Error creating patient');
-      console.error('Error:', err);
+      setFormError(err.response?.data?.message || 'Failed to register patient');
     } finally {
       setFormLoading(false);
     }
   };
 
-  const filteredPatients = patients.filter(patient => {
-    const fullName = `${patient.last_name}, ${patient.first_name} ${patient.middle_name || ''}`.toLowerCase();
-    const matchesSearch = fullName.includes(searchTerm.toLowerCase()) ||
-      patient.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      patient.mobile_number.includes(searchTerm) ||
-      patient.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      patient.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (patient.occupation && patient.occupation.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (patient.physician && patient.physician.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesStatus = activeFilters.status.length === 0 || activeFilters.status.includes(patient.status);
-    const matchesGender = activeFilters.gender.length === 0 || activeFilters.gender.includes(patient.sex);
-    const matchesDepartment = activeFilters.department.length === 0 || activeFilters.department.includes(patient.department);
-    const matchesCivilStatus = activeFilters.civilStatus.length === 0 || activeFilters.civilStatus.includes(patient.civil_status);
-    return matchesSearch && matchesStatus && matchesGender && matchesDepartment && matchesCivilStatus;
-  });
+  const handleFilterChange = (filterType: string, value: string) => {
+    setActiveFilters(prev => {
+      const prevValues = prev[filterType as keyof typeof prev];
+      return {
+        ...prev,
+        [filterType]: prevValues.includes(value)
+          ? prevValues.filter(v => v !== value)
+          : [...prevValues, value]
+      };
+    });
+  };
 
-  const hasActiveFilters = Object.values(activeFilters).some(filter => filter.length > 0);
+  const clearFilters = () => {
+    setActiveFilters({ status: [], gender: [], department: [], civilStatus: [] });
+  };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="text-lg">Loading patients...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="text-red-500 text-lg">{error}</div>
-      </div>
-    );
-  }
+  const handleViewDetails = (patient: Patient) => {
+    setSelectedPatient(patient);
+    setShowDetailsModal(true);
+  };
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Patient Records Management</h1>
-          <p className="text-gray-600">Comprehensive patient information and registration system</p>
-        </div>
-        <Button onClick={() => setIsRegistrationModalOpen(true)} className="bg-blue-600 hover:bg-blue-700 m-2">
-          <UserPlus className="w-4 h-4 mr-2" />
-          Register New Patient
-        </Button>
-      </div>
       <Card>
         <CardHeader>
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <CardTitle className="mb-2 md:mb-0">Patient Directory</CardTitle>
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
-              <div className="relative w-full sm:w-80">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <Input
-                  placeholder="Search patients, ID, phone, department..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-full"
-                />
-              </div>
-              <PatientFilters 
-                activeFilters={activeFilters}
-                handleFilterChange={handleFilterChange}
-                clearFilters={clearFilters}
-                hasActiveFilters={hasActiveFilters}
-              />
-            </div>
-          </div>
+          <CardTitle>Patients</CardTitle>
         </CardHeader>
         <CardContent>
-          {hasActiveFilters && (
-            <div className="mb-4 flex flex-wrap gap-2">
-              {Object.entries(activeFilters).map(([filterType, values]) =>
-                values.map(value => (
-                  <Badge key={`${filterType}-${value}`} variant="secondary" className="flex items-center gap-1">
-                    {value}
-                    <X 
-                      className="w-3 h-3 cursor-pointer" 
-                      onClick={() => handleFilterChange(filterType, value)}
-                    />
-                  </Badge>
-                ))
-              )}
+          <div className="flex flex-col md:flex-row md:justify-between mb-4 gap-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Input
+                placeholder="Search patients..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 max-w-sm"
+              />
             </div>
-          )}
-          
-          <PatientTable 
-            patients={filteredPatients}
+            <Button onClick={() => setShowRegistrationModal(true)} className="flex items-center gap-2">
+              <UserPlus /> Register Patient
+            </Button>
+          </div>
+
+          <PatientFilters
+            activeFilters={activeFilters}
+            handleFilterChange={handleFilterChange}
+            clearFilters={clearFilters}
+            hasActiveFilters={Object.values(activeFilters).flat().length > 0}
+          />
+
+          <PatientTable
+            patients={Array.isArray(filteredPatients) ? filteredPatients : []}
             handleViewDetails={handleViewDetails}
           />
         </CardContent>
       </Card>
 
       <PatientRegistrationModal
-        isOpen={isRegistrationModalOpen}
-        onClose={() => setIsRegistrationModalOpen(false)}
+        isOpen={showRegistrationModal}
+        onClose={() => setShowRegistrationModal(false)}
         formData={formData}
         handleFormChange={handleFormChange}
         handleRegisterPatient={handleRegisterPatient}
         formLoading={formLoading}
-        success={success}
+        success={formSuccess}
         formError={formError}
       />
 
       {selectedPatient && (
         <PatientDetailsModal
-          isOpen={isDetailsModalOpen}
-          onClose={() => setIsDetailsModalOpen(false)}
+          isOpen={showDetailsModal}
+          onClose={() => setShowDetailsModal(false)}
           patient={selectedPatient}
         />
       )}
     </div>
   );
 };
-
-export default PatientRegistration;

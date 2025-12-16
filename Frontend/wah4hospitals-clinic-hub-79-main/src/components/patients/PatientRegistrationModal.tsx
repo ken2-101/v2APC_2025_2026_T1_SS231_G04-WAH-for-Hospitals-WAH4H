@@ -26,13 +26,8 @@ export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> =
   success,
   formError
 }) => {
-  // Reset dependent address fields when parent field changes
   useEffect(() => {
-    // This logic is handled by the parent's handleFormChange if we were passing specific setters,
-    // but since we are using a single handleFormChange, we might need to handle side effects here or in the parent.
-    // For simplicity, we'll assume the user manually selects the correct child options, 
-    // or we could enhance handleFormChange in the parent.
-    // However, to ensure data consistency, let's just render the options based on current selection.
+    // placeholder for side-effects if needed
   }, [formData.region, formData.province, formData.city_municipality]);
 
   if (!isOpen) return null;
@@ -52,22 +47,16 @@ export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> =
               <X className="w-5 h-5" />
             </Button>
           </div>
-          
+
           {success && (
-            <div className="mb-4 p-3 bg-green-100 text-green-700 rounded-md">
-              {success}
-            </div>
+            <div className="mb-4 p-3 bg-green-100 text-green-700 rounded-md">{success}</div>
           )}
-          
           {formError && (
-            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
-              {formError}
-            </div>
+            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">{formError}</div>
           )}
 
           <form onSubmit={handleRegisterPatient} className="space-y-6">
-            
-            {/* Identity Section */}
+            {/* Identity */}
             <div>
               <h4 className="text-lg font-semibold mb-3 border-b pb-2">Identity & Personal Information</h4>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -84,7 +73,7 @@ export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> =
                   <Input type="text" id="national_id" name="national_id" value={formData.national_id} onChange={handleFormChange} />
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
                 <div>
                   <label htmlFor="last_name" className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
@@ -100,7 +89,7 @@ export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> =
                 </div>
                 <div>
                   <label htmlFor="suffix" className="block text-sm font-medium text-gray-700 mb-1">Suffix</label>
-                  <Input type="text" id="suffix" name="suffix" value={formData.suffix} onChange={handleFormChange} placeholder="e.g. Jr, III" />
+                  <Input type="text" id="suffix" name="suffix" value={formData.suffix} onChange={handleFormChange} placeholder="e.g., Jr, III" />
                 </div>
               </div>
 
@@ -135,7 +124,7 @@ export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> =
               </div>
             </div>
 
-            {/* Contact Details */}
+            {/* Contact */}
             <div>
               <h4 className="text-lg font-semibold mb-3 border-b pb-2">Contact Details</h4>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -154,7 +143,7 @@ export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> =
               </div>
             </div>
 
-            {/* Address (PSGC) */}
+            {/* Address */}
             <div>
               <h4 className="text-lg font-semibold mb-3 border-b pb-2">Address (PSGC)</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -231,7 +220,7 @@ export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> =
               </div>
             </div>
 
-            {/* Submit Button */}
+            {/* Buttons */}
             <div className="flex justify-end gap-2 pt-4">
               <Button type="button" variant="outline" onClick={onClose} disabled={formLoading}>Cancel</Button>
               <Button type="submit" disabled={formLoading} className="bg-blue-600 hover:bg-blue-700">

@@ -28,34 +28,43 @@ export const PatientTable: React.FC<PatientTableProps> = ({
             <th className="text-left py-3 px-4 font-medium">Actions</th>
           </tr>
         </thead>
+
         <tbody>
-          {patients.map((patient) => (
-            <tr key={patient.id} className="border-b hover:bg-gray-50">
-              <td className="py-4 px-4 font-medium">{patient.id}</td>
-              <td className="py-4 px-4">{`${patient.last_name}, ${patient.first_name} ${patient.middle_name || ''} ${patient.suffix || ''}`}</td>
-              <td className="py-4 px-4">{new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear()}</td>
-              <td className="py-4 px-4">{patient.mobile_number}</td>
-              <td className="py-4 px-4">{patient.department}</td>
-              <td className="py-4 px-4">{patient.room}</td>
-              <td className="py-4 px-4">
-                <Badge className={patient.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
-                  {patient.status}
-                </Badge>
-              </td>
-              <td className="py-4 px-4">
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  onClick={() => handleViewDetails(patient)}
-                >
-                  <FileText className="w-4 h-4 mr-1" />
-                  Details
-                </Button>
-              </td>
-            </tr>
-          ))}
+          {patients.map((patient) => {
+            const fullName = `${patient.last_name}, ${patient.first_name} ${patient.middle_name || ''} ${patient.suffix || ''}`.trim();
+            const age = new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear();
+
+            return (
+              <tr key={patient.id} className="border-b hover:bg-gray-50">
+                <td className="py-4 px-4 font-medium">{patient.id}</td>
+                <td className="py-4 px-4">{fullName}</td>
+                <td className="py-4 px-4">{age}</td>
+                <td className="py-4 px-4">{patient.mobile_number}</td>
+                <td className="py-4 px-4">{patient.department}</td>
+                <td className="py-4 px-4">{patient.room}</td>
+                <td className="py-4 px-4">
+                  <Badge
+                    className={
+                      patient.status === 'Active'
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-red-100 text-red-800'
+                    }
+                  >
+                    {patient.status}
+                  </Badge>
+                </td>
+                <td className="py-4 px-4">
+                  <Button size="sm" variant="outline" onClick={() => handleViewDetails(patient)}>
+                    <FileText className="w-4 h-4 mr-1" />
+                    Details
+                  </Button>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
+
       {patients.length === 0 && (
         <div className="text-center py-8 text-gray-500">
           No patients found matching your search criteria.
