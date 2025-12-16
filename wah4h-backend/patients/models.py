@@ -3,7 +3,7 @@ from django.db import models
 class Patient(models.Model):
     # Identification
     patient_id = models.CharField(max_length=20, unique=True)  # Facility Patient ID
-    philhealth_id = models.CharField(max_length=20)
+    philhealth_id = models.CharField(max_length=20, blank=True, null=True)
     national_id = models.CharField(max_length=20, blank=True, null=True)
 
     # Personal Info
@@ -30,7 +30,7 @@ class Patient(models.Model):
 
     # Hospital / Admission Info
     status = models.CharField(max_length=10, choices=[('Active', 'Active'), ('Inactive', 'Inactive')])
-    admission_date = models.DateField()
+    admission_date = models.DateField(blank=True, null=True)
     department = models.CharField(max_length=50, blank=True, null=True)
     room = models.CharField(max_length=50, blank=True, null=True)
     physician = models.CharField(max_length=100, blank=True, null=True)

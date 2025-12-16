@@ -19,7 +19,7 @@ export const PatientRegistration: React.FC = () => {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
 
   const [formData, setFormData] = useState<PatientFormData>({
-    id: '',
+    patient_id: '',
     philhealth_id: '',
     national_id: '',
     last_name: '',
@@ -69,7 +69,8 @@ export const PatientRegistration: React.FC = () => {
 
   const fetchPatients = async () => {
     try {
-      const res = await axios.get<Patient[]>('/api/patients');
+      const res = await axios.get<Patient[]>('https://supreme-memory-5w9pg5gjv59379g7-8000.app.github.dev/api/patients/');
+
       // Defensive: ensure res.data is always an array
       const patientList = Array.isArray(res.data) ? res.data : [];
       setPatients(patientList);
@@ -93,7 +94,7 @@ export const PatientRegistration: React.FC = () => {
     if (searchQuery) {
       temp = temp.filter(p =>
         `${p.last_name} ${p.first_name} ${p.middle_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.patient_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.mobile_number.includes(searchQuery)
       );
     }
@@ -113,11 +114,11 @@ export const PatientRegistration: React.FC = () => {
     setFormSuccess('');
 
     try {
-      await axios.post('/api/patients', formData);
+      await axios.post('https://supreme-memory-5w9pg5gjv59379g7-8000.app.github.dev/api/patients/',formData);
       setFormSuccess('Patient registered successfully!');
       setShowRegistrationModal(false);
       setFormData({
-        id: '',
+        patient_id: '',
         philhealth_id: '',
         national_id: '',
         last_name: '',
