@@ -5,7 +5,7 @@ import { UserRole } from './RoleContext';
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
-  'https://crispy-system-px6qj9j4w5p2rj7-8000.app.github.dev'; // fallback
+  'https://crispy-system-px6qj9j4w5p2rj7-8000.app.github.dev';
 
 interface User {
   id: string;
@@ -27,7 +27,7 @@ interface RegisterData {
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<boolean>;
-  register: (userData: RegisterData) => Promise<boolean>;
+  register: (data: RegisterData) => Promise<boolean>;
   logout: () => void;
   isLoading: boolean;
 }
@@ -45,26 +45,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  // Load user from localStorage on mount
   useEffect(() => {
     const saved = localStorage.getItem('currentUser');
     if (saved) setUser(JSON.parse(saved));
   }, []);
 
-  // Axios instance with credentials support
   const axiosInstance = axios.create({
     baseURL: API_BASE_URL,
-    withCredentials: true, // needed if your backend uses cookies
+    headers: {
+      'Content-Type': 'application/json',
+    },
   });
 
   const login = async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
     try {
-      const res = await axiosInstance.post('/accounts/api/login/', { email, password });
+      const res = await axiosInstance.post('/accounts/api/login/', {
+        email,
+        password,
+      });
 
       const { tokens, user: userData } = res.data;
 
-      // Save tokens and user info
       localStorage.setItem('accessToken', tokens.access);
       localStorage.setItem('refreshToken', tokens.refresh);
       localStorage.setItem('currentUser', JSON.stringify(userData));
@@ -92,44 +94,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const register = async (data: RegisterData): Promise<boolean> => {
     setIsLoading(true);
-    try {
-      if (data.password !== data.confirmPassword) {
-        toast({
-          title: 'Registration failed',
-          description: 'Passwords do not match',
-          variant: 'destructive',
-        });
-        return false;
-      }
 
-      const res = await axiosInstance.post('/accounts/register', {
+    try {
+      const res = await axiosInstance.post('/accounts/register/', {
         first_name: data.firstName,
         last_name: data.lastName,
         email: data.email,
         password: data.password,
+        confirm_password: data.confirmPassword, // 🔥 REQUIRED
         role: data.role,
       });
 
-      const { tokens, user: userData } = res.data;
-
-      // Save tokens and user info
-      localStorage.setItem('accessToken', tokens.access);
-      localStorage.setItem('refreshToken', tokens.refresh);
-      localStorage.setItem('currentUser', JSON.stringify(userData));
-      localStorage.setItem('userRole', userData.role);
-
-      setUser(userData);
-
       toast({
         title: 'Registration successful',
-        description: `Welcome ${userData.firstName}`,
+        description: 'You may now log in',
       });
 
       return true;
     } catch (err: any) {
+      console.error('REGISTER ERROR:', err.response?.data);
+
       toast({
         title: 'Registration failed',
-        description: err.response?.data?.detail || 'Unable to register',
+        description:
+          err.response?.data?.detail ||
+          JSON.stringify(err.response?.data) ||
+          'Unable to register',
         variant: 'destructive',
       });
       return false;
