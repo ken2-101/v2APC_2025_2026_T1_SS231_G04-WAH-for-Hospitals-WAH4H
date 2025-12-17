@@ -1,12 +1,14 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { FileText } from 'lucide-react';
+import { FileText, Edit, Trash2 } from 'lucide-react';
 import type { Admission } from '../../types/admission';
 
 interface AdmissionTableProps {
   admissions: Admission[];
-  onDetailsClick?: (admission: Admission) => void; // optional callback
+  onDetailsClick?: (admission: Admission) => void;
+  onEditClick?: (admission: Admission) => void;
+  onDeleteClick?: (admission: Admission) => void;
 }
 
 // Helper to get badge class based on status
@@ -26,6 +28,8 @@ const getStatusBadgeClass = (status: string) => {
 export const AdmissionTable: React.FC<AdmissionTableProps> = ({
   admissions,
   onDetailsClick,
+  onEditClick,
+  onDeleteClick,
 }) => {
   return (
     <div className="overflow-x-auto">
@@ -45,7 +49,7 @@ export const AdmissionTable: React.FC<AdmissionTableProps> = ({
           {admissions.length === 0 && (
             <tr>
               <td colSpan={7} className="text-center py-8 text-gray-500">
-                No admissions found matching your search criteria.
+                No admissions found.
               </td>
             </tr>
           )}
@@ -57,7 +61,7 @@ export const AdmissionTable: React.FC<AdmissionTableProps> = ({
                   ? `${admission.patient_details.last_name}, ${admission.patient_details.first_name}`
                   : 'Unknown Patient'}
               </td>
-              <td className="py-4 px-4">{admission.id}</td>
+              <td className="py-4 px-4">{admission.admission_id}</td>
               <td className="py-4 px-4">
                 {new Date(admission.admission_date).toLocaleString()}
               </td>
@@ -70,7 +74,7 @@ export const AdmissionTable: React.FC<AdmissionTableProps> = ({
                   {admission.status}
                 </Badge>
               </td>
-              <td className="py-4 px-4">
+              <td className="py-4 px-4 flex gap-2">
                 <Button
                   size="sm"
                   variant="outline"
@@ -78,6 +82,22 @@ export const AdmissionTable: React.FC<AdmissionTableProps> = ({
                 >
                   <FileText className="w-4 h-4 mr-1" />
                   Details
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => onEditClick?.(admission)}
+                >
+                  <Edit className="w-4 h-4 mr-1" />
+                  Edit
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => onDeleteClick?.(admission)}
+                >
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  Delete
                 </Button>
               </td>
             </tr>
