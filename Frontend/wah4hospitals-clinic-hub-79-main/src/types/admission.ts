@@ -1,13 +1,14 @@
 // src/types/admission.ts
 
+// Full Admission type for fetched/existing records
 export interface Admission {
-    id: string; // required for existing/fetched admissions
+    id: string; // internal DB ID
     admission_id: string; // human-readable admission number
-    patient: string; // ID of the patient
-    patient_details?: any; // optional nested details
+    patient: string; // patient ID
+    patient_details?: any; // optional nested patient info
     admission_date: string;
     attending_physician: string;
-    assigned_nurse: string; // ✅ included
+    assigned_nurse: string; // included
     ward: string;
     room: string;
     bed: string;
@@ -19,10 +20,16 @@ export interface Admission {
     mode_of_arrival: 'Walk-in' | 'Ambulance' | 'Referral';
 }
 
-// Type used when creating a new admission (id is not needed)
-export type NewAdmission = Omit<Admission, 'id' | 'patient_details'>;
+// Type used when creating a new admission (backend generates admission_id)
+export type NewAdmission = Omit<Admission, 'id' | 'patient_details' | 'admission_id'>;
 
-// Bed structure for rooms
+// Payload type for creating a new admission
+// admission_id is optional because backend generates it
+export type CreateAdmission = Omit<Admission, 'id' | 'patient_details'> & {
+    admission_id?: string;
+};
+
+// Bed structure for hospital rooms
 export interface Bed {
     id: string;
     number: string;

@@ -7,7 +7,8 @@ import { Search, Plus } from 'lucide-react';
 import { AdmissionFilters } from '@/components/admission/AdmissionFilters';
 import { AdmissionTable } from '@/components/admission/AdmissionTable';
 import { AdmitPatientModal } from '@/components/admission/AdmitPatientModal';
-import type { Admission, NewAdmission } from '@/types/admission';
+import { EditAdmissionModal } from '@/components/admission/EditAdmissionModal'; // make sure you have this
+import type { Admission, CreateAdmission } from '@/types/admission';
 import { admissionService } from '@/services/admissionService';
 
 interface AdmissionProps {
@@ -23,7 +24,10 @@ const Admission: React.FC<AdmissionProps> = ({ onNavigate }) => {
   const [activeFilters, setActiveFilters] = useState({ ward: '', status: '', doctor: '' });
   const [isAdmitModalOpen, setIsAdmitModalOpen] = useState(false);
 
-  // Fetch admissions
+  // New state for edit modal
+  const [selectedAdmission, setSelectedAdmission] = useState<Admission | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
   const fetchAdmissions = async () => {
     setLoading(true);
     try {
@@ -42,7 +46,6 @@ const Admission: React.FC<AdmissionProps> = ({ onNavigate }) => {
     fetchAdmissions();
   }, []);
 
-  // Filter handlers
   const handleFilterChange = (key: string, value: string) => {
     setActiveFilters(prev => ({ ...prev, [key]: value }));
   };
@@ -54,22 +57,23 @@ const Admission: React.FC<AdmissionProps> = ({ onNavigate }) => {
   // Admit patient handler
   const handleAdmitPatient = async (data: any) => {
     try {
-      const payload: NewAdmission = {
+      const payload: Partial<CreateAdmission> = {
         patient: data.patientId,
         admission_date: data.admissionDate,
         attending_physician: data.attendingPhysician,
+        assigned_nurse: data.assignedNurse || '',
         ward: data.ward,
         room: data.room,
         bed: data.bed,
-        status: 'Active', // type-safe literal
-        encounter_type: 'Inpatient', // type-safe literal
+        status: 'Active',
+        encounter_type: 'Inpatient',
         admitting_diagnosis: data.admittingDiagnosis,
         reason_for_admission: data.reasonForAdmission,
         admission_category: data.admissionCategory as 'Emergency' | 'Regular',
         mode_of_arrival: data.modeOfArrival as 'Walk-in' | 'Ambulance' | 'Referral',
       };
 
-      await admissionService.create(payload);
+      await admissionService.create(payload as CreateAdmission);
       await fetchAdmissions();
       setIsAdmitModalOpen(false);
     } catch (err) {
@@ -77,7 +81,6 @@ const Admission: React.FC<AdmissionProps> = ({ onNavigate }) => {
     }
   };
 
-  // Filtered admissions
   const filteredAdmissions = admissions.filter(admission => {
     const patientName = admission.patient_details
       ? `${admission.patient_details.last_name}, ${admission.patient_details.first_name}`.toLowerCase()
@@ -101,7 +104,6 @@ const Admission: React.FC<AdmissionProps> = ({ onNavigate }) => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-wrap items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Admission Management</h1>
@@ -116,7 +118,6 @@ const Admission: React.FC<AdmissionProps> = ({ onNavigate }) => {
         </Button>
       </div>
 
-      {/* Admission Card */}
       <Card>
         <CardHeader>
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -141,17 +142,31 @@ const Admission: React.FC<AdmissionProps> = ({ onNavigate }) => {
           </div>
         </CardHeader>
         <CardContent>
-          <AdmissionTable admissions={filteredAdmissions} />
+          <AdmissionTable
+            admissions={filteredAdmissions}
+            onEditClick={(admission) => {
+              setSelectedAdmission(admission);
+              setIsEditModalOpen(true);
+            }}
+          />
         </CardContent>
       </Card>
 
-      {/* Admit Patient Modal */}
       <AdmitPatientModal
         isOpen={isAdmitModalOpen}
         onClose={() => setIsAdmitModalOpen(false)}
         onAdmit={handleAdmitPatient}
         onNavigate={onNavigate}
       />
+
+      {selectedAdmission && (
+        <EditAdmissionModal
+          isOpen={isEditModalOpen}
+          admission={selectedAdmission}
+          onClose={() => setIsEditModalOpen(false)}
+          fetchAdmissions={fetchAdmissions}
+        />
+      )}
     </div>
   );
 };

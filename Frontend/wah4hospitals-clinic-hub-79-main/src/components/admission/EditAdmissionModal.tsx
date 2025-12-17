@@ -1,3 +1,4 @@
+// src/components/admission/EditAdmissionModal.tsx
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,8 +15,8 @@ interface EditAdmissionModalProps {
   fetchAdmissions: () => Promise<void>;
 }
 
-// Editable fields only (exclude id and patient_details)
-type AdmissionForm = Omit<Admission, 'id' | 'patient_details'>;
+// Editable fields only (exclude id, patient_details, patient, admission_date)
+type AdmissionForm = Omit<Admission, 'id' | 'patient_details' | 'patient' | 'admission_date'>;
 
 export const EditAdmissionModal: React.FC<EditAdmissionModalProps> = ({
   isOpen,
@@ -25,8 +26,6 @@ export const EditAdmissionModal: React.FC<EditAdmissionModalProps> = ({
 }) => {
   const [formData, setFormData] = useState<AdmissionForm>({
     admission_id: '',
-    patient: '',
-    admission_date: '',
     encounter_type: 'Inpatient',
     admitting_diagnosis: '',
     reason_for_admission: '',
@@ -47,8 +46,8 @@ export const EditAdmissionModal: React.FC<EditAdmissionModalProps> = ({
   // Populate form when admission changes
   useEffect(() => {
     if (admission) {
-      const { id, patient_details, ...rest } = admission;
-      setFormData(rest as AdmissionForm); // Type assertion ensures TypeScript knows rest matches AdmissionForm
+      const { id, patient, patient_details, admission_date, ...rest } = admission;
+      setFormData(rest as AdmissionForm);
       setConfirmText('');
       setError('');
     }
@@ -70,8 +69,11 @@ export const EditAdmissionModal: React.FC<EditAdmissionModalProps> = ({
     setError('');
 
     try {
+      const BASE_URL = import.meta.env.VITE_API_URL || 'https://supreme-memory-5w9pg5gjv59379g7-8000.app.github.dev';
+
+      // ✅ Only send editable fields, omit patient & admission_date
       await axios.put(
-        `https://YOUR_BACKEND_URL/api/admissions/${admission.id}/`,
+        `${BASE_URL}/api/admissions/${admission.id}/`,
         formData
       );
       await fetchAdmissions();

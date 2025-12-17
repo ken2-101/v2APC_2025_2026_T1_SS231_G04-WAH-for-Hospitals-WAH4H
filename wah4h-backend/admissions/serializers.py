@@ -8,7 +8,6 @@ class AdmissionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Admission
-
         fields = [
             "id",
             "admission_id",
@@ -30,27 +29,37 @@ class AdmissionSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
 
+        # 🔒 IMMUTABLE AFTER CREATION
         read_only_fields = [
             "id",
             "admission_id",
-            "status",
+            "patient",
+            "admission_date",
+            "encounter_type",
             "created_at",
             "updated_at",
             "patient_details",
         ]
 
-    # ✅ BLOCK MULTIPLE ACTIVE ADMISSIONS
+    # ✅ BLOCK MULTIPLE ACTIVE ADMISSIONS (CREATE ONLY / EXCLUDE SELF ON UPDATE)
     def validate_patient(self, patient):
-        if Admission.objects.filter(
+        qs = Admission.objects.filter(
             patient=patient,
             status="Active"
-        ).exists():
+        )
+
+        # 🚑 IMPORTANT: exclude self during update
+        if self.instance:
+            qs = qs.exclude(id=self.instance.id)
+
+        if qs.exists():
             raise serializers.ValidationError(
                 "This patient already has an active admission."
             )
+
         return patient
 
-    # ✅ FORCE DEFAULTS ON CREATE
+    # ✅ FORCE DEFAULTS ON CREATE ONLY
     def create(self, validated_data):
         validated_data.setdefault("status", "Active")
         validated_data.setdefault("encounter_type", "Inpatient")
