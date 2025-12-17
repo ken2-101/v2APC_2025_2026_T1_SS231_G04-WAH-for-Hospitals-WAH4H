@@ -1,7 +1,9 @@
+// src/types/admission.ts
+
 export interface Admission {
-    id: string;
+    id: string; // required for existing/fetched admissions
     patient: string; // ID of the patient
-    patient_details?: any; // Nested patient details
+    patient_details?: any; // optional nested details
     admission_date: string;
     attending_physician: string;
     ward: string;
@@ -14,6 +16,9 @@ export interface Admission {
     admission_category: 'Emergency' | 'Regular';
     mode_of_arrival: 'Walk-in' | 'Ambulance' | 'Referral';
 }
+
+// Type used when creating a new admission (id is not needed)
+export type NewAdmission = Omit<Admission, 'id' | 'patient_details'>;
 
 export interface Bed {
     id: string;

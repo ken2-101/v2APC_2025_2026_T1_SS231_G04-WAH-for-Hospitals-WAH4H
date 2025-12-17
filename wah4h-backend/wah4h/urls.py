@@ -8,7 +8,7 @@ urlpatterns = [
     path('accounts/', include('accounts.urls')),
 
     # Patients module
-    path('api/patients/', include('patients.urls')),
+    path('api/', include('patients.urls')),
 
     # Admissions module
     path('api/admissions/', include('admissions.urls')),

@@ -1,5 +1,5 @@
+// src/pages/admission/Admission.tsx
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,26 +7,28 @@ import { Search, Plus } from 'lucide-react';
 import { AdmissionFilters } from '@/components/admission/AdmissionFilters';
 import { AdmissionTable } from '@/components/admission/AdmissionTable';
 import { AdmitPatientModal } from '@/components/admission/AdmitPatientModal';
-import type { Admission } from '@/types/admission';
+import type { Admission, NewAdmission } from '@/types/admission';
+import { admissionService } from '@/services/admissionService';
 
-interface AdmissionPageProps {
+interface AdmissionProps {
   onNavigate?: (tabId: string) => void;
 }
 
-const AdmissionPage: React.FC<AdmissionPageProps> = ({ onNavigate }) => {
+const Admission: React.FC<AdmissionProps> = ({ onNavigate }) => {
   const [admissions, setAdmissions] = useState<Admission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilters, setActiveFilters] = useState({ ward: '', status: '', doctor: '' });
   const [isAdmitModalOpen, setIsAdmitModalOpen] = useState(false);
 
-  // Fetch admissions from backend
+  // Fetch admissions
   const fetchAdmissions = async () => {
     setLoading(true);
     try {
-      const response = await axios.get<Admission[]>('/api/admissions/');
-      setAdmissions(response.data);
+      const data = await admissionService.getAll();
+      setAdmissions(data);
       setError(null);
     } catch (err) {
       console.error('Error fetching admissions:', err);
@@ -52,33 +54,30 @@ const AdmissionPage: React.FC<AdmissionPageProps> = ({ onNavigate }) => {
   // Admit patient handler
   const handleAdmitPatient = async (data: any) => {
     try {
-      const payload = {
+      const payload: NewAdmission = {
         patient: data.patientId,
         admission_date: data.admissionDate,
         attending_physician: data.attendingPhysician,
         ward: data.ward,
         room: data.room,
         bed: data.bed,
-        status: 'Active',
-        encounter_type: 'Inpatient',
+        status: 'Active', // type-safe literal
+        encounter_type: 'Inpatient', // type-safe literal
         admitting_diagnosis: data.admittingDiagnosis,
         reason_for_admission: data.reasonForAdmission,
-        admission_category: data.admissionCategory,
-        mode_of_arrival: data.modeOfArrival,
+        admission_category: data.admissionCategory as 'Emergency' | 'Regular',
+        mode_of_arrival: data.modeOfArrival as 'Walk-in' | 'Ambulance' | 'Referral',
       };
 
-      await axios.post('/api/admissions/', payload);
-
-      // Refresh admissions
-      fetchAdmissions();
+      await admissionService.create(payload);
+      await fetchAdmissions();
       setIsAdmitModalOpen(false);
     } catch (err) {
       console.error('Error admitting patient:', err);
-      // TODO: show error toast
     }
   };
 
-  // Filter admissions for table
+  // Filtered admissions
   const filteredAdmissions = admissions.filter(admission => {
     const patientName = admission.patient_details
       ? `${admission.patient_details.last_name}, ${admission.patient_details.first_name}`.toLowerCase()
@@ -157,4 +156,4 @@ const AdmissionPage: React.FC<AdmissionPageProps> = ({ onNavigate }) => {
   );
 };
 
-export default AdmissionPage;
+export default Admission;
