@@ -2,11 +2,13 @@ from rest_framework import serializers
 from .models import Admission
 from patients.serializers import PatientSerializer
 
+
 class AdmissionSerializer(serializers.ModelSerializer):
-    patient_details = PatientSerializer(source='patient', read_only=True)
+    patient_details = PatientSerializer(source="patient", read_only=True)
 
     class Meta:
         model = Admission
+
         fields = [
             "id",
             "admission_id",
@@ -28,11 +30,28 @@ class AdmissionSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
 
-        # 🔑 THIS IS THE IMPORTANT PART
         read_only_fields = [
             "id",
             "admission_id",
+            "status",
             "created_at",
             "updated_at",
             "patient_details",
         ]
+
+    # ✅ BLOCK MULTIPLE ACTIVE ADMISSIONS
+    def validate_patient(self, patient):
+        if Admission.objects.filter(
+            patient=patient,
+            status="Active"
+        ).exists():
+            raise serializers.ValidationError(
+                "This patient already has an active admission."
+            )
+        return patient
+
+    # ✅ FORCE DEFAULTS ON CREATE
+    def create(self, validated_data):
+        validated_data.setdefault("status", "Active")
+        validated_data.setdefault("encounter_type", "Inpatient")
+        return super().create(validated_data)
