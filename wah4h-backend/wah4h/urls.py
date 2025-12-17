@@ -4,7 +4,12 @@ from django.urls import path, include
 urlpatterns = [
     path('admin/', admin.site.urls),
 
-    # Include accounts app URLs
+    # Accounts
     path('accounts/', include('accounts.urls')),
-    path('api/', include('patients.urls')),
+
+    # Patients module
+    path('api/patients/', include('patients.urls')),
+
+    # Admissions module
+    path('api/admissions/', include('admissions.urls')),
 ]

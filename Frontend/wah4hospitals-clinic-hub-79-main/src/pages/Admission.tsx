@@ -17,19 +17,15 @@ const AdmissionPage: React.FC<AdmissionPageProps> = ({ onNavigate }) => {
   const [admissions, setAdmissions] = useState<Admission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeFilters, setActiveFilters] = useState({
-    ward: '',
-    status: '',
-    doctor: '',
-  });
+  const [activeFilters, setActiveFilters] = useState({ ward: '', status: '', doctor: '' });
   const [isAdmitModalOpen, setIsAdmitModalOpen] = useState(false);
 
   // Fetch admissions from backend
   const fetchAdmissions = async () => {
+    setLoading(true);
     try {
-      const response = await axios.get<Admission[]>('http://localhost:8000/api/admissions/');
+      const response = await axios.get<Admission[]>('/api/admissions/');
       setAdmissions(response.data);
       setError(null);
     } catch (err) {
@@ -44,6 +40,7 @@ const AdmissionPage: React.FC<AdmissionPageProps> = ({ onNavigate }) => {
     fetchAdmissions();
   }, []);
 
+  // Filter handlers
   const handleFilterChange = (key: string, value: string) => {
     setActiveFilters(prev => ({ ...prev, [key]: value }));
   };
@@ -52,12 +49,11 @@ const AdmissionPage: React.FC<AdmissionPageProps> = ({ onNavigate }) => {
     setActiveFilters({ ward: '', status: '', doctor: '' });
   };
 
+  // Admit patient handler
   const handleAdmitPatient = async (data: any) => {
     try {
-      // Transform form data to match backend expected format
       const payload = {
-        id: `ADM-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`, // Generate ID or let backend handle it if auto-increment
-        patient: data.patientId, // Assuming form provides patient ID
+        patient: data.patientId,
         admission_date: data.admissionDate,
         attending_physician: data.attendingPhysician,
         ward: data.ward,
@@ -68,28 +64,30 @@ const AdmissionPage: React.FC<AdmissionPageProps> = ({ onNavigate }) => {
         admitting_diagnosis: data.admittingDiagnosis,
         reason_for_admission: data.reasonForAdmission,
         admission_category: data.admissionCategory,
-        mode_of_arrival: data.modeOfArrival
+        mode_of_arrival: data.modeOfArrival,
       };
 
-      await axios.post('http://localhost:8000/api/admissions/', payload);
-      
-      // Refresh list
+      await axios.post('/api/admissions/', payload);
+
+      // Refresh admissions
       fetchAdmissions();
       setIsAdmitModalOpen(false);
     } catch (err) {
       console.error('Error admitting patient:', err);
-      // Handle error (show toast, etc.)
+      // TODO: show error toast
     }
   };
 
+  // Filter admissions for table
   const filteredAdmissions = admissions.filter(admission => {
-    const patientName = admission.patient_details 
+    const patientName = admission.patient_details
       ? `${admission.patient_details.last_name}, ${admission.patient_details.first_name}`.toLowerCase()
       : '';
-    
-    const matchesSearch = patientName.includes(searchTerm.toLowerCase()) ||
-                          admission.id.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
+    const matchesSearch =
+      patientName.includes(searchTerm.toLowerCase()) ||
+      admission.id.toLowerCase().includes(searchTerm.toLowerCase());
+
     const matchesWard = !activeFilters.ward || admission.ward === activeFilters.ward;
     const matchesStatus = !activeFilters.status || admission.status === activeFilters.status;
     const matchesDoctor = !activeFilters.doctor || admission.attending_physician === activeFilters.doctor;
@@ -104,17 +102,22 @@ const AdmissionPage: React.FC<AdmissionPageProps> = ({ onNavigate }) => {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-wrap items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Admission Management</h1>
           <p className="text-gray-600">Manage inpatient encounters and room assignments</p>
         </div>
-        <Button onClick={() => setIsAdmitModalOpen(true)} className="bg-blue-600 hover:bg-blue-700">
+        <Button
+          onClick={() => setIsAdmitModalOpen(true)}
+          className="bg-blue-600 hover:bg-blue-700 flex items-center"
+        >
           <Plus className="w-4 h-4 mr-2" />
           Admit Patient
         </Button>
       </div>
 
+      {/* Admission Card */}
       <Card>
         <CardHeader>
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -125,7 +128,7 @@ const AdmissionPage: React.FC<AdmissionPageProps> = ({ onNavigate }) => {
                 <Input
                   placeholder="Search patient name or ID..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={e => setSearchTerm(e.target.value)}
                   className="pl-10 w-full"
                 />
               </div>
@@ -143,6 +146,7 @@ const AdmissionPage: React.FC<AdmissionPageProps> = ({ onNavigate }) => {
         </CardContent>
       </Card>
 
+      {/* Admit Patient Modal */}
       <AdmitPatientModal
         isOpen={isAdmitModalOpen}
         onClose={() => setIsAdmitModalOpen(false)}
