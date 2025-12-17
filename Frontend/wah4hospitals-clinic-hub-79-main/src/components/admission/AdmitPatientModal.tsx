@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import axios from 'axios';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -55,25 +55,36 @@ export const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
+  const searchTimeout = useRef<NodeJS.Timeout | null>(null);
 
   const handleChange = (field: keyof AdmissionFormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+
+    if (field === 'patientName') {
+      if (selectedPatient) {
+        setSelectedPatient(null);
+        setFormData(prev => ({ ...prev, patientId: '' }));
+      }
+
+      if (searchTimeout.current) clearTimeout(searchTimeout.current);
+      searchTimeout.current = setTimeout(() => {
+        handleSearchPatient(value);
+      }, 300); // faster debounce
+    }
   };
 
-  const handleSubmit = () => {
-    onAdmit(formData);
-    onClose();
-    setStep(1);
-  };
-
-  const handleSearchPatient = async () => {
-    if (!formData.patientName) return;
+  const handleSearchPatient = async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
     setIsSearching(true);
     try {
-      const response = await axios.get(`/api/patients/?search=${formData.patientName}`);
-      setSearchResults(response.data);
+      const response = await axios.get(`/api/patients/?search=${encodeURIComponent(query)}`);
+      setSearchResults(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Error searching patient:', error);
+      setSearchResults([]);
     } finally {
       setIsSearching(false);
     }
@@ -86,6 +97,29 @@ export const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({
       patientId: patient.id,
       patientName: `${patient.last_name}, ${patient.first_name}`,
     }));
+    setSearchResults([]);
+  };
+
+  const handleSubmit = () => {
+    if (!formData.patientId) return;
+    onAdmit(formData);
+    onClose();
+    setStep(1);
+    setFormData({
+      patientId: '',
+      patientName: '',
+      admissionDate: new Date().toISOString().slice(0, 16),
+      admittingDiagnosis: '',
+      reasonForAdmission: '',
+      ward: '',
+      room: '',
+      bed: '',
+      attendingPhysician: '',
+      assignedNurse: '',
+      admissionCategory: 'Regular',
+      modeOfArrival: 'Walk-in',
+    });
+    setSelectedPatient(null);
     setSearchResults([]);
   };
 
@@ -125,15 +159,11 @@ export const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({
                 className="pl-10"
                 value={formData.patientName}
                 onChange={e => handleChange('patientName', e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleSearchPatient()}
               />
             </div>
-            <Button onClick={handleSearchPatient} disabled={isSearching}>
-              {isSearching ? 'Searching...' : 'Search'}
-            </Button>
           </div>
 
-          {searchResults.length > 0 ? (
+          {Array.isArray(searchResults) && searchResults.length > 0 && (
             <div className="border rounded-md p-2 max-h-48 overflow-y-auto">
               <p className="text-sm text-gray-500 mb-2">Select a patient:</p>
               {searchResults.map(patient => (
@@ -150,25 +180,25 @@ export const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({
                 </div>
               ))}
             </div>
-          ) : (
-            formData.patientName && !isSearching && (
-              <div className="text-center py-4">
-                <p className="text-gray-500 mb-2">No patient found.</p>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    if (onNavigate) {
-                      onNavigate('patients');
-                      onClose();
-                    } else {
-                      window.location.href = '/patients';
-                    }
-                  }}
-                >
-                  Create New Patient Record
-                </Button>
-              </div>
-            )
+          )}
+
+          {formData.patientName && !isSearching && searchResults.length === 0 && (
+            <div className="text-center py-4">
+              <p className="text-gray-500 mb-2">No patient found.</p>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (onNavigate) {
+                    onNavigate('patients');
+                    onClose();
+                  } else {
+                    window.location.href = '/patients';
+                  }
+                }}
+              >
+                Create New Patient Record
+              </Button>
+            </div>
           )}
         </>
       ) : (
@@ -261,10 +291,14 @@ export const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[600px]" aria-describedby="admit-patient-description">
         <DialogHeader>
           <DialogTitle>Admit Patient</DialogTitle>
         </DialogHeader>
+
+        <p id="admit-patient-description" className="sr-only">
+          Use this dialog to admit a patient, fill out all required details, and navigate through steps.
+        </p>
 
         <div className="py-4">
           {step === 1 && renderStep1()}
@@ -277,7 +311,10 @@ export const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({
           <Button variant="outline" onClick={step === 1 ? onClose : () => setStep(step - 1)}>
             {step === 1 ? 'Cancel' : 'Back'}
           </Button>
-          <Button onClick={step === 4 ? handleSubmit : () => setStep(step + 1)}>
+          <Button
+            onClick={step === 4 ? handleSubmit : () => setStep(step + 1)}
+            disabled={step === 1 && !selectedPatient}
+          >
             {step === 4 ? 'Admit Patient' : 'Next'}
           </Button>
         </DialogFooter>
