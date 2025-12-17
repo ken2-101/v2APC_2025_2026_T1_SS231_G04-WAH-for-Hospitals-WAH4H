@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import Admission
-from patients.serializers import PatientSerializer  # Nested serializer for patient_details
+from patients.serializers import PatientSerializer
 
 class AdmissionSerializer(serializers.ModelSerializer):
     patient_details = PatientSerializer(source='patient', read_only=True)
@@ -26,4 +26,13 @@ class AdmissionSerializer(serializers.ModelSerializer):
             "status",
             "created_at",
             "updated_at",
+        ]
+
+        # 🔑 THIS IS THE IMPORTANT PART
+        read_only_fields = [
+            "id",
+            "admission_id",
+            "created_at",
+            "updated_at",
+            "patient_details",
         ]
