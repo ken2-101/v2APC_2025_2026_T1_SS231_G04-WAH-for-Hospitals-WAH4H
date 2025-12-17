@@ -1,0 +1,129 @@
+import React, { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { X } from 'lucide-react';
+import type { Patient, PatientFormData } from '../../types/patient';
+
+interface EditPatientModalProps {
+  isOpen: boolean;
+  patient: Patient | null;
+  onClose: () => void;
+  onSave: (data: PatientFormData) => void;
+  loading: boolean;
+}
+
+export const EditPatientModal: React.FC<EditPatientModalProps> = ({
+  isOpen,
+  patient,
+  onClose,
+  onSave,
+  loading
+}) => {
+  const [formData, setFormData] = useState<PatientFormData | null>(null);
+  const [confirmText, setConfirmText] = useState('');
+
+  useEffect(() => {
+    if (patient) {
+      const { id, patient_id, created_at, updated_at, ...rest } = patient;
+      setFormData(rest);
+    }
+  }, [patient]);
+
+  if (!isOpen || !formData) return null;
+
+  const canSave = confirmText === 'EDIT';
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+    setFormData(prev => prev ? { ...prev, [name]: value } : prev);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (canSave) onSave(formData);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl font-bold">Edit Patient</h3>
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              <X className="w-5 h-5" />
+            </Button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+
+            {/* Patient ID (read-only) */}
+            <div>
+              <label className="text-sm font-medium">Patient ID</label>
+              <Input
+                value={patient?.patient_id}
+                disabled
+                className="bg-gray-100"
+              />
+            </div>
+
+            {/* Basic Info */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <InputField label="Last Name" name="last_name" value={formData.last_name} onChange={handleChange} />
+              <InputField label="First Name" name="first_name" value={formData.first_name} onChange={handleChange} />
+              <InputField label="Middle Name" name="middle_name" value={formData.middle_name || ''} onChange={handleChange} />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <InputField label="Sex" name="sex" value={formData.sex} onChange={handleChange} />
+              <InputField label="Date of Birth" type="date" name="date_of_birth" value={formData.date_of_birth} onChange={handleChange} />
+              <InputField label="Civil Status" name="civil_status" value={formData.civil_status} onChange={handleChange} />
+            </div>
+
+            <InputField
+              label="Occupation"
+              name="occupation"
+              value={formData.occupation || ''}
+              onChange={handleChange}
+            />
+
+            {/* EDIT Confirmation */}
+            <div className="border-t pt-4">
+              <p className="text-sm text-gray-700 mb-1">
+                Type <b>EDIT</b> to confirm changes
+              </p>
+              <Input
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                placeholder="Type EDIT"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={!canSave || loading}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {loading ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </div>
+
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ---------------- Reusable Input ----------------
+const InputField: React.FC<any> = ({ label, ...props }) => (
+  <div>
+    <label className="block text-sm font-medium mb-1">{label}</label>
+    <Input {...props} />
+  </div>
+);
