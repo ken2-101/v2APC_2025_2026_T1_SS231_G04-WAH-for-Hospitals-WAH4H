@@ -69,7 +69,7 @@ export const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({
       if (searchTimeout.current) clearTimeout(searchTimeout.current);
       searchTimeout.current = setTimeout(() => {
         handleSearchPatient(value);
-      }, 300); // faster debounce
+      }, 300);
     }
   };
 
@@ -78,10 +78,17 @@ export const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({
       setSearchResults([]);
       return;
     }
+
     setIsSearching(true);
     try {
-      const response = await axios.get(`/api/patients/?search=${encodeURIComponent(query)}`);
-      setSearchResults(Array.isArray(response.data) ? response.data : []);
+      const response = await axios.get(
+        `https://supreme-memory-5w9pg5gjv59379g7-8000.app.github.dev/api/patients/?search=${encodeURIComponent(query)}`
+      );
+      if (Array.isArray(response.data)) {
+        setSearchResults(response.data);
+      } else {
+        setSearchResults([]);
+      }
     } catch (error) {
       console.error('Error searching patient:', error);
       setSearchResults([]);
@@ -123,12 +130,12 @@ export const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({
     setSearchResults([]);
   };
 
-  const SelectField: React.FC<{
-    label: string;
-    value: string;
-    onChange: (val: string) => void;
-    options: string[];
-  }> = ({ label, value, onChange, options }) => (
+  const SelectField: React.FC<{ label: string; value: string; onChange: (val: string) => void; options: string[] }> = ({
+    label,
+    value,
+    onChange,
+    options,
+  }) => (
     <div>
       <Label>{label}</Label>
       <Select value={value} onValueChange={onChange}>
@@ -137,9 +144,7 @@ export const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({
         </SelectTrigger>
         <SelectContent>
           {options.map(opt => (
-            <SelectItem key={opt} value={opt}>
-              {opt}
-            </SelectItem>
+            <SelectItem key={opt} value={opt}>{opt}</SelectItem>
           ))}
         </SelectContent>
       </Select>
@@ -163,7 +168,7 @@ export const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({
             </div>
           </div>
 
-          {Array.isArray(searchResults) && searchResults.length > 0 && (
+          {searchResults.length > 0 && (
             <div className="border rounded-md p-2 max-h-48 overflow-y-auto">
               <p className="text-sm text-gray-500 mb-2">Select a patient:</p>
               {searchResults.map(patient => (
@@ -174,7 +179,7 @@ export const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({
                 >
                   <div>
                     <p className="font-medium">{patient.last_name}, {patient.first_name}</p>
-                    <p className="text-xs text-gray-500">ID: {patient.id} | DOB: {patient.date_of_birth}</p>
+                    <p className="text-xs text-gray-500">ID: {patient.patient_id} | DOB: {patient.date_of_birth}</p>
                   </div>
                   <Button size="sm" variant="ghost">Select</Button>
                 </div>
@@ -206,7 +211,7 @@ export const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({
           <div>
             <p className="font-medium text-green-800">Selected Patient</p>
             <p className="text-green-700">{selectedPatient.last_name}, {selectedPatient.first_name}</p>
-            <p className="text-sm text-green-600">ID: {selectedPatient.id}</p>
+            <p className="text-sm text-green-600">ID: {selectedPatient.patient_id}</p>
           </div>
           <Button variant="ghost" size="sm" onClick={() => setSelectedPatient(null)}>Change</Button>
         </div>
