@@ -40,7 +40,7 @@ export const DeleteAdmissionModal: React.FC<DeleteAdmissionModalProps> = ({
 
     try {
       await axios.delete(
-        `https://YOUR_BACKEND_URL/api/admissions/${admissionId}/`
+        `https://supreme-memory-5w9pg5gjv59379g7-8000.app.github.dev/api/admissions/${admissionId}/`
       );
       await fetchAdmissions();
       onClose();

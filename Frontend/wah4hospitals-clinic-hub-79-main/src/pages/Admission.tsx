@@ -1,13 +1,15 @@
-// src/pages/admission/Admission.tsx
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, Plus } from 'lucide-react';
+
 import { AdmissionFilters } from '@/components/admission/AdmissionFilters';
 import { AdmissionTable } from '@/components/admission/AdmissionTable';
 import { AdmitPatientModal } from '@/components/admission/AdmitPatientModal';
-import { EditAdmissionModal } from '@/components/admission/EditAdmissionModal'; // make sure you have this
+import { EditAdmissionModal } from '@/components/admission/EditAdmissionModal';
+import { DeleteAdmissionModal } from '@/components/admission/DeleteAdmissionModal';
+
 import type { Admission, CreateAdmission } from '@/types/admission';
 import { admissionService } from '@/services/admissionService';
 
@@ -22,11 +24,12 @@ const Admission: React.FC<AdmissionProps> = ({ onNavigate }) => {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilters, setActiveFilters] = useState({ ward: '', status: '', doctor: '' });
+
   const [isAdmitModalOpen, setIsAdmitModalOpen] = useState(false);
 
-  // New state for edit modal
   const [selectedAdmission, setSelectedAdmission] = useState<Admission | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   const fetchAdmissions = async () => {
     setLoading(true);
@@ -54,7 +57,7 @@ const Admission: React.FC<AdmissionProps> = ({ onNavigate }) => {
     setActiveFilters({ ward: '', status: '', doctor: '' });
   };
 
-  // Admit patient handler
+  // Admit patient
   const handleAdmitPatient = async (data: any) => {
     try {
       const payload: Partial<CreateAdmission> = {
@@ -69,8 +72,8 @@ const Admission: React.FC<AdmissionProps> = ({ onNavigate }) => {
         encounter_type: 'Inpatient',
         admitting_diagnosis: data.admittingDiagnosis,
         reason_for_admission: data.reasonForAdmission,
-        admission_category: data.admissionCategory as 'Emergency' | 'Regular',
-        mode_of_arrival: data.modeOfArrival as 'Walk-in' | 'Ambulance' | 'Referral',
+        admission_category: data.admissionCategory,
+        mode_of_arrival: data.modeOfArrival,
       };
 
       await admissionService.create(payload as CreateAdmission);
@@ -121,15 +124,15 @@ const Admission: React.FC<AdmissionProps> = ({ onNavigate }) => {
       <Card>
         <CardHeader>
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <CardTitle className="mb-2 md:mb-0">Admitted Patients</CardTitle>
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
+            <CardTitle>Admitted Patients</CardTitle>
+            <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
               <div className="relative w-full sm:w-80">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <Input
                   placeholder="Search patient name or ID..."
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
-                  className="pl-10 w-full"
+                  className="pl-10"
                 />
               </div>
               <AdmissionFilters
@@ -141,12 +144,17 @@ const Admission: React.FC<AdmissionProps> = ({ onNavigate }) => {
             </div>
           </div>
         </CardHeader>
+
         <CardContent>
           <AdmissionTable
             admissions={filteredAdmissions}
             onEditClick={(admission) => {
               setSelectedAdmission(admission);
               setIsEditModalOpen(true);
+            }}
+            onDeleteClick={(admission) => {
+              setSelectedAdmission(admission);
+              setIsDeleteModalOpen(true);
             }}
           />
         </CardContent>
@@ -163,7 +171,22 @@ const Admission: React.FC<AdmissionProps> = ({ onNavigate }) => {
         <EditAdmissionModal
           isOpen={isEditModalOpen}
           admission={selectedAdmission}
-          onClose={() => setIsEditModalOpen(false)}
+          onClose={() => {
+            setIsEditModalOpen(false);
+            setSelectedAdmission(null);
+          }}
+          fetchAdmissions={fetchAdmissions}
+        />
+      )}
+
+      {selectedAdmission && (
+        <DeleteAdmissionModal
+          isOpen={isDeleteModalOpen}
+          admissionId={selectedAdmission.id} // ✅ FIXED
+          onClose={() => {
+            setIsDeleteModalOpen(false);
+            setSelectedAdmission(null);
+          }}
           fetchAdmissions={fetchAdmissions}
         />
       )}
