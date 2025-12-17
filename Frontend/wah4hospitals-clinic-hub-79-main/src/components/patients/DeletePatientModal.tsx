@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { X } from 'lucide-react';
 import type { Patient } from '../../types/patient';
 import axios from 'axios';
 
@@ -19,6 +20,7 @@ export const DeletePatientModal: React.FC<DeletePatientModalProps> = ({
 }) => {
   const [confirmText, setConfirmText] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   if (!isOpen) return null;
 
@@ -26,42 +28,62 @@ export const DeletePatientModal: React.FC<DeletePatientModalProps> = ({
 
   const handleDelete = async () => {
     if (!canDelete) return;
+
     setLoading(true);
+    setError('');
+
     try {
-      await axios.delete(`https://supreme-memory-5w9pg5gjv59379g7-8000.app.github.dev/api/patients/${patient.patient_id}/`);
+      // Use numeric ID for DELETE request
+      await axios.delete(
+        `https://supreme-memory-5w9pg5gjv59379g7-8000.app.github.dev/api/patients/${patient.id}/`
+      );
       await fetchPatients();
-      onClose();
-    } catch (err) {
+      handleClose();
+    } catch (err: any) {
       console.error('Failed to delete patient:', err);
+      setError(
+        err.response?.data
+          ? JSON.stringify(err.response.data)
+          : 'Failed to delete patient'
+      );
     } finally {
       setLoading(false);
     }
   };
 
+  const handleClose = () => {
+    setConfirmText('');
+    setError('');
+    onClose();
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-md w-full">
-        <h3 className="text-lg font-bold text-red-600 mb-2">
-          Confirm Delete
-        </h3>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-md w-full p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-bold text-red-600">Delete Patient</h3>
+          <Button variant="ghost" size="sm" onClick={handleClose}>
+            <X className="w-5 h-5" />
+          </Button>
+        </div>
+
+        {error && <p className="text-red-600 mb-2">{error}</p>}
 
         <p className="text-sm mb-4">
-          You are about to delete <b>{patient.first_name} {patient.last_name}</b>.
-          <br />This action cannot be undone.
+          Are you sure you want to delete <b>{patient.last_name}, {patient.first_name}</b>? This action cannot be undone.
         </p>
 
-        <p className="text-sm mb-1">
+        <p className="text-sm mb-2">
           Type <b>DELETE</b> to confirm:
         </p>
-
         <Input
           value={confirmText}
-          onChange={(e) => setConfirmText(e.target.value)}
+          onChange={e => setConfirmText(e.target.value)}
           placeholder="Type DELETE"
         />
 
         <div className="flex justify-end gap-2 mt-6">
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={handleClose}>
             Cancel
           </Button>
           <Button

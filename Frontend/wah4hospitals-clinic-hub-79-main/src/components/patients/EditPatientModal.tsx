@@ -42,11 +42,15 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
   });
   const [confirmText, setConfirmText] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
+  // Populate form when patient changes
   useEffect(() => {
     if (patient) {
       const { id, patient_id, created_at, updated_at, ...rest } = patient;
       setFormData(rest);
+      setConfirmText('');
+      setError('');
     }
   }, [patient]);
 
@@ -66,18 +70,32 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
     if (!canSave) return;
 
     setLoading(true);
+    setError('');
+
     try {
+      // Use numeric ID for PUT request, not patient_id string
       await axios.put(
-        `https://supreme-memory-5w9pg5gjv59379g7-8000.app.github.dev/api/patients/${patient.patient_id}/`,
+        `https://supreme-memory-5w9pg5gjv59379g7-8000.app.github.dev/api/patients/${patient.id}/`,
         formData
       );
       await fetchPatients();
       onClose();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to update patient:', err);
+      setError(
+        err.response?.data
+          ? JSON.stringify(err.response.data)
+          : 'Failed to update patient'
+      );
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleClose = () => {
+    setConfirmText('');
+    setError('');
+    onClose();
   };
 
   return (
@@ -86,10 +104,12 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
         <div className="p-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl font-bold">Edit Patient</h3>
-            <Button variant="ghost" size="sm" onClick={onClose}>
+            <Button variant="ghost" size="sm" onClick={handleClose}>
               <X className="w-5 h-5" />
             </Button>
           </div>
+
+          {error && <p className="text-red-600 mb-2">{error}</p>}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
@@ -119,7 +139,9 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
             </div>
 
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+              <Button type="button" variant="outline" onClick={handleClose}>
+                Cancel
+              </Button>
               <Button type="submit" disabled={!canSave || loading} className="bg-blue-600 hover:bg-blue-700">
                 {loading ? 'Saving...' : 'Save Changes'}
               </Button>
@@ -131,6 +153,7 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
   );
 };
 
+// Reusable input field
 const InputField: React.FC<any> = ({ label, ...props }) => (
   <div>
     <label className="block text-sm font-medium mb-1">{label}</label>
