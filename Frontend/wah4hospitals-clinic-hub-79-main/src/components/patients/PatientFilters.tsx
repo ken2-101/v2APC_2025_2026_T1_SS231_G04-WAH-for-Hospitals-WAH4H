@@ -5,29 +5,27 @@ import { Filter, X } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
+  DropdownMenuCheckboxItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
   DropdownMenuLabel,
-  DropdownMenuCheckboxItem,
+  DropdownMenuItem,
 } from '@/components/ui/dropdown-menu';
 
 interface PatientFiltersProps {
   activeFilters: {
     status: string[];
     gender: string[];
-    department: string[];
     civilStatus: string[];
   };
-  handleFilterChange: (filterType: string, value: string) => void;
+  handleFilterChange: (filterType: keyof PatientFiltersProps['activeFilters'], value: string) => void;
   clearFilters: () => void;
   hasActiveFilters: boolean;
 }
 
-// Predefined options for easier mapping
+// Predefined options
 const STATUS_OPTIONS = ['Active', 'Inactive'];
 const GENDER_OPTIONS = ['M', 'F'];
-const DEPARTMENT_OPTIONS = ['General Medicine', 'Cardiology', 'Pediatrics', 'Emergency'];
 const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Divorced', 'Widowed'];
 
 export const PatientFilters: React.FC<PatientFiltersProps> = ({
@@ -36,11 +34,14 @@ export const PatientFilters: React.FC<PatientFiltersProps> = ({
   clearFilters,
   hasActiveFilters
 }) => {
-  const renderCheckboxItems = (filterType: string, options: string[]) => {
+  const renderCheckboxItems = (
+    filterType: keyof PatientFiltersProps['activeFilters'],
+    options: string[]
+  ) => {
     return options.map(option => (
       <DropdownMenuCheckboxItem
         key={option}
-        checked={activeFilters[filterType as keyof typeof activeFilters].includes(option)}
+        checked={activeFilters[filterType].includes(option)}
         onCheckedChange={() => handleFilterChange(filterType, option)}
       >
         {filterType === 'gender' ? (option === 'M' ? 'Male' : 'Female') : option}
@@ -69,10 +70,6 @@ export const PatientFilters: React.FC<PatientFiltersProps> = ({
 
         <DropdownMenuLabel>Filter by Sex</DropdownMenuLabel>
         {renderCheckboxItems('gender', GENDER_OPTIONS)}
-        <DropdownMenuSeparator />
-
-        <DropdownMenuLabel>Filter by Department</DropdownMenuLabel>
-        {renderCheckboxItems('department', DEPARTMENT_OPTIONS)}
         <DropdownMenuSeparator />
 
         <DropdownMenuLabel>Filter by Civil Status</DropdownMenuLabel>

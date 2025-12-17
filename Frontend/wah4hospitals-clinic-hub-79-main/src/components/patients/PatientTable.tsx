@@ -1,7 +1,7 @@
+// File: /components/patients/PatientTable.tsx
 import React from 'react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { FileText } from 'lucide-react';
 import type { Patient } from '../../types/patient';
 
 interface PatientTableProps {
@@ -9,67 +9,40 @@ interface PatientTableProps {
   handleViewDetails: (patient: Patient) => void;
 }
 
-export const PatientTable: React.FC<PatientTableProps> = ({
-  patients,
-  handleViewDetails
-}) => {
+export const PatientTable: React.FC<PatientTableProps> = ({ patients, handleViewDetails }) => {
+  if (!patients.length) {
+    return <p className="text-center py-4 text-gray-500">No patients found.</p>;
+  }
+
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse">
-        <thead>
-          <tr className="border-b">
-            <th className="text-left py-3 px-4 font-medium">Patient ID</th>
-            <th className="text-left py-3 px-4 font-medium">Full Name</th>
-            <th className="text-left py-3 px-4 font-medium">Age</th>
-            <th className="text-left py-3 px-4 font-medium">Mobile Number</th>
-            <th className="text-left py-3 px-4 font-medium">Department</th>
-            <th className="text-left py-3 px-4 font-medium">Room</th>
-            <th className="text-left py-3 px-4 font-medium">Status</th>
-            <th className="text-left py-3 px-4 font-medium">Actions</th>
-          </tr>
-        </thead>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Patient ID</TableHead>
+          <TableHead>Full Name</TableHead>
+          <TableHead>Sex</TableHead>
+          <TableHead>Civil Status</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Actions</TableHead>
+        </TableRow>
+      </TableHeader>
 
-        <tbody>
-          {patients.map((patient) => {
-            const fullName = `${patient.last_name}, ${patient.first_name} ${patient.middle_name || ''} ${patient.suffix || ''}`.trim();
-            const age = new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear();
-
-            return (
-              <tr key={patient.id} className="border-b hover:bg-gray-50">
-                <td className="py-4 px-4 font-medium">{patient.id}</td>
-                <td className="py-4 px-4">{fullName}</td>
-                <td className="py-4 px-4">{age}</td>
-                <td className="py-4 px-4">{patient.mobile_number}</td>
-                <td className="py-4 px-4">{patient.department}</td>
-                <td className="py-4 px-4">{patient.room}</td>
-                <td className="py-4 px-4">
-                  <Badge
-                    className={
-                      patient.status === 'Active'
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
-                    }
-                  >
-                    {patient.status}
-                  </Badge>
-                </td>
-                <td className="py-4 px-4">
-                  <Button size="sm" variant="outline" onClick={() => handleViewDetails(patient)}>
-                    <FileText className="w-4 h-4 mr-1" />
-                    Details
-                  </Button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-
-      {patients.length === 0 && (
-        <div className="text-center py-8 text-gray-500">
-          No patients found matching your search criteria.
-        </div>
-      )}
-    </div>
+      <TableBody>
+        {patients.map((patient) => (
+          <TableRow key={patient.id}>
+            <TableCell>{patient.patient_id}</TableCell>
+            <TableCell>{`${patient.last_name}, ${patient.first_name} ${patient.middle_name ?? ''} ${patient.suffix ?? ''}`.trim()}</TableCell>
+            <TableCell>{patient.sex === 'M' ? 'Male' : 'Female'}</TableCell>
+            <TableCell>{patient.civil_status}</TableCell>
+            <TableCell>{patient.status}</TableCell>
+            <TableCell>
+              <Button size="sm" variant="outline" onClick={() => handleViewDetails(patient)}>
+                View
+              </Button>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 };

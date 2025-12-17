@@ -7,8 +7,7 @@ import {
   PersonalInfoCard,
   ContactInfoCard,
   OccupationCard,
-  RoomCard,
-  MedicalInfoCard
+  IdentificationCard,
 } from './PatientDetailSections';
 
 interface PatientDetailsModalProps {
@@ -42,7 +41,7 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({ isOpen
               <h3 className="text-xl font-semibold">
                 {`${patient.last_name}, ${patient.first_name} ${patient.middle_name ?? ''} ${patient.suffix ?? ''}`}
               </h3>
-              <p className="text-gray-600">Patient ID: {patient.id}</p>
+              <p className="text-gray-600">Patient ID: {patient.patient_id}</p>
               <Badge className="mt-1">{patient.status}</Badge>
             </div>
           </div>
@@ -52,11 +51,8 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({ isOpen
             <PersonalInfoCard patient={patient} />
             <ContactInfoCard patient={patient} />
             <OccupationCard patient={patient} />
-            <RoomCard patient={patient} />
+            <IdentificationCard patient={patient} />
           </div>
-
-          {/* Medical Info spans full width */}
-          <MedicalInfoCard patient={patient} />
         </div>
       </DialogContent>
     </Dialog>

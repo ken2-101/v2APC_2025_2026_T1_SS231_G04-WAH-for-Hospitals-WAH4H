@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Calendar, Phone, Briefcase, Home, Heart, LucideIcon } from 'lucide-react';
+import { Calendar, Phone, Briefcase, LucideIcon } from 'lucide-react';
 import type { Patient } from '../../types/patient';
 import { regions, provinces, cities } from '../../data/addressData';
 
@@ -53,10 +53,13 @@ const formatAddress = (patient: Patient) => {
   if (patient.house_no_street) parts.push(patient.house_no_street);
   if (patient.barangay) parts.push(patient.barangay);
 
-  const cityName = cities[patient.province]?.find(c => c.code === patient.city_municipality)?.name || patient.city_municipality;
+  const cityName =
+    cities[patient.province]?.find(c => c.code === patient.city_municipality)?.name ||
+    patient.city_municipality;
   if (cityName) parts.push(cityName);
 
-  const provinceName = provinces[patient.region]?.find(p => p.code === patient.province)?.name || patient.province;
+  const provinceName =
+    provinces[patient.region]?.find(p => p.code === patient.province)?.name || patient.province;
   if (provinceName) parts.push(provinceName);
 
   const regionName = regions.find(r => r.code === patient.region)?.name || patient.region;
@@ -102,28 +105,12 @@ export const OccupationCard: React.FC<{ patient: Patient }> = ({ patient }) => (
   </DetailCard>
 );
 
-export const RoomCard: React.FC<{ patient: Patient }> = ({ patient }) => (
-  <DetailCard title="Room Assignment" icon={Home} iconColor="text-orange-600">
-    <div className="text-sm space-y-2">
-      <DetailItem label="Room" value={patient.room} />
-      <DetailItem label="Department" value={patient.department} />
-    </div>
-  </DetailCard>
-);
-
-export const MedicalInfoCard: React.FC<{ patient: Patient }> = ({ patient }) => (
-  <DetailCard title="Medical Information" icon={Heart} iconColor="text-red-600">
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-      <div className="space-y-3">
-        <DetailItem label="Admission Date" value={patient.admission_date} />
-        <DetailItem label="Condition" value={patient.condition} />
-        <DetailItem label="Attending Physician" value={patient.physician} />
-      </div>
-      <div className="space-y-3">
-        <DetailItem label="PhilHealth ID" value={patient.philhealth_id} className="font-medium font-mono" />
-        {patient.national_id && <DetailItem label="National ID" value={patient.national_id} className="font-medium font-mono" />}
-        <DetailItem label="Status" value={patient.status} />
-      </div>
+export const IdentificationCard: React.FC<{ patient: Patient }> = ({ patient }) => (
+  <DetailCard title="Identification & Status" icon={Briefcase} iconColor="text-indigo-600">
+    <div className="space-y-3 text-sm">
+      <DetailItem label="PhilHealth ID" value={patient.philhealth_id} className="font-medium font-mono" />
+      {patient.national_id && <DetailItem label="National ID" value={patient.national_id} className="font-medium font-mono" />}
+      <DetailItem label="Status" value={patient.status} />
     </div>
   </DetailCard>
 );

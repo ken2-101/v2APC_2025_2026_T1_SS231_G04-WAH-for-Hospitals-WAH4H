@@ -1,3 +1,4 @@
+// PatientRegistration.tsx
 import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,8 @@ import { PatientFilters } from '@/components/patients/PatientFilters';
 import type { Patient, PatientFormData } from '../types/patient';
 import axios from 'axios';
 
+const API_URL = 'https://supreme-memory-5w9pg5gjv59379g7-8000.app.github.dev/api/patients/';
+
 export const PatientRegistration: React.FC = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [filteredPatients, setFilteredPatients] = useState<Patient[]>([]);
@@ -18,15 +21,17 @@ export const PatientRegistration: React.FC = () => {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
 
-  const [formData, setFormData] = useState<PatientFormData>({
-    patient_id: '',
+  // --------------------------
+  // Initial form data (no patient_id)
+  // --------------------------
+  const initialFormData: Omit<PatientFormData, 'patient_id'> = {
     philhealth_id: '',
     national_id: '',
     last_name: '',
     first_name: '',
     middle_name: '',
     suffix: '',
-    sex: '',
+    sex: 'M',
     date_of_birth: '',
     civil_status: '',
     nationality: '',
@@ -39,18 +44,10 @@ export const PatientRegistration: React.FC = () => {
     barangay: '',
     house_no_street: '',
     status: 'Active',
-    admission_date: '',
-    department: '',
-    room: '',
-    physician: '',
-    condition: '',
     occupation: '',
-    passport_number: '',
-    drivers_license: '',
-    senior_citizen_id: '',
-    pwd_id: ''
-  });
+  };
 
+  const [formData, setFormData] = useState({ ...initialFormData });
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
@@ -62,46 +59,52 @@ export const PatientRegistration: React.FC = () => {
     civilStatus: [] as string[],
   });
 
-  // Fetch patients on mount
+  // --------------------------
+  // Fetch patients
+  // --------------------------
   useEffect(() => {
     fetchPatients();
   }, []);
 
   const fetchPatients = async () => {
     try {
-      const res = await axios.get<Patient[]>('https://supreme-memory-5w9pg5gjv59379g7-8000.app.github.dev/api/patients/');
-
-      // Defensive: ensure res.data is always an array
-      const patientList = Array.isArray(res.data) ? res.data : [];
-      setPatients(patientList);
-      setFilteredPatients(patientList);
+      const res = await axios.get<Patient[]>(API_URL);
+      const list = Array.isArray(res.data) ? res.data : [];
+      setPatients(list);
+      setFilteredPatients(list);
     } catch (err) {
-      console.error(err);
+      console.error('Error fetching patients:', err);
       setPatients([]);
       setFilteredPatients([]);
     }
   };
 
-  // Filter & Search
+  // --------------------------
+  // Filter & search
+  // --------------------------
   useEffect(() => {
     let temp = [...patients];
 
     if (activeFilters.status.length) temp = temp.filter(p => activeFilters.status.includes(p.status));
     if (activeFilters.gender.length) temp = temp.filter(p => activeFilters.gender.includes(p.sex));
-    if (activeFilters.department.length) temp = temp.filter(p => activeFilters.department.includes(p.department));
     if (activeFilters.civilStatus.length) temp = temp.filter(p => activeFilters.civilStatus.includes(p.civil_status));
 
     if (searchQuery) {
-      temp = temp.filter(p =>
-        `${p.last_name} ${p.first_name} ${p.middle_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.patient_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.mobile_number.includes(searchQuery)
+      const q = searchQuery.toLowerCase();
+      temp = temp.filter(
+        p =>
+          `${p.last_name} ${p.first_name} ${p.middle_name || ''}`.toLowerCase().includes(q) ||
+          p.patient_id.toLowerCase().includes(q) ||
+          p.mobile_number.includes(searchQuery)
       );
     }
 
     setFilteredPatients(temp);
   }, [patients, activeFilters, searchQuery]);
 
+  // --------------------------
+  // Form handlers
+  // --------------------------
   const handleFormChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -114,84 +117,64 @@ export const PatientRegistration: React.FC = () => {
     setFormSuccess('');
 
     try {
-      await axios.post('https://supreme-memory-5w9pg5gjv59379g7-8000.app.github.dev/api/patients/',formData);
-      setFormSuccess('Patient registered successfully!');
+      const res = await axios.post(API_URL, formData);
+      const registeredPatient: Patient = res.data;
+
+      setFormSuccess(`Patient registered successfully! ID: ${registeredPatient.patient_id}`);
       setShowRegistrationModal(false);
-      setFormData({
-        patient_id: '',
-        philhealth_id: '',
-        national_id: '',
-        last_name: '',
-        first_name: '',
-        middle_name: '',
-        suffix: '',
-        sex: '',
-        date_of_birth: '',
-        civil_status: '',
-        nationality: '',
-        mobile_number: '',
-        telephone: '',
-        email: '',
-        region: '',
-        province: '',
-        city_municipality: '',
-        barangay: '',
-        house_no_street: '',
-        status: 'Active',
-        admission_date: '',
-        department: '',
-        room: '',
-        physician: '',
-        condition: '',
-        occupation: '',
-        passport_number: '',
-        drivers_license: '',
-        senior_citizen_id: '',
-        pwd_id: ''
-      });
+      setFormData({ ...initialFormData });
       fetchPatients();
     } catch (err: any) {
-      setFormError(err.response?.data?.message || 'Failed to register patient');
+      console.error('Full Axios error:', err);
+
+      if (err.response) {
+        if (typeof err.response.data === 'object') {
+          const messages = Object.entries(err.response.data)
+            .map(([field, msgs]: [string, any]) => (Array.isArray(msgs) ? `${field}: ${msgs.join(', ')}` : `${field}: ${msgs}`))
+            .join('\n');
+          setFormError(messages);
+        } else {
+          setFormError(err.response.data);
+        }
+      } else {
+        setFormError(err.message || 'Failed to register patient');
+      }
     } finally {
       setFormLoading(false);
     }
   };
 
+  // --------------------------
+  // Filter change handlers
+  // --------------------------
   const handleFilterChange = (filterType: string, value: string) => {
     setActiveFilters(prev => {
       const prevValues = prev[filterType as keyof typeof prev];
       return {
         ...prev,
-        [filterType]: prevValues.includes(value)
-          ? prevValues.filter(v => v !== value)
-          : [...prevValues, value]
+        [filterType]: prevValues.includes(value) ? prevValues.filter(v => v !== value) : [...prevValues, value],
       };
     });
   };
 
-  const clearFilters = () => {
-    setActiveFilters({ status: [], gender: [], department: [], civilStatus: [] });
-  };
+  const clearFilters = () => setActiveFilters({ status: [], gender: [], department: [], civilStatus: [] });
+  const handleViewDetails = (patient: Patient) => { setSelectedPatient(patient); setShowDetailsModal(true); };
 
-  const handleViewDetails = (patient: Patient) => {
-    setSelectedPatient(patient);
-    setShowDetailsModal(true);
-  };
-
+  // --------------------------
+  // Render
+  // --------------------------
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle>Patients</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle>Patients</CardTitle></CardHeader>
         <CardContent>
           <div className="flex flex-col md:flex-row md:justify-between mb-4 gap-2">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
                 placeholder="Search patients..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={e => setSearchQuery(e.target.value)}
                 className="pl-8 max-w-sm"
               />
             </div>
@@ -207,10 +190,7 @@ export const PatientRegistration: React.FC = () => {
             hasActiveFilters={Object.values(activeFilters).flat().length > 0}
           />
 
-          <PatientTable
-            patients={Array.isArray(filteredPatients) ? filteredPatients : []}
-            handleViewDetails={handleViewDetails}
-          />
+          <PatientTable patients={filteredPatients} handleViewDetails={handleViewDetails} />
         </CardContent>
       </Card>
 

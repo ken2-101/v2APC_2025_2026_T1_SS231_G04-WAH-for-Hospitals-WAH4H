@@ -1,65 +1,67 @@
 export type Patient = {
-    id: string;
-    philhealth_id: string;
-    last_name: string;
-    first_name: string;
-    middle_name?: string;
-    suffix?: string;
-    sex: 'M' | 'F';
-    date_of_birth: string;
-    civil_status: string;
-    nationality: string;
-    mobile_number: string;
-    telephone?: string;
-    email?: string;
-    region: string;
-    province: string;
-    city_municipality: string;
-    barangay: string;
-    house_no_street?: string;
-    national_id?: string;
-    passport_number?: string;
-    drivers_license?: string;
-    senior_citizen_id?: string;
-    pwd_id?: string;
-    occupation?: string;
-    room?: string;
-    department?: string;
-    admission_date: string;
-    condition?: string;
-    physician?: string;
-    status: string;
+  /** Django primary key */
+  id: number;
+
+  /** Hospital-generated ID (e.g. P0001) */
+  patient_id: string;
+
+  philhealth_id?: string;
+  national_id?: string;
+
+  last_name: string;
+  first_name: string;
+  middle_name?: string;
+  suffix?: string;
+
+  sex: 'M' | 'F';
+  date_of_birth: string;
+  civil_status: string;
+  nationality: string;
+
+  mobile_number: string;
+  telephone?: string;
+  email?: string;
+
+  region: string;
+  province: string;
+  city_municipality: string;
+  barangay: string;
+  house_no_street?: string;
+
+  occupation?: string;
+
+  /** Patient lifecycle status (Active / Inactive / Deceased) */
+  status: string;
+
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type PatientFormData = {
-    id: string;
-    philhealth_id: string;
-    last_name: string;
-    first_name: string;
-    middle_name: string;
-    suffix: string;
-    sex: string;
-    date_of_birth: string;
-    civil_status: string;
-    nationality: string;
-    mobile_number: string;
-    telephone: string;
-    email: string;
-    region: string;
-    province: string;
-    city_municipality: string;
-    barangay: string;
-    house_no_street: string;
-    national_id: string;
-    passport_number: string;
-    drivers_license: string;
-    senior_citizen_id: string;
-    pwd_id: string;
-    occupation: string;
-    room: string;
-    department: string;
-    admission_date: string;
-    condition: string;
-    physician: string;
-    status: string;
+  philhealth_id?: string;
+  national_id?: string;
+
+  last_name: string;
+  first_name: string;
+  middle_name?: string;
+  suffix?: string;
+
+  sex: 'M' | 'F';
+  date_of_birth: string;
+  civil_status: string;
+  nationality: string;
+
+  mobile_number: string;
+  telephone?: string;
+  email?: string;
+
+  region: string;
+  province: string;
+  city_municipality: string;
+  barangay: string;
+  house_no_street?: string;
+
+  occupation?: string;
+
+  status: string;
 };

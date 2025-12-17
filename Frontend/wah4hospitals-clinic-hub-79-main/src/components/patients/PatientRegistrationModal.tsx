@@ -9,7 +9,9 @@ interface PatientRegistrationModalProps {
   isOpen: boolean;
   onClose: () => void;
   formData: PatientFormData;
-  handleFormChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
+  handleFormChange: (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => void;
   handleRegisterPatient: (e: React.FormEvent) => void;
   formLoading: boolean;
   success: string;
@@ -48,22 +50,14 @@ export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> =
             </Button>
           </div>
 
-          {success && (
-            <div className="mb-4 p-3 bg-green-100 text-green-700 rounded-md">{success}</div>
-          )}
-          {formError && (
-            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">{formError}</div>
-          )}
+          {success && <div className="mb-4 p-3 bg-green-100 text-green-700 rounded-md">{success}</div>}
+          {formError && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">{formError}</div>}
 
           <form onSubmit={handleRegisterPatient} className="space-y-6">
-            {/* Identity */}
+            {/* Identity & Personal Info */}
             <div>
               <h4 className="text-lg font-semibold mb-3 border-b pb-2">Identity & Personal Information</h4>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label htmlFor="id" className="block text-sm font-medium text-gray-700 mb-1">Facility Patient ID *</label>
-                  <Input type="text" id="id" name="id" value={formData.id} onChange={handleFormChange} required placeholder="e.g., P001" />
-                </div>
                 <div>
                   <label htmlFor="philhealth_id" className="block text-sm font-medium text-gray-700 mb-1">PhilHealth ID *</label>
                   <Input type="text" id="philhealth_id" name="philhealth_id" value={formData.philhealth_id} onChange={handleFormChange} required placeholder="12-digit PIN" />
@@ -179,44 +173,6 @@ export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> =
               <div className="mt-4">
                 <label htmlFor="house_no_street" className="block text-sm font-medium text-gray-700 mb-1">House No. / Street</label>
                 <Input type="text" id="house_no_street" name="house_no_street" value={formData.house_no_street} onChange={handleFormChange} placeholder="Lot/Block/Phase/Street Name" />
-              </div>
-            </div>
-
-            {/* Hospital Info */}
-            <div>
-              <h4 className="text-lg font-semibold mb-3 border-b pb-2">Hospital Admission Info</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">Status *</label>
-                  <select id="status" name="status" value={formData.status} onChange={handleFormChange} required className="w-full rounded-md border border-gray-300 px-3 py-2">
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="admission_date" className="block text-sm font-medium text-gray-700 mb-1">Admission Date *</label>
-                  <Input type="date" id="admission_date" name="admission_date" value={formData.admission_date} onChange={handleFormChange} required />
-                </div>
-                <div>
-                  <label htmlFor="department" className="block text-sm font-medium text-gray-700 mb-1">Department</label>
-                  <Input type="text" id="department" name="department" value={formData.department} onChange={handleFormChange} />
-                </div>
-                <div>
-                  <label htmlFor="room" className="block text-sm font-medium text-gray-700 mb-1">Room</label>
-                  <Input type="text" id="room" name="room" value={formData.room} onChange={handleFormChange} />
-                </div>
-                <div>
-                  <label htmlFor="physician" className="block text-sm font-medium text-gray-700 mb-1">Physician</label>
-                  <Input type="text" id="physician" name="physician" value={formData.physician} onChange={handleFormChange} />
-                </div>
-                <div>
-                  <label htmlFor="condition" className="block text-sm font-medium text-gray-700 mb-1">Condition</label>
-                  <Input type="text" id="condition" name="condition" value={formData.condition} onChange={handleFormChange} />
-                </div>
-                <div>
-                  <label htmlFor="occupation" className="block text-sm font-medium text-gray-700 mb-1">Occupation</label>
-                  <Input type="text" id="occupation" name="occupation" value={formData.occupation} onChange={handleFormChange} />
-                </div>
               </div>
             </div>
 
