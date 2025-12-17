@@ -1,0 +1,46 @@
+{
+  "regions": [
+    { "code": "NCR", "name": "National Capital Region" },
+    { "code": "CAR", "name": "Cordillera Administrative Region" },
+    { "code": "I", "name": "Ilocos Region" },
+    { "code": "II", "name": "Cagayan Valley" },
+    { "code": "III", "name": "Central Luzon" },
+    { "code": "IVA", "name": "CALABARZON" },
+    { "code": "IVB", "name": "MIMAROPA" },
+    { "code": "V", "name": "Bicol Region" }
+  ],
+  "provinces": {
+    "NCR": [
+      { "code": "MNL", "name": "Manila" },
+      { "code": "QUE", "name": "Quezon City" },
+      { "code": "CUB", "name": "Cebu City" }
+    ],
+    "III": [
+      { "code": "PAMP", "name": "Pampanga" },
+      { "code": "BUL", "name": "Bulacan" },
+      { "code": "ZMB", "name": "Zambales" }
+    ]
+  },
+  "cities": {
+    "MNL": [
+      { "code": "MNL001", "name": "District 1" },
+      { "code": "MNL002", "name": "District 2" }
+    ],
+    "QUE": [
+      { "code": "QUE001", "name": "Cubao" },
+      { "code": "QUE002", "name": "Novaliches" }
+    ],
+    "PAMP": [
+      { "code": "SANFER", "name": "San Fernando" },
+      { "code": "ANG", "name": "Angeles" }
+    ]
+  },
+  "barangays": {
+    "MNL001": ["Barangay 1", "Barangay 2", "Barangay 3"],
+    "MNL002": ["Barangay 4", "Barangay 5", "Barangay 6"],
+    "QUE001": ["Barangay Cubao 1", "Barangay Cubao 2"],
+    "QUE002": ["Barangay Novaliches 1", "Barangay Novaliches 2"],
+    "SANFER": ["Barangay San Fernando 1", "Barangay San Fernando 2"],
+    "ANG": ["Barangay Angeles 1", "Barangay Angeles 2"]
+  }
+}

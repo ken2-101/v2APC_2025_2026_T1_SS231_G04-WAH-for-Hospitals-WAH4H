@@ -38,6 +38,7 @@ export type Patient = {
 };
 
 export type PatientFormData = {
+  patient_id?: string; // 
   philhealth_id?: string;
   national_id?: string;
 

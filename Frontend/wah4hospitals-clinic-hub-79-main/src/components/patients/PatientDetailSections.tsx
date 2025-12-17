@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Calendar, Phone, Briefcase, LucideIcon } from 'lucide-react';
 import type { Patient } from '../../types/patient';
-import { regions, provinces, cities } from '../../data/addressData';
+import addressData from '../../data/addressData.json';
 
 // Generic card wrapper
 interface DetailCardProps {
@@ -54,15 +54,15 @@ const formatAddress = (patient: Patient) => {
   if (patient.barangay) parts.push(patient.barangay);
 
   const cityName =
-    cities[patient.province]?.find(c => c.code === patient.city_municipality)?.name ||
+    addressData.cities[patient.province]?.find((c: any) => c.code === patient.city_municipality)?.name ||
     patient.city_municipality;
   if (cityName) parts.push(cityName);
 
   const provinceName =
-    provinces[patient.region]?.find(p => p.code === patient.province)?.name || patient.province;
+    addressData.provinces[patient.region]?.find((p: any) => p.code === patient.province)?.name || patient.province;
   if (provinceName) parts.push(provinceName);
 
-  const regionName = regions.find(r => r.code === patient.region)?.name || patient.region;
+  const regionName = addressData.regions.find((r: any) => r.code === patient.region)?.name || patient.region;
   if (regionName) parts.push(regionName);
 
   return parts.join(', ');
@@ -109,7 +109,7 @@ export const IdentificationCard: React.FC<{ patient: Patient }> = ({ patient }) 
   <DetailCard title="Identification & Status" icon={Briefcase} iconColor="text-indigo-600">
     <div className="space-y-3 text-sm">
       <DetailItem label="PhilHealth ID" value={patient.philhealth_id} className="font-medium font-mono" />
-      {patient.national_id && <DetailItem label="National ID" value={patient.national_id} className="font-medium font-mono" />}
+      <DetailItem label="National ID" value={patient.national_id ?? 'N/A'} className="font-medium font-mono" />
       <DetailItem label="Status" value={patient.status} />
     </div>
   </DetailCard>
