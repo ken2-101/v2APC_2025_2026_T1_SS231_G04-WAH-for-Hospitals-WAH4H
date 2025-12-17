@@ -8,6 +8,8 @@ import { PatientDetailsModal } from '@/components/patients/PatientDetailsModal';
 import { PatientRegistrationModal } from '@/components/patients/PatientRegistrationModal';
 import { PatientTable } from '@/components/patients/PatientTable';
 import { PatientFilters } from '@/components/patients/PatientFilters';
+import { EditPatientModal } from '@/components/patients/EditPatientModal';
+import { DeletePatientModal } from '@/components/patients/DeletePatientModal';
 import type { Patient, PatientFormData } from '../types/patient';
 import axios from 'axios';
 
@@ -20,10 +22,9 @@ export const PatientRegistration: React.FC = () => {
   const [showRegistrationModal, setShowRegistrationModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [editPatient, setEditPatient] = useState<Patient | null>(null);
+  const [deletePatient, setDeletePatient] = useState<Patient | null>(null);
 
-  // --------------------------
-  // Initial form data (no patient_id)
-  // --------------------------
   const initialFormData: Omit<PatientFormData, 'patient_id'> = {
     philhealth_id: '',
     national_id: '',
@@ -51,7 +52,6 @@ export const PatientRegistration: React.FC = () => {
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
-
   const [activeFilters, setActiveFilters] = useState({
     status: [] as string[],
     gender: [] as string[],
@@ -59,19 +59,13 @@ export const PatientRegistration: React.FC = () => {
     civilStatus: [] as string[],
   });
 
-  // --------------------------
   // Fetch patients
-  // --------------------------
-  useEffect(() => {
-    fetchPatients();
-  }, []);
-
+  useEffect(() => { fetchPatients(); }, []);
   const fetchPatients = async () => {
     try {
       const res = await axios.get<Patient[]>(API_URL);
-      const list = Array.isArray(res.data) ? res.data : [];
-      setPatients(list);
-      setFilteredPatients(list);
+      setPatients(Array.isArray(res.data) ? res.data : []);
+      setFilteredPatients(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error('Error fetching patients:', err);
       setPatients([]);
@@ -79,32 +73,24 @@ export const PatientRegistration: React.FC = () => {
     }
   };
 
-  // --------------------------
   // Filter & search
-  // --------------------------
   useEffect(() => {
     let temp = [...patients];
-
     if (activeFilters.status.length) temp = temp.filter(p => activeFilters.status.includes(p.status));
     if (activeFilters.gender.length) temp = temp.filter(p => activeFilters.gender.includes(p.sex));
     if (activeFilters.civilStatus.length) temp = temp.filter(p => activeFilters.civilStatus.includes(p.civil_status));
-
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       temp = temp.filter(
-        p =>
-          `${p.last_name} ${p.first_name} ${p.middle_name || ''}`.toLowerCase().includes(q) ||
-          p.patient_id.toLowerCase().includes(q) ||
-          p.mobile_number.includes(searchQuery)
+        p => `${p.last_name} ${p.first_name} ${p.middle_name || ''}`.toLowerCase().includes(q) ||
+             p.patient_id.toLowerCase().includes(q) ||
+             p.mobile_number.includes(searchQuery)
       );
     }
-
     setFilteredPatients(temp);
   }, [patients, activeFilters, searchQuery]);
 
-  // --------------------------
   // Form handlers
-  // --------------------------
   const handleFormChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -112,41 +98,25 @@ export const PatientRegistration: React.FC = () => {
 
   const handleRegisterPatient = async (e: FormEvent) => {
     e.preventDefault();
-    setFormLoading(true);
-    setFormError('');
-    setFormSuccess('');
-
+    setFormLoading(true); setFormError(''); setFormSuccess('');
     try {
       const res = await axios.post(API_URL, formData);
       const registeredPatient: Patient = res.data;
-
       setFormSuccess(`Patient registered successfully! ID: ${registeredPatient.patient_id}`);
       setShowRegistrationModal(false);
       setFormData({ ...initialFormData });
       fetchPatients();
     } catch (err: any) {
       console.error('Full Axios error:', err);
-
       if (err.response) {
-        if (typeof err.response.data === 'object') {
-          const messages = Object.entries(err.response.data)
-            .map(([field, msgs]: [string, any]) => (Array.isArray(msgs) ? `${field}: ${msgs.join(', ')}` : `${field}: ${msgs}`))
-            .join('\n');
-          setFormError(messages);
-        } else {
-          setFormError(err.response.data);
-        }
-      } else {
-        setFormError(err.message || 'Failed to register patient');
-      }
-    } finally {
-      setFormLoading(false);
-    }
+        const messages = typeof err.response.data === 'object'
+          ? Object.entries(err.response.data).map(([f, m]) => Array.isArray(m) ? `${f}: ${m.join(', ')}` : `${f}: ${m}`).join('\n')
+          : err.response.data;
+        setFormError(messages);
+      } else { setFormError(err.message || 'Failed to register patient'); }
+    } finally { setFormLoading(false); }
   };
 
-  // --------------------------
-  // Filter change handlers
-  // --------------------------
   const handleFilterChange = (filterType: string, value: string) => {
     setActiveFilters(prev => {
       const prevValues = prev[filterType as keyof typeof prev];
@@ -161,8 +131,11 @@ export const PatientRegistration: React.FC = () => {
   const handleViewDetails = (patient: Patient) => { setSelectedPatient(patient); setShowDetailsModal(true); };
 
   // --------------------------
-  // Render
+  // Edit/Delete handlers
   // --------------------------
+  const handleEditPatient = (patient: Patient) => setEditPatient(patient);
+  const handleDeletePatient = (patient: Patient) => setDeletePatient(patient);
+
   return (
     <div className="space-y-6">
       <Card>
@@ -190,7 +163,12 @@ export const PatientRegistration: React.FC = () => {
             hasActiveFilters={Object.values(activeFilters).flat().length > 0}
           />
 
-          <PatientTable patients={filteredPatients} handleViewDetails={handleViewDetails} />
+          <PatientTable
+            patients={filteredPatients}
+            handleViewDetails={handleViewDetails}
+            handleEdit={handleEditPatient}
+            handleDelete={handleDeletePatient}
+          />
         </CardContent>
       </Card>
 
@@ -210,6 +188,24 @@ export const PatientRegistration: React.FC = () => {
           isOpen={showDetailsModal}
           onClose={() => setShowDetailsModal(false)}
           patient={selectedPatient}
+        />
+      )}
+
+      {editPatient && (
+        <EditPatientModal
+          patient={editPatient}
+          isOpen={!!editPatient}
+          onClose={() => setEditPatient(null)}
+          fetchPatients={fetchPatients}
+        />
+      )}
+
+      {deletePatient && (
+        <DeletePatientModal
+          patient={deletePatient}
+          isOpen={!!deletePatient}
+          onClose={() => setDeletePatient(null)}
+          fetchPatients={fetchPatients}
         />
       )}
     </div>

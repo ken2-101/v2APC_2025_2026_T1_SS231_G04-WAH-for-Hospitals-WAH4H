@@ -3,24 +3,45 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { X } from 'lucide-react';
 import type { Patient, PatientFormData } from '../../types/patient';
+import axios from 'axios';
 
 interface EditPatientModalProps {
   isOpen: boolean;
-  patient: Patient | null;
+  patient: Patient;
   onClose: () => void;
-  onSave: (data: PatientFormData) => void;
-  loading: boolean;
+  fetchPatients: () => Promise<void>;
 }
 
 export const EditPatientModal: React.FC<EditPatientModalProps> = ({
   isOpen,
   patient,
   onClose,
-  onSave,
-  loading
+  fetchPatients,
 }) => {
-  const [formData, setFormData] = useState<PatientFormData | null>(null);
+  const [formData, setFormData] = useState<Omit<PatientFormData, 'patient_id'>>({
+    philhealth_id: '',
+    national_id: '',
+    last_name: '',
+    first_name: '',
+    middle_name: '',
+    suffix: '',
+    sex: 'M',
+    date_of_birth: '',
+    civil_status: '',
+    nationality: '',
+    mobile_number: '',
+    telephone: '',
+    email: '',
+    region: '',
+    province: '',
+    city_municipality: '',
+    barangay: '',
+    house_no_street: '',
+    status: 'Active',
+    occupation: '',
+  });
   const [confirmText, setConfirmText] = useState('');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (patient) {
@@ -29,7 +50,7 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
     }
   }, [patient]);
 
-  if (!isOpen || !formData) return null;
+  if (!isOpen) return null;
 
   const canSave = confirmText === 'EDIT';
 
@@ -37,12 +58,26 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
-    setFormData(prev => prev ? { ...prev, [name]: value } : prev);
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (canSave) onSave(formData);
+    if (!canSave) return;
+
+    setLoading(true);
+    try {
+      await axios.put(
+        `https://supreme-memory-5w9pg5gjv59379g7-8000.app.github.dev/api/patients/${patient.patient_id}/`,
+        formData
+      );
+      await fetchPatients();
+      onClose();
+    } catch (err) {
+      console.error('Failed to update patient:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -57,18 +92,11 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-
-            {/* Patient ID (read-only) */}
             <div>
               <label className="text-sm font-medium">Patient ID</label>
-              <Input
-                value={patient?.patient_id}
-                disabled
-                className="bg-gray-100"
-              />
+              <Input value={patient.patient_id} disabled className="bg-gray-100" />
             </div>
 
-            {/* Basic Info */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <InputField label="Last Name" name="last_name" value={formData.last_name} onChange={handleChange} />
               <InputField label="First Name" name="first_name" value={formData.first_name} onChange={handleChange} />
@@ -81,38 +109,21 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
               <InputField label="Civil Status" name="civil_status" value={formData.civil_status} onChange={handleChange} />
             </div>
 
-            <InputField
-              label="Occupation"
-              name="occupation"
-              value={formData.occupation || ''}
-              onChange={handleChange}
-            />
+            <InputField label="Occupation" name="occupation" value={formData.occupation || ''} onChange={handleChange} />
 
-            {/* EDIT Confirmation */}
             <div className="border-t pt-4">
               <p className="text-sm text-gray-700 mb-1">
                 Type <b>EDIT</b> to confirm changes
               </p>
-              <Input
-                value={confirmText}
-                onChange={(e) => setConfirmText(e.target.value)}
-                placeholder="Type EDIT"
-              />
+              <Input value={confirmText} onChange={e => setConfirmText(e.target.value)} placeholder="Type EDIT" />
             </div>
 
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={!canSave || loading}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
+              <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+              <Button type="submit" disabled={!canSave || loading} className="bg-blue-600 hover:bg-blue-700">
                 {loading ? 'Saving...' : 'Save Changes'}
               </Button>
             </div>
-
           </form>
         </div>
       </div>
@@ -120,7 +131,6 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
   );
 };
 
-// ---------------- Reusable Input ----------------
 const InputField: React.FC<any> = ({ label, ...props }) => (
   <div>
     <label className="block text-sm font-medium mb-1">{label}</label>

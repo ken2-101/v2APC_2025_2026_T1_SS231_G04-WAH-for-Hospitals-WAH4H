@@ -1,42 +1,27 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import type { Patient } from '../../types/patient';
-import axios from 'axios';
 
 interface DeletePatientModalProps {
   isOpen: boolean;
-  patient: Patient;
+  patientName: string;
   onClose: () => void;
-  fetchPatients: () => Promise<void>;
+  onConfirm: () => void;
+  loading: boolean;
 }
 
 export const DeletePatientModal: React.FC<DeletePatientModalProps> = ({
   isOpen,
-  patient,
+  patientName,
   onClose,
-  fetchPatients,
+  onConfirm,
+  loading
 }) => {
   const [confirmText, setConfirmText] = useState('');
-  const [loading, setLoading] = useState(false);
 
   if (!isOpen) return null;
 
   const canDelete = confirmText === 'DELETE';
-
-  const handleDelete = async () => {
-    if (!canDelete) return;
-    setLoading(true);
-    try {
-      await axios.delete(`https://supreme-memory-5w9pg5gjv59379g7-8000.app.github.dev/api/patients/${patient.patient_id}/`);
-      await fetchPatients();
-      onClose();
-    } catch (err) {
-      console.error('Failed to delete patient:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -46,7 +31,7 @@ export const DeletePatientModal: React.FC<DeletePatientModalProps> = ({
         </h3>
 
         <p className="text-sm mb-4">
-          You are about to delete <b>{patient.first_name} {patient.last_name}</b>.
+          You are about to delete <b>{patientName}</b>.
           <br />This action cannot be undone.
         </p>
 
@@ -67,7 +52,7 @@ export const DeletePatientModal: React.FC<DeletePatientModalProps> = ({
           <Button
             variant="destructive"
             disabled={!canDelete || loading}
-            onClick={handleDelete}
+            onClick={onConfirm}
           >
             {loading ? 'Deleting...' : 'Delete'}
           </Button>

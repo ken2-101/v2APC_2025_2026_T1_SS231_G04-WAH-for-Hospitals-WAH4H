@@ -1,48 +1,83 @@
-// File: /components/patients/PatientTable.tsx
 import React from 'react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import { Pencil, Trash2, Eye } from 'lucide-react';
 import type { Patient } from '../../types/patient';
 
 interface PatientTableProps {
   patients: Patient[];
   handleViewDetails: (patient: Patient) => void;
+  handleEdit: (patient: Patient) => void;
+  handleDelete: (patient: Patient) => void;
 }
 
-export const PatientTable: React.FC<PatientTableProps> = ({ patients, handleViewDetails }) => {
+export const PatientTable: React.FC<PatientTableProps> = ({
+  patients,
+  handleViewDetails,
+  handleEdit,
+  handleDelete,
+}) => {
   if (!patients.length) {
-    return <p className="text-center py-4 text-gray-500">No patients found.</p>;
+    return (
+      <div className="text-center text-gray-500 py-6">
+        No patients found
+      </div>
+    );
   }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Patient ID</TableHead>
-          <TableHead>Full Name</TableHead>
-          <TableHead>Sex</TableHead>
-          <TableHead>Civil Status</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Actions</TableHead>
-        </TableRow>
-      </TableHeader>
+    <div className="overflow-x-auto">
+      <table className="min-w-full text-sm">
+        <thead className="bg-gray-100">
+          <tr>
+            <th className="px-4 py-2 text-left">Patient ID</th>
+            <th className="px-4 py-2 text-left">Name</th>
+            <th className="px-4 py-2 text-left">Sex</th>
+            <th className="px-4 py-2 text-left">Status</th>
+            <th className="px-4 py-2 text-center">Actions</th>
+          </tr>
+        </thead>
 
-      <TableBody>
-        {patients.map((patient) => (
-          <TableRow key={patient.id}>
-            <TableCell>{patient.patient_id}</TableCell>
-            <TableCell>{`${patient.last_name}, ${patient.first_name} ${patient.middle_name ?? ''} ${patient.suffix ?? ''}`.trim()}</TableCell>
-            <TableCell>{patient.sex === 'M' ? 'Male' : 'Female'}</TableCell>
-            <TableCell>{patient.civil_status}</TableCell>
-            <TableCell>{patient.status}</TableCell>
-            <TableCell>
-              <Button size="sm" variant="outline" onClick={() => handleViewDetails(patient)}>
-                View
-              </Button>
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        <tbody>
+          {patients.map(patient => (
+            <tr key={patient.id} className="border-b hover:bg-gray-50">
+              <td className="px-4 py-2 font-mono">{patient.patient_id}</td>
+              <td className="px-4 py-2">
+                {patient.last_name}, {patient.first_name}
+              </td>
+              <td className="px-4 py-2">{patient.sex}</td>
+              <td className="px-4 py-2">{patient.status}</td>
+
+              <td className="px-4 py-2">
+                <div className="flex justify-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleViewDetails(patient)}
+                  >
+                    <Eye className="w-4 h-4" />
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleEdit(patient)}
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => handleDelete(patient)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 };
