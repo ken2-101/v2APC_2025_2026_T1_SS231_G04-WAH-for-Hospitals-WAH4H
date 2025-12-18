@@ -283,22 +283,34 @@ const ModernLayout: React.FC<ModernLayoutProps> = ({
               {/* User Menu */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="flex items-center space-x-2 hover-lift"
-                  >
-                    <div className="w-8 h-8 gradient-primary rounded-full flex items-center justify-center">
-                      <User className="w-4 h-4 text-white" />
-                    </div>
-                    <div className="text-left hidden md:block">
-                      <p className="text-sm font-medium">
-                        {user ? `${user.firstName} ${user.lastName}` : 'Dr. Maria Santos'}
-                      </p>
-                      <p className="text-xs text-gray-500">{getRoleDisplayName()}</p>
-                    </div>
-                  </Button>
-                </DropdownMenuTrigger>
+  <Button
+    variant="ghost"
+    size="sm"
+    className="flex items-center space-x-2 hover-lift"
+  >
+    <div className="w-8 h-8 gradient-primary rounded-full flex items-center justify-center">
+      <span className="text-white font-medium">
+        {(() => {
+          if (!user) return 'GU'; // Guest User
+          const first = user.firstName || user.firstName?.split(' ')[0] || '';
+          const last = user.lastName || user.firstName?.split(' ')[1] || '';
+          return `${first[0] || ''}${last[0] || ''}`.toUpperCase();
+        })()}
+      </span>
+    </div>
+    <div className="text-left hidden md:block">
+      <p className="text-sm font-medium">
+        {user
+          ? user.firstName && user.lastName
+            ? `${user.firstName} ${user.lastName}`
+            : user.firstName || 'Unknown User'
+          : 'Guest User'}
+      </p>
+      <p className="text-xs text-gray-500">{getRoleDisplayName()}</p>
+    </div>
+  </Button>
+</DropdownMenuTrigger>
+
                 <DropdownMenuContent align="end" className="modal-content">
                   <DropdownMenuItem className="font-medium text-purple-700">
                     <Crown className="w-4 h-4 mr-2" />
