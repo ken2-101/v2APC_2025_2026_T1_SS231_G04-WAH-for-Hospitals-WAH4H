@@ -57,7 +57,8 @@ export const AdmissionTable: React.FC<AdmissionTableProps> = ({
                   ? `${admission.patient_details.last_name}, ${admission.patient_details.first_name}`
                   : 'Unknown Patient'}
               </td>
-              <td className="py-4 px-4">{admission.id}</td>
+              {/* Display backend admission_id */}
+              <td className="py-4 px-4">{admission.admission_id ?? admission.id}</td>
               <td className="py-4 px-4">
                 {new Date(admission.admission_date).toLocaleString()}
               </td>

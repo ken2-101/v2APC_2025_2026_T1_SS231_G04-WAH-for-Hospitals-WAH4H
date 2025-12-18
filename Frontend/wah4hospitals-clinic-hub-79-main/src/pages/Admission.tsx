@@ -1,4 +1,3 @@
-// src/pages/admission/Admission.tsx
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,6 +6,7 @@ import { Search, Plus } from 'lucide-react';
 import { AdmissionFilters } from '@/components/admission/AdmissionFilters';
 import { AdmissionTable } from '@/components/admission/AdmissionTable';
 import { AdmitPatientModal } from '@/components/admission/AdmitPatientModal';
+import { AdmissionDetailsModal } from '@/components/admission/AdmissionDetailsModal';
 import type { Admission, NewAdmission } from '@/types/admission';
 import { admissionService } from '@/services/admissionService';
 
@@ -23,7 +23,11 @@ const Admission: React.FC<AdmissionProps> = ({ onNavigate }) => {
   const [activeFilters, setActiveFilters] = useState({ ward: '', status: '', doctor: '' });
   const [isAdmitModalOpen, setIsAdmitModalOpen] = useState(false);
 
-  // Fetch admissions
+  // Details modal state
+  const [selectedAdmission, setSelectedAdmission] = useState<Admission | null>(null);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+
+  // -------------------- Fetch admissions --------------------
   const fetchAdmissions = async () => {
     setLoading(true);
     try {
@@ -42,7 +46,7 @@ const Admission: React.FC<AdmissionProps> = ({ onNavigate }) => {
     fetchAdmissions();
   }, []);
 
-  // Filter handlers
+  // -------------------- Filter handlers --------------------
   const handleFilterChange = (key: string, value: string) => {
     setActiveFilters(prev => ({ ...prev, [key]: value }));
   };
@@ -51,7 +55,7 @@ const Admission: React.FC<AdmissionProps> = ({ onNavigate }) => {
     setActiveFilters({ ward: '', status: '', doctor: '' });
   };
 
-  // Admit patient handler
+  // -------------------- Admit patient handler --------------------
   const handleAdmitPatient = async (data: any) => {
     try {
       const payload: NewAdmission = {
@@ -61,8 +65,9 @@ const Admission: React.FC<AdmissionProps> = ({ onNavigate }) => {
         ward: data.ward,
         room: data.room,
         bed: data.bed,
-        status: 'Active', // type-safe literal
-        encounter_type: 'Inpatient', // type-safe literal
+        assigned_nurse: data.assignedNurse ?? '', // safely include assigned_nurse
+        status: 'Active',
+        encounter_type: 'Inpatient',
         admitting_diagnosis: data.admittingDiagnosis,
         reason_for_admission: data.reasonForAdmission,
         admission_category: data.admissionCategory as 'Emergency' | 'Regular',
@@ -77,7 +82,7 @@ const Admission: React.FC<AdmissionProps> = ({ onNavigate }) => {
     }
   };
 
-  // Filtered admissions
+  // -------------------- Filtered admissions --------------------
   const filteredAdmissions = admissions.filter(admission => {
     const patientName = admission.patient_details
       ? `${admission.patient_details.last_name}, ${admission.patient_details.first_name}`.toLowerCase()
@@ -85,7 +90,7 @@ const Admission: React.FC<AdmissionProps> = ({ onNavigate }) => {
 
     const matchesSearch =
       patientName.includes(searchTerm.toLowerCase()) ||
-      admission.id.toLowerCase().includes(searchTerm.toLowerCase());
+      (admission.admission_id && admission.admission_id.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesWard = !activeFilters.ward || admission.ward === activeFilters.ward;
     const matchesStatus = !activeFilters.status || admission.status === activeFilters.status;
@@ -96,9 +101,16 @@ const Admission: React.FC<AdmissionProps> = ({ onNavigate }) => {
 
   const hasActiveFilters = Object.values(activeFilters).some(Boolean);
 
+  // -------------------- Open details modal --------------------
+  const handleOpenDetails = (admission: Admission) => {
+    setSelectedAdmission(admission);
+    setIsDetailsModalOpen(true);
+  };
+
   if (loading) return <div>Loading admissions...</div>;
   if (error) return <div className="text-red-500">{error}</div>;
 
+  // -------------------- Render --------------------
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -141,7 +153,10 @@ const Admission: React.FC<AdmissionProps> = ({ onNavigate }) => {
           </div>
         </CardHeader>
         <CardContent>
-          <AdmissionTable admissions={filteredAdmissions} />
+          <AdmissionTable
+            admissions={filteredAdmissions}
+            onDetailsClick={handleOpenDetails} // wire table to details modal
+          />
         </CardContent>
       </Card>
 
@@ -151,6 +166,22 @@ const Admission: React.FC<AdmissionProps> = ({ onNavigate }) => {
         onClose={() => setIsAdmitModalOpen(false)}
         onAdmit={handleAdmitPatient}
         onNavigate={onNavigate}
+      />
+
+      {/* Admission Details Modal */}
+      <AdmissionDetailsModal
+        isOpen={isDetailsModalOpen}
+        onClose={() => setIsDetailsModalOpen(false)}
+        admission={selectedAdmission}
+        onUpdate={async (updatedAdmission) => {
+          // update in frontend state
+          setAdmissions(prev =>
+            prev.map(a => (a.id === updatedAdmission.id ? updatedAdmission : a))
+          );
+        }}
+        onDelete={async (id) => {
+          setAdmissions(prev => prev.filter(a => a.id !== id));
+        }}
       />
     </div>
   );
