@@ -37,9 +37,9 @@ const Register = () => {
     { value: 'doctor', label: 'Doctor' },
     { value: 'nurse', label: 'Nurse' },
     { value: 'pharmacist', label: 'Pharmacist' },
-    { value: 'lab', label: 'Lab Technician' },
-    { value: 'billing', label: 'Billing Staff' },
-    { value: 'admin', label: 'Administrator' },
+    { value: 'lab-technician', label: 'Lab Technician' },
+    { value: 'billing_clerk', label: 'Billing Staff' },
+    { value: 'administrator', label: 'Administrator' },
   ];
 
   const validateForm = () => {

@@ -8,9 +8,10 @@ export type UserRole =
   | 'lab-technician'
   | 'administrator'
   | 'radiologist'
-  | 'billing-staff';
+  | 'billing_clerk';
 
-export interface RoleContextType {
+export interface RoleContextType 
+{
   isAdminMode: boolean;
   currentRole: UserRole;
   availableTabs: string[];
@@ -37,7 +38,7 @@ const roleAccessConfig: Record<UserRole, string[]> = {
     'appointments', 'monitoring', 'discharge', 'inventory', 'compliance', 'billing', 'settings'
   ],
   radiologist: ['dashboard', 'monitoring', 'patients', 'settings'],
-  'billing-staff': ['dashboard', 'philhealth', 'erp', 'billing', 'settings'],
+  'billing_clerk': ['dashboard', 'philhealth', 'erp', 'billing', 'settings'],
 };
 
 interface RoleProviderProps {
