@@ -5,13 +5,16 @@ Django settings for wah4h project.
 from pathlib import Path
 from datetime import timedelta
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY
 SECRET_KEY = "django-insecure-rz74s8wlt7x+-10!5ky61@n4%7v*_o!$)fxe$e5@@8vh0kxo53"
 DEBUG = True
-ALLOWED_HOSTS = ["*"]  # Dev only. Restrict in production.
+ALLOWED_HOSTS = ["*"]
+
+# REQUIRED FOR CODESPACES / PROXY
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # Application definition
 INSTALLED_APPS = [
@@ -35,7 +38,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    "corsheaders.middleware.CorsMiddleware",  # Must be first for CORS
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -93,12 +96,9 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-# CORS (development only)
-CORS_ALLOWED_ORIGINS = [
-    "https://supreme-memory-5w9pg5gjv59379g7-8080.app.github.dev",  # Frontend Codespace
-    "https://supreme-memory-5w9pg5gjv59379g7-8000.app.github.dev",  # Backend Codespace
-]
-CORS_ALLOW_CREDENTIALS = True  # Allow cookies if needed
+# CORS (DEV)
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
 
 # Custom user model
 AUTH_USER_MODEL = "accounts.User"
@@ -119,3 +119,4 @@ SIMPLE_JWT = {
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
+        
