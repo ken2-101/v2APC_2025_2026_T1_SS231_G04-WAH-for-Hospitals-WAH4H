@@ -1,57 +1,82 @@
-# monitoring/models.py
 from django.db import models
-
-class Patient(models.Model):
-    id = models.AutoField(primary_key=True)
-    first_name = models.CharField(max_length=100)
-    last_name = models.CharField(max_length=100)
-    room = models.CharField(max_length=50, blank=True, null=True)
-    admitted_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"{self.first_name} {self.last_name}"
+from admissions.models import Admission
 
 class VitalSign(models.Model):
-    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="vitals")
-    blood_pressure = models.CharField(max_length=20)  # "120/80"
+    admission = models.ForeignKey(
+        Admission,
+        on_delete=models.CASCADE,
+        related_name="vitals"
+    )
+
+    date_time = models.DateTimeField()
+    blood_pressure = models.CharField(max_length=20)
     heart_rate = models.IntegerField()
     respiratory_rate = models.IntegerField()
     temperature = models.FloatField()
-    oxygen_saturation = models.FloatField()
-    height = models.FloatField(null=True, blank=True)
-    weight = models.FloatField(null=True, blank=True)
+    oxygen_saturation = models.IntegerField()
     staff_name = models.CharField(max_length=100)
-    date_time = models.DateTimeField(auto_now_add=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Vitals @ {self.date_time} ({self.admission.admission_id})"
+
 
 class ClinicalNote(models.Model):
-    NOTE_TYPE_CHOICES = [
-        ("SOAP", "SOAP"),
+    NOTE_TYPES = [
         ("Progress", "Progress"),
-        ("Rounds", "Rounds")
+        ("SOAP", "SOAP"),
     ]
-    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="notes")
-    type = models.CharField(max_length=20, choices=NOTE_TYPE_CHOICES)
-    content = models.TextField()
-    staff_name = models.CharField(max_length=100)
-    date_time = models.DateTimeField(auto_now_add=True)
+
+    admission = models.ForeignKey(
+        Admission,
+        on_delete=models.CASCADE,
+        related_name="notes"
+    )
+
+    date_time = models.DateTimeField()
+    type = models.CharField(max_length=20, choices=NOTE_TYPES)
+    subjective = models.TextField(blank=True)
+    objective = models.TextField(blank=True)
+    assessment = models.TextField()
+    plan = models.TextField(blank=True)
+    provider_name = models.CharField(max_length=100)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
 
 class DietaryOrder(models.Model):
-    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="dietary_orders")
-    meal_plan = models.CharField(max_length=255)
-    activity_level = models.CharField(max_length=50, blank=True, null=True)
-    npo = models.BooleanField(default=False)
-    updated_at = models.DateTimeField(auto_now=True)
+    admission = models.OneToOneField(
+        Admission,
+        on_delete=models.CASCADE,
+        related_name="dietary_order"
+    )
+
+    diet_type = models.CharField(max_length=50)
+    allergies = models.JSONField(default=list, blank=True)
+    npo_response = models.BooleanField(default=False)
+    activity_level = models.CharField(max_length=50)
+    ordered_by = models.CharField(max_length=100)
+    last_updated = models.DateTimeField(auto_now=True)
+
 
 class HistoryEvent(models.Model):
-    EVENT_TYPE_CHOICES = [
+    CATEGORY_CHOICES = [
+        ("Admission", "Admission"),
         ("Vitals", "Vitals"),
         ("Note", "Note"),
-        ("Medication", "Medication"),
-        ("Lab", "Lab"),
         ("Procedure", "Procedure"),
-        ("Admission", "Admission")
     ]
-    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="history")
-    type = models.CharField(max_length=50, choices=EVENT_TYPE_CHOICES)
-    description = models.TextField()
-    date_time = models.DateTimeField(auto_now_add=True)
+
+    admission = models.ForeignKey(
+        Admission,
+        on_delete=models.CASCADE,
+        related_name="history"
+    )
+
+    date_time = models.DateTimeField()
+    category = models.CharField(max_length=30, choices=CATEGORY_CHOICES)
+    description = models.CharField(max_length=255)
+    details = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)

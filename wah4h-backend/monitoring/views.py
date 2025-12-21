@@ -1,26 +1,32 @@
-# monitoring/views.py
-from rest_framework import viewsets
-from .models import Patient, VitalSign, ClinicalNote, DietaryOrder, HistoryEvent
+from rest_framework.viewsets import ModelViewSet
+from .models import (
+    VitalSign,
+    ClinicalNote,
+    DietaryOrder,
+    HistoryEvent
+)
 from .serializers import (
-    PatientSerializer, VitalSignSerializer, ClinicalNoteSerializer, DietaryOrderSerializer, HistoryEventSerializer
+    VitalSignSerializer,
+    ClinicalNoteSerializer,
+    DietaryOrderSerializer,
+    HistoryEventSerializer
 )
 
-class PatientViewSet(viewsets.ModelViewSet):
-    queryset = Patient.objects.all()
-    serializer_class = PatientSerializer
-
-class VitalSignViewSet(viewsets.ModelViewSet):
-    queryset = VitalSign.objects.all()
+class VitalSignViewSet(ModelViewSet):
+    queryset = VitalSign.objects.all().order_by("-date_time")
     serializer_class = VitalSignSerializer
 
-class ClinicalNoteViewSet(viewsets.ModelViewSet):
-    queryset = ClinicalNote.objects.all()
+
+class ClinicalNoteViewSet(ModelViewSet):
+    queryset = ClinicalNote.objects.all().order_by("-date_time")
     serializer_class = ClinicalNoteSerializer
 
-class DietaryOrderViewSet(viewsets.ModelViewSet):
+
+class DietaryOrderViewSet(ModelViewSet):
     queryset = DietaryOrder.objects.all()
     serializer_class = DietaryOrderSerializer
 
-class HistoryEventViewSet(viewsets.ModelViewSet):
-    queryset = HistoryEvent.objects.all()
+
+class HistoryEventViewSet(ModelViewSet):
+    queryset = HistoryEvent.objects.all().order_by("-date_time")
     serializer_class = HistoryEventSerializer

@@ -1,15 +1,15 @@
-# monitoring/urls.py
-from rest_framework import routers
-from django.urls import path, include
-from .views import PatientViewSet, VitalSignViewSet, ClinicalNoteViewSet, DietaryOrderViewSet, HistoryEventViewSet
+from rest_framework.routers import DefaultRouter
+from .views import (
+    VitalSignViewSet,
+    ClinicalNoteViewSet,
+    DietaryOrderViewSet,
+    HistoryEventViewSet
+)
 
-router = routers.DefaultRouter()
-router.register(r'patients', PatientViewSet)
-router.register(r'vitals', VitalSignViewSet)
-router.register(r'notes', ClinicalNoteViewSet)
-router.register(r'dietary', DietaryOrderViewSet)
-router.register(r'history', HistoryEventViewSet)
+router = DefaultRouter()
+router.register("vitals", VitalSignViewSet)
+router.register("notes", ClinicalNoteViewSet)
+router.register("dietary-orders", DietaryOrderViewSet)
+router.register("history", HistoryEventViewSet)
 
-urlpatterns = [
-    path('', include(router.urls)),
-]
+urlpatterns = router.urls
