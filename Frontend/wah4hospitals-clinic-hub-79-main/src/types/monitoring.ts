@@ -2,8 +2,9 @@ export type PatientStatus = 'Stable' | 'Critical';
 
 export interface VitalSign {
     id: string;
+    admissionId: string; // links to admission
     dateTime: string;
-    bloodPressure: string;
+    bloodPressure: string; // format: "systolic/diastolic"
     heartRate: number;
     respiratoryRate: number;
     temperature: number;
@@ -15,6 +16,7 @@ export interface VitalSign {
 
 export interface ClinicalNote {
     id: string;
+    admissionId: string; // links to admission
     dateTime: string;
     type: 'SOAP' | 'Progress' | 'Rounds';
     subjective: string;
@@ -25,6 +27,7 @@ export interface ClinicalNote {
 }
 
 export interface DietaryOrder {
+    admissionId: string; // links to admission
     dietType: string;
     fluidRestrictions?: string;
     allergies: string[];
@@ -36,6 +39,7 @@ export interface DietaryOrder {
 
 export interface HistoryEvent {
     id: string;
+    admissionId: string; // links to admission
     dateTime: string;
     category: 'Vitals' | 'Note' | 'Medication' | 'Lab' | 'Procedure' | 'Admission';
     description: string;
@@ -43,7 +47,8 @@ export interface HistoryEvent {
 }
 
 export interface MonitoringPatient {
-    id: string;
+    id: string; // this is admissionId
+    patientId: string; // actual patient reference
     patientName: string;
     room: string;
     doctorName: string;

@@ -9,9 +9,11 @@ interface HistoryTabProps {
 
 export const HistoryTab: React.FC<HistoryTabProps> = ({ events }) => {
     // Sort events by date descending
-    const sortedEvents = [...events].sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
+    const sortedEvents = [...events].sort(
+        (a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()
+    );
 
-    const getIcon = (category: string) => {
+    const getIcon = (category: HistoryEvent['category']) => {
         switch (category) {
             case 'Vitals': return <Activity className="w-5 h-5 text-blue-500" />;
             case 'Note': return <FileText className="w-5 h-5 text-gray-500" />;
@@ -26,7 +28,9 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ events }) => {
     return (
         <div className="space-y-6">
             <Card>
-                <CardHeader><CardTitle>Patient History & Timeline</CardTitle></CardHeader>
+                <CardHeader>
+                    <CardTitle>Patient History & Timeline</CardTitle>
+                </CardHeader>
                 <CardContent>
                     {sortedEvents.length === 0 ? (
                         <div className="text-center text-gray-500 py-8">No history recorded.</div>

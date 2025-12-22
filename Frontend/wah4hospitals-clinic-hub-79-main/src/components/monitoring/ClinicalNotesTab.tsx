@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,37 +12,46 @@ import { ClinicalNote } from '../../types/monitoring';
 
 interface ClinicalNotesTabProps {
     notes: ClinicalNote[];
+    admissionId: string;
     onAddNote: (note: ClinicalNote) => void;
 }
 
-export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({ notes, onAddNote }) => {
+const API_BASE = '/api';
+
+export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({ notes, admissionId, onAddNote }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
 
-    // Form State
-    const [type, setType] = useState<any>('SOAP');
+    const [type, setType] = useState<'SOAP' | 'Progress' | 'Rounds'>('SOAP');
     const [subjective, setSubjective] = useState('');
     const [objective, setObjective] = useState('');
     const [assessment, setAssessment] = useState('');
     const [plan, setPlan] = useState('');
 
-    const handleSave = () => {
-        const newNote: ClinicalNote = {
-            id: Date.now().toString(),
-            dateTime: new Date().toISOString(),
+    const resetForm = () => {
+        setSubjective('');
+        setObjective('');
+        setAssessment('');
+        setPlan('');
+    };
+
+    const handleSave = async () => {
+        const payload = {
             type,
             subjective,
             objective,
             assessment,
             plan,
-            providerName: 'Dr. Current User' // Mock
+            admissionId, // Correct property name
         };
-        onAddNote(newNote);
-        setIsModalOpen(false);
-        resetForm();
-    };
 
-    const resetForm = () => {
-        setSubjective(''); setObjective(''); setAssessment(''); setPlan('');
+        try {
+            const res = await axios.post(`${API_BASE}/monitoring/notes/`, payload);
+            onAddNote(res.data);
+            setIsModalOpen(false);
+            resetForm();
+        } catch (err) {
+            console.error('Failed to save note', err);
+        }
     };
 
     return (
@@ -63,7 +73,7 @@ export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({ notes, onAdd
                                         {note.type} Note
                                         <Badge variant="outline" className="font-normal text-xs">{new Date(note.dateTime).toLocaleString()}</Badge>
                                     </CardTitle>
-                                    <p className="text-sm text-gray-500">By {note.providerName}</p>
+                                    <p className="text-sm text-gray-500">By {note.providerName || 'Unknown'}</p>
                                 </div>
                                 <Lock className="w-4 h-4 text-gray-400" />
                             </div>
@@ -80,9 +90,8 @@ export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({ notes, onAdd
                                 <div className="whitespace-pre-wrap">{note.assessment}</div>
                             )}
                         </CardContent>
-                        {/* Mock Attachment view */}
                         <CardFooter className="pt-2 border-t text-xs text-gray-400">
-                            Signed electronically by {note.providerName}
+                            Signed electronically by {note.providerName || 'Unknown'}
                         </CardFooter>
                     </Card>
                 ))}
@@ -94,7 +103,7 @@ export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({ notes, onAdd
                     <div className="grid gap-4 py-4">
                         <div>
                             <Label>Note Type</Label>
-                            <Select value={type} onValueChange={setType}>
+                            <Select value={type} onValueChange={val => setType(val as 'SOAP' | 'Progress' | 'Rounds')}>
                                 <SelectTrigger><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="SOAP">SOAP Note</SelectItem>
@@ -135,7 +144,6 @@ export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({ notes, onAdd
                             <div className="border border-dashed rounded-md p-4 bg-gray-50 flex items-center justify-center text-gray-500 cursor-pointer hover:bg-gray-100">
                                 <Paperclip className="w-4 h-4 mr-2" />
                                 <span>Click to attach images (X-ray, etc.)</span>
-                                {/* Mock input */}
                                 <input type="file" className="hidden" />
                             </div>
                         </div>

@@ -33,6 +33,7 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
     const handleSave = () => {
         const newVital: VitalSign = {
             id: Date.now().toString(),
+            admissionId: patientId,
             dateTime: new Date().toISOString(),
             bloodPressure: `${bpSys}/${bpDia}`,
             heartRate: Number(hr),
@@ -61,7 +62,6 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
         return alerts;
     };
 
-    // Prepare chart data
     const chartData = vitals.map(v => ({
         time: new Date(v.dateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         hr: v.heartRate,
@@ -69,7 +69,7 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
         sys: Number(v.bloodPressure.split('/')[0]),
         dia: Number(v.bloodPressure.split('/')[1]),
         o2: v.oxygenSaturation
-    })).slice(-10); // Last 10 points
+    })).slice(-10);
 
     return (
         <div className="space-y-6">

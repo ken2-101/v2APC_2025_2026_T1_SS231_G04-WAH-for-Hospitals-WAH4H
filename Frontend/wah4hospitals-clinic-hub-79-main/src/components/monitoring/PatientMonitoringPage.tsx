@@ -22,9 +22,27 @@ interface PatientMonitoringPageProps {
 }
 
 export const PatientMonitoringPage: React.FC<PatientMonitoringPageProps> = ({
-    patient, vitals, notes, history, dietaryOrder,
-    onBack, onAddVital, onAddNote, onUpdateDietary
+    patient,
+    vitals,
+    notes,
+    history,
+    dietaryOrder,
+    onBack,
+    onAddVital,
+    onAddNote,
+    onUpdateDietary,
 }) => {
+    // Provide a default dietary order if none exists
+    const defaultDietaryOrder: DietaryOrder = {
+        admissionId: patient.id,
+        dietType: '',
+        allergies: [],
+        npoResponse: false,
+        activityLevel: '',
+        lastUpdated: new Date().toISOString(),
+        orderedBy: '',
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex items-center gap-4">
@@ -34,7 +52,11 @@ export const PatientMonitoringPage: React.FC<PatientMonitoringPageProps> = ({
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">{patient.patientName}</h1>
                     <div className="flex gap-4 text-sm text-gray-500">
-                        <span className="flex items-center"><User className="w-3 h-3 mr-1" /> {patient.id}</span>
+                        {patient.id && (
+                            <span className="flex items-center">
+                                <User className="w-3 h-3 mr-1" /> {patient.id}
+                            </span>
+                        )}
                         <span className="font-medium text-gray-700">Room {patient.room}</span>
                         <span>Dr. {patient.doctorName}</span>
                     </div>
@@ -49,18 +71,44 @@ export const PatientMonitoringPage: React.FC<PatientMonitoringPageProps> = ({
                     <TabsTrigger value="history">History</TabsTrigger>
                 </TabsList>
 
+                {/* Vitals Tab */}
                 <TabsContent value="vitals" className="mt-6">
-                    <VitalSignsTab vitals={vitals} onAddVital={onAddVital} patientId={patient.id} />
+                    {patient.id && (
+                        <VitalSignsTab
+                            vitals={vitals.map(v => ({
+                                ...v,
+                                heartRate: Number(v.heartRate),
+                                respiratoryRate: Number(v.respiratoryRate),
+                                temperature: Number(v.temperature),
+                                oxygenSaturation: Number(v.oxygenSaturation),
+                            }))}
+                            onAddVital={onAddVital}
+                            patientId={patient.id}
+                        />
+                    )}
                 </TabsContent>
 
+                {/* Clinical Notes Tab */}
                 <TabsContent value="notes" className="mt-6">
-                    <ClinicalNotesTab notes={notes} onAddNote={onAddNote} />
+                    {patient.id && (
+                        <ClinicalNotesTab
+                            admissionId={patient.id}
+                            notes={notes}
+                            onAddNote={onAddNote}
+                        />
+                    )}
                 </TabsContent>
 
+                {/* Dietary Tab */}
                 <TabsContent value="dietary" className="mt-6">
-                    <DietaryTab order={dietaryOrder} onUpdateOrder={onUpdateDietary} />
+                    <DietaryTab
+                        admissionId={patient.id}
+                        order={dietaryOrder ?? defaultDietaryOrder}
+                        onUpdateOrder={onUpdateDietary}
+                    />
                 </TabsContent>
 
+                {/* History Tab */}
                 <TabsContent value="history" className="mt-6">
                     <HistoryTab events={history} />
                 </TabsContent>
