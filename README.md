@@ -13,3 +13,4 @@ Elijah Josh Quibin
 1. python -m venv venv           # Create and activate virtual environment
 2. venv\Scripts\activate         # on cmd
 3. source venv/Scripts/activate  # on bash
+4. source venv/bin/activate      # codespaces bash

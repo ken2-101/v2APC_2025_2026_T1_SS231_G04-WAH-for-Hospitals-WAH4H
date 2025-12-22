@@ -5,7 +5,7 @@ import { UserRole } from './RoleContext';
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
-  'https://supreme-memory-5w9pg5gjv59379g7-8000.app.github.dev';
+  'https://ominous-space-sniffle-4jw9q46794qpfgvq-8000.app.github.dev';
 
 interface User {
   id: string;
