@@ -2,9 +2,9 @@ export type PatientStatus = 'Stable' | 'Critical';
 
 export interface VitalSign {
     id: string;
-    admissionId: string; // links to admission
+    admissionId: string;
     dateTime: string;
-    bloodPressure: string; // format: "systolic/diastolic"
+    bloodPressure: string;
     heartRate: number;
     respiratoryRate: number;
     temperature: number;
@@ -16,7 +16,7 @@ export interface VitalSign {
 
 export interface ClinicalNote {
     id: string;
-    admissionId: string; // links to admission
+    admissionId: string;
     dateTime: string;
     type: 'SOAP' | 'Progress' | 'Rounds';
     subjective: string;
@@ -27,33 +27,43 @@ export interface ClinicalNote {
 }
 
 export interface DietaryOrder {
-    admissionId: string; // links to admission
     dietType: string;
     fluidRestrictions?: string;
     allergies: string[];
-    npoResponse: boolean; // True if NPO
+    npoResponse: boolean;
     activityLevel: string;
     lastUpdated: string;
     orderedBy: string;
+    id?: string; // optional id to match backend
 }
 
 export interface HistoryEvent {
     id: string;
-    admissionId: string; // links to admission
+    admissionId: string;
     dateTime: string;
     category: 'Vitals' | 'Note' | 'Medication' | 'Lab' | 'Procedure' | 'Admission';
     description: string;
     details?: string;
 }
 
-export interface MonitoringPatient {
-    id: string; // this is admissionId
-    patientId: string; // actual patient reference
+// ✅ This is the type your dashboard/page expects
+export interface MonitoringAdmission {
+    id: number;
+    patientId: number;
     patientName: string;
     room: string;
     doctorName: string;
     nurseName: string;
     status: PatientStatus;
+    encounterType: string;
+    admittingDiagnosis: string;
+    reasonForAdmission: string;
+    admissionCategory: string;
+    modeOfArrival: string;
+    admissionDate: string;
+    attendingPhysician: string;
+    assignedNurse?: string;
+    ward: string;
     lastVitals?: VitalSign;
     lastNote?: ClinicalNote;
     dietary?: DietaryOrder;
