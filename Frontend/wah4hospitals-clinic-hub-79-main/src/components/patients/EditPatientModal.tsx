@@ -75,7 +75,7 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
     try {
       // Use numeric ID for PUT request, not patient_id string
       await axios.put(
-        `https://supreme-memory-5w9pg5gjv59379g7-8000.app.github.dev/api/patients/${patient.id}/`,
+        `https://scaling-memory-jj56p55q79g42qwq5-8000.app.github.dev/api/patients/${patient.id}/`,
         formData
       );
       await fetchPatients();

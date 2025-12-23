@@ -13,7 +13,7 @@ import { DeletePatientModal } from '@/components/patients/DeletePatientModal';
 import type { Patient, PatientFormData } from '../types/patient';
 import axios from 'axios';
 
-const API_URL = 'https://supreme-memory-5w9pg5gjv59379g7-8000.app.github.dev/api/patients/';
+const API_URL = 'https://scaling-memory-jj56p55q79g42qwq5-8000.app.github.dev/api/patients/';
 
 export const PatientRegistration: React.FC = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
