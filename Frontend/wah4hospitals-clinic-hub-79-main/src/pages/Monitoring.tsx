@@ -10,7 +10,7 @@ import {
 import { PatientMonitoringPage } from '@/components/monitoring/PatientMonitoringPage';
 import { MonitoringDashboard } from '@/components/monitoring/MonitoringDashboard';
 
-// ✅ Detect backend URL dynamically (works in Codespaces & local)
+// Detect backend URL dynamically
 const API_BASE =
   process.env.NODE_ENV === 'development'
     ? 'https://scaling-memory-jj56p55q79g42qwq5-8000.app.github.dev/api'
@@ -32,7 +32,6 @@ const Monitoring: React.FC = () => {
       try {
         const res = await axios.get(`${API_BASE}/admissions/`);
         if (Array.isArray(res.data)) {
-          // Map API response to MonitoringAdmission
           const mapped: MonitoringAdmission[] = res.data.map((adm: any) => ({
             id: adm.id,
             patientId: adm.patient,
@@ -72,10 +71,10 @@ const Monitoring: React.FC = () => {
 
     try {
       const [vitalsRes, notesRes, dietaryRes, historyRes] = await Promise.all([
-        axios.get(`${API_BASE}/monitorings/by_admission/?admission_id=${adm.id}`),
-        axios.get(`${API_BASE}/notes/by_admission/?admission_id=${adm.id}`),
-        axios.get(`${API_BASE}/dietary/by_admission/?admission_id=${adm.id}`),
-        axios.get(`${API_BASE}/history/by_admission/?admission_id=${adm.id}`),
+        axios.get(`${API_BASE}/monitoring/vitals/?admission=${adm.id}`),
+        axios.get(`${API_BASE}/monitoring/notes/?admission=${adm.id}`),
+        axios.get(`${API_BASE}/monitoring/dietary-orders/?admission=${adm.id}`),
+        axios.get(`${API_BASE}/monitoring/history/?admission=${adm.id}`),
       ]);
 
       setVitals(Array.isArray(vitalsRes.data) ? vitalsRes.data : []);
@@ -87,14 +86,26 @@ const Monitoring: React.FC = () => {
     }
   };
 
-  // Add new vital
-  const handleAddVital = async (newVital: VitalSign) => {
+  // Add new vital (backend-compatible)
+  const handleAddVital = async (newVital: Omit<VitalSign, 'id'>) => {
     if (!selectedAdmission) return;
     try {
-      const res = await axios.post(`${API_BASE}/monitorings/`, newVital);
+      const payload = {
+        admission: newVital.admissionId,
+        date_time: newVital.dateTime,
+        blood_pressure: newVital.bloodPressure,
+        heart_rate: newVital.heartRate,
+        respiratory_rate: newVital.respiratoryRate,
+        temperature: newVital.temperature,
+        oxygen_saturation: newVital.oxygenSaturation,
+        height: newVital.height,
+        weight: newVital.weight,
+        staff_name: newVital.staffName,
+      };
+      const res = await axios.post(`${API_BASE}/monitoring/vitals/`, payload);
       setVitals((prev) => [...prev, res.data]);
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      console.error('Error adding vital:', err.response?.data || err);
     }
   };
 
@@ -102,7 +113,17 @@ const Monitoring: React.FC = () => {
   const handleAddNote = async (newNote: ClinicalNote) => {
     if (!selectedAdmission) return;
     try {
-      const res = await axios.post(`${API_BASE}/notes/`, newNote);
+      const payload = {
+        admission: newNote.admissionId,
+        date_time: newNote.dateTime,
+        type: newNote.type,
+        subjective: newNote.subjective,
+        objective: newNote.objective,
+        assessment: newNote.assessment,
+        plan: newNote.plan,
+        provider_name: newNote.providerName,
+      };
+      const res = await axios.post(`${API_BASE}/monitoring/notes/`, payload);
       setNotes((prev) => [...prev, res.data]);
     } catch (err) {
       console.error(err);
@@ -111,10 +132,9 @@ const Monitoring: React.FC = () => {
 
   // Update dietary order
   const handleUpdateDietary = async (order: DietaryOrder) => {
-    if (!selectedAdmission) return;
-    if (!order.id) return; // defensive
+    if (!selectedAdmission || !order.id) return;
     try {
-      const res = await axios.put(`${API_BASE}/dietary/${order.id}/`, order);
+      const res = await axios.put(`${API_BASE}/monitoring/dietary-orders/${order.id}/`, order);
       setDietary(res.data);
     } catch (err) {
       console.error(err);

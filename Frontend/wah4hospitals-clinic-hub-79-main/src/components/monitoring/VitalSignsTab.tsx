@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,8 +11,8 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { VitalSign } from '../../types/monitoring';
 
 interface VitalSignsTabProps {
-    vitals: VitalSign[];
-    onAddVital: (vital: VitalSign) => void;
+    vitals: any[]; // raw API response
+    onAddVital: (vital: Omit<VitalSign, 'id'>) => void;
     patientId: string;
 }
 
@@ -20,19 +20,32 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [viewMode, setViewMode] = useState<'table' | 'graph'>('graph');
 
-    // Form State
     const [bpSys, setBpSys] = useState('');
     const [bpDia, setBpDia] = useState('');
     const [hr, setHr] = useState('');
     const [rr, setRr] = useState('');
     const [temp, setTemp] = useState('');
     const [o2, setO2] = useState('');
-    const [height, setHeight] = useState('');
-    const [weight, setWeight] = useState('');
+
+    // Map API response to proper VitalSign type
+    const mappedVitals: VitalSign[] = useMemo(() => {
+        return vitals.map(v => ({
+            id: String(v.id),            // convert id to string
+            admissionId: String(v.admission),
+            dateTime: v.date_time,
+            bloodPressure: v.blood_pressure,
+            heartRate: v.heart_rate,
+            respiratoryRate: v.respiratory_rate,
+            temperature: v.temperature,
+            oxygenSaturation: v.oxygen_saturation,
+            staffName: v.staff_name
+        }));
+    }, [vitals]);
 
     const handleSave = () => {
-        const newVital: VitalSign = {
-            id: Date.now().toString(),
+        if (!bpSys || !bpDia || !hr || !rr || !temp || !o2) return;
+
+        const newVital: Omit<VitalSign, 'id'> = {
             admissionId: patientId,
             dateTime: new Date().toISOString(),
             bloodPressure: `${bpSys}/${bpDia}`,
@@ -40,21 +53,21 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
             respiratoryRate: Number(rr),
             temperature: Number(temp),
             oxygenSaturation: Number(o2),
-            height: height ? Number(height) : undefined,
-            weight: weight ? Number(weight) : undefined,
-            staffName: 'Current User' // Mock
+            staffName: 'Current User'
         };
+
         onAddVital(newVital);
         setIsModalOpen(false);
         resetForm();
     };
 
     const resetForm = () => {
-        setBpSys(''); setBpDia(''); setHr(''); setRr(''); setTemp(''); setO2(''); setHeight(''); setWeight('');
+        setBpSys(''); setBpDia(''); setHr(''); setRr(''); setTemp(''); setO2('');
     };
 
     const checkAlerts = (v: VitalSign) => {
-        const alerts = [];
+        const alerts: string[] = [];
+        if (!v.bloodPressure) return alerts;
         const [sys, dia] = v.bloodPressure.split('/').map(Number);
         if (sys > 140 || sys < 90) alerts.push('Abnormal BP');
         if (v.heartRate > 100 || v.heartRate < 60) alerts.push('Abnormal HR');
@@ -62,13 +75,13 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
         return alerts;
     };
 
-    const chartData = vitals.map(v => ({
+    const chartData = mappedVitals.map(v => ({
         time: new Date(v.dateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        hr: v.heartRate,
-        temp: v.temperature,
-        sys: Number(v.bloodPressure.split('/')[0]),
-        dia: Number(v.bloodPressure.split('/')[1]),
-        o2: v.oxygenSaturation
+        hr: v.heartRate || 0,
+        temp: v.temperature || 0,
+        sys: v.bloodPressure ? Number(v.bloodPressure.split('/')[0]) : 0,
+        dia: v.bloodPressure ? Number(v.bloodPressure.split('/')[1]) : 0,
+        o2: v.oxygenSaturation || 0
     })).slice(-10);
 
     return (
@@ -84,12 +97,12 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
                 </div>
             </div>
 
-            {vitals.length > 0 && checkAlerts(vitals[vitals.length - 1]).length > 0 && (
+            {mappedVitals.length > 0 && checkAlerts(mappedVitals[mappedVitals.length - 1]).length > 0 && (
                 <Alert variant="destructive">
                     <AlertTriangle className="h-4 w-4" />
                     <AlertTitle>Vital Signs Alert</AlertTitle>
                     <AlertDescription>
-                        Latest vitals indicate: {checkAlerts(vitals[vitals.length - 1]).join(', ')}. Please monitor closer.
+                        Latest vitals indicate: {checkAlerts(mappedVitals[mappedVitals.length - 1]).join(', ')}. Please monitor closely.
                     </AlertDescription>
                 </Alert>
             )}
@@ -148,7 +161,7 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {vitals.map(v => (
+                                {mappedVitals.map(v => (
                                     <TableRow key={v.id}>
                                         <TableCell>{new Date(v.dateTime).toLocaleString()}</TableCell>
                                         <TableCell className="font-medium">{v.bloodPressure}</TableCell>
@@ -175,8 +188,6 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
                         <div><Label>Resp Rate</Label><Input type="number" value={rr} onChange={e => setRr(e.target.value)} /></div>
                         <div><Label>Temp (°C)</Label><Input type="number" step="0.1" value={temp} onChange={e => setTemp(e.target.value)} /></div>
                         <div><Label>O2 Sat (%)</Label><Input type="number" value={o2} onChange={e => setO2(e.target.value)} /></div>
-                        <div><Label>Height (cm) - Opt</Label><Input type="number" value={height} onChange={e => setHeight(e.target.value)} /></div>
-                        <div><Label>Weight (kg) - Opt</Label><Input type="number" value={weight} onChange={e => setWeight(e.target.value)} /></div>
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>

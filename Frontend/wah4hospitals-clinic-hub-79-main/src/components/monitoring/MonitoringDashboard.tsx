@@ -30,11 +30,10 @@ export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({
         const nurseName = adm.assignedNurse || 'Unknown Nurse';
         const room = adm.room || '—';
         const status: PatientStatus = adm.status || 'Stable';
-        const id = adm.id;
 
         return (
           <Card
-            key={id}
+            key={adm.id}
             className="cursor-pointer hover:shadow-md transition"
             onClick={() => onSelectAdmission(adm)}
           >
@@ -46,6 +45,7 @@ export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({
                 </Badge>
               </CardTitle>
             </CardHeader>
+
             <CardContent className="text-sm space-y-1">
               <div>
                 <strong>Room:</strong> {room}
