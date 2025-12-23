@@ -16,11 +16,11 @@ interface ClinicalNotesTabProps {
     onAddNote: (note: ClinicalNote) => void;
 }
 
-const API_BASE = '/api';
+// ✅ Fixed: Correct backend URL using port 8000
+const API_BASE = 'https://scaling-memory-jj56p55q79g42qwq5-8000.app.github.dev/api/monitoring/notes/';
 
 export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({ notes, admissionId, onAddNote }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
-
     const [type, setType] = useState<'SOAP' | 'Progress' | 'Rounds'>('SOAP');
     const [subjective, setSubjective] = useState('');
     const [objective, setObjective] = useState('');
@@ -41,16 +41,32 @@ export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({ notes, admis
             objective,
             assessment,
             plan,
-            admissionId, // Correct property name
+            admission: admissionId, // backend expects 'admission'
         };
 
         try {
-            const res = await axios.post(`${API_BASE}/monitoring/notes/`, payload);
-            onAddNote(res.data);
+            // ✅ Correct POST to /notes/ without appending :id
+            const res = await axios.post(API_BASE, payload);
+            
+            // Map backend fields to frontend type
+            const newNote: ClinicalNote = {
+                id: String(res.data.id),
+                dateTime: res.data.date_time,
+                type: res.data.type,
+                subjective: res.data.subjective,
+                objective: res.data.objective,
+                assessment: res.data.assessment,
+                plan: res.data.plan,
+                providerName: res.data.provider_name,
+                admissionId: String(res.data.admission),
+            };
+
+            onAddNote(newNote);
             setIsModalOpen(false);
             resetForm();
-        } catch (err) {
+        } catch (err: any) {
             console.error('Failed to save note', err);
+            alert('Failed to save note. Please check your connection or API URL.');
         }
     };
 
@@ -63,7 +79,9 @@ export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({ notes, admis
             </div>
 
             <div className="space-y-4">
-                {notes.length === 0 && <p className="text-center text-gray-500 py-8">No clinical notes recorded yet.</p>}
+                {notes.length === 0 && (
+                    <p className="text-center text-gray-500 py-8">No clinical notes recorded yet.</p>
+                )}
                 {notes.map((note) => (
                     <Card key={note.id} className="border-l-4 border-l-blue-600">
                         <CardHeader className="pb-2">
@@ -71,9 +89,13 @@ export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({ notes, admis
                                 <div>
                                     <CardTitle className="text-lg flex items-center gap-2">
                                         {note.type} Note
-                                        <Badge variant="outline" className="font-normal text-xs">{new Date(note.dateTime).toLocaleString()}</Badge>
+                                        <Badge variant="outline" className="font-normal text-xs">
+                                            {new Date(note.dateTime).toLocaleString()}
+                                        </Badge>
                                     </CardTitle>
-                                    <p className="text-sm text-gray-500">By {note.providerName || 'Unknown'}</p>
+                                    <p className="text-sm text-gray-500">
+                                        By {note.providerName || 'Unknown'}
+                                    </p>
                                 </div>
                                 <Lock className="w-4 h-4 text-gray-400" />
                             </div>
