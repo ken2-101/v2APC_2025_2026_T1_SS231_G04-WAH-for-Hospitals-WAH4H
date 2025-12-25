@@ -16,12 +16,16 @@ interface ClinicalNotesTabProps {
     onAddNote: (note: ClinicalNote) => void;
 }
 
-// ✅ Fixed: Correct backend URL using port 8000
-const API_BASE = 'https://scaling-memory-jj56p55q79g42qwq5-8000.app.github.dev/api/monitoring/notes/';
+const API_BASE =
+    'https://scaling-memory-jj56p55q79g42qwq5-8000.app.github.dev/api/monitoring/notes/';
 
-export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({ notes, admissionId, onAddNote }) => {
+export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({
+    notes,
+    admissionId,
+    onAddNote,
+}) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [type, setType] = useState<'SOAP' | 'Progress' | 'Rounds'>('SOAP');
+    const [type, setType] = useState<'SOAP' | 'Progress'>('SOAP');
     const [subjective, setSubjective] = useState('');
     const [objective, setObjective] = useState('');
     const [assessment, setAssessment] = useState('');
@@ -36,21 +40,22 @@ export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({ notes, admis
 
     const handleSave = async () => {
         const payload = {
+            admission: Number(admissionId),              // 🔑 must be number
+            date_time: new Date().toISOString(),          // 🔑 REQUIRED
             type,
             subjective,
             objective,
             assessment,
             plan,
-            admission: admissionId, // backend expects 'admission'
+            provider_name: 'Dr. Test User',               // 🔑 REQUIRED (replace later)
         };
 
         try {
-            // ✅ Correct POST to /notes/ without appending :id
             const res = await axios.post(API_BASE, payload);
-            
-            // Map backend fields to frontend type
+
             const newNote: ClinicalNote = {
                 id: String(res.data.id),
+                admissionId: String(res.data.admission),
                 dateTime: res.data.date_time,
                 type: res.data.type,
                 subjective: res.data.subjective,
@@ -58,15 +63,17 @@ export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({ notes, admis
                 assessment: res.data.assessment,
                 plan: res.data.plan,
                 providerName: res.data.provider_name,
-                admissionId: String(res.data.admission),
             };
 
             onAddNote(newNote);
             setIsModalOpen(false);
             resetForm();
         } catch (err: any) {
-            console.error('Failed to save note', err);
-            alert('Failed to save note. Please check your connection or API URL.');
+            console.error(
+                'Failed to save note',
+                err.response?.data || err
+            );
+            alert('Failed to save note. Check console for details.');
         }
     };
 
@@ -80,8 +87,11 @@ export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({ notes, admis
 
             <div className="space-y-4">
                 {notes.length === 0 && (
-                    <p className="text-center text-gray-500 py-8">No clinical notes recorded yet.</p>
+                    <p className="text-center text-gray-500 py-8">
+                        No clinical notes recorded yet.
+                    </p>
                 )}
+
                 {notes.map((note) => (
                     <Card key={note.id} className="border-l-4 border-l-blue-600">
                         <CardHeader className="pb-2">
@@ -100,18 +110,22 @@ export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({ notes, admis
                                 <Lock className="w-4 h-4 text-gray-400" />
                             </div>
                         </CardHeader>
+
                         <CardContent className="grid gap-4 text-sm mt-2">
                             {note.type === 'SOAP' ? (
                                 <>
-                                    <div><span className="font-bold text-gray-700">S:</span> {note.subjective}</div>
-                                    <div><span className="font-bold text-gray-700">O:</span> {note.objective}</div>
-                                    <div><span className="font-bold text-gray-700">A:</span> {note.assessment}</div>
-                                    <div><span className="font-bold text-gray-700">P:</span> {note.plan}</div>
+                                    <div><strong>S:</strong> {note.subjective}</div>
+                                    <div><strong>O:</strong> {note.objective}</div>
+                                    <div><strong>A:</strong> {note.assessment}</div>
+                                    <div><strong>P:</strong> {note.plan}</div>
                                 </>
                             ) : (
-                                <div className="whitespace-pre-wrap">{note.assessment}</div>
+                                <div className="whitespace-pre-wrap">
+                                    {note.assessment}
+                                </div>
                             )}
                         </CardContent>
+
                         <CardFooter className="pt-2 border-t text-xs text-gray-400">
                             Signed electronically by {note.providerName || 'Unknown'}
                         </CardFooter>
@@ -121,57 +135,78 @@ export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({ notes, admis
 
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
                 <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader><DialogTitle>New Clinical Note</DialogTitle></DialogHeader>
+                    <DialogHeader>
+                        <DialogTitle>New Clinical Note</DialogTitle>
+                    </DialogHeader>
+
                     <div className="grid gap-4 py-4">
                         <div>
                             <Label>Note Type</Label>
-                            <Select value={type} onValueChange={val => setType(val as 'SOAP' | 'Progress' | 'Rounds')}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
+                            <Select
+                                value={type}
+                                onValueChange={(val) =>
+                                    setType(val as 'SOAP' | 'Progress')
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="SOAP">SOAP Note</SelectItem>
                                     <SelectItem value="Progress">Progress Note</SelectItem>
-                                    <SelectItem value="Rounds">Rounds Note</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
 
-                        {type === 'SOAP' ? (
+                        {type === 'SOAP' && (
                             <>
-                                <div>
-                                    <Label>Subjective</Label>
-                                    <Textarea value={subjective} onChange={e => setSubjective(e.target.value)} placeholder="Patient complaints, history..." className="h-20" />
-                                </div>
-                                <div>
-                                    <Label>Objective</Label>
-                                    <Textarea value={objective} onChange={e => setObjective(e.target.value)} placeholder="Physical exam findings, vitals..." className="h-20" />
-                                </div>
-                                <div>
-                                    <Label>Assessment</Label>
-                                    <Textarea value={assessment} onChange={e => setAssessment(e.target.value)} placeholder="Diagnosis, differential..." className="h-20" />
-                                </div>
-                                <div>
-                                    <Label>Plan</Label>
-                                    <Textarea value={plan} onChange={e => setPlan(e.target.value)} placeholder="Treatment, meds, follow-up..." className="h-20" />
-                                </div>
+                                <Label>Subjective</Label>
+                                <Textarea
+                                    value={subjective}
+                                    onChange={(e) => setSubjective(e.target.value)}
+                                />
+
+                                <Label>Objective</Label>
+                                <Textarea
+                                    value={objective}
+                                    onChange={(e) => setObjective(e.target.value)}
+                                />
+
+                                <Label>Assessment</Label>
+                                <Textarea
+                                    value={assessment}
+                                    onChange={(e) => setAssessment(e.target.value)}
+                                />
+
+                                <Label>Plan</Label>
+                                <Textarea
+                                    value={plan}
+                                    onChange={(e) => setPlan(e.target.value)}
+                                />
                             </>
-                        ) : (
-                            <div>
-                                <Label>Note Content</Label>
-                                <Textarea value={assessment} onChange={e => setAssessment(e.target.value)} placeholder="Enter details..." className="h-40" />
-                            </div>
                         )}
 
-                        <div>
-                            <Label>Attachments</Label>
-                            <div className="border border-dashed rounded-md p-4 bg-gray-50 flex items-center justify-center text-gray-500 cursor-pointer hover:bg-gray-100">
-                                <Paperclip className="w-4 h-4 mr-2" />
-                                <span>Click to attach images (X-ray, etc.)</span>
-                                <input type="file" className="hidden" />
-                            </div>
+                        {type === 'Progress' && (
+                            <>
+                                <Label>Progress Note</Label>
+                                <Textarea
+                                    value={assessment}
+                                    onChange={(e) => setAssessment(e.target.value)}
+                                    className="h-40"
+                                />
+                            </>
+                        )}
+
+                        <div className="border border-dashed rounded-md p-4 bg-gray-50 text-gray-500 flex items-center justify-center">
+                            <Paperclip className="w-4 h-4 mr-2" />
+                            Attachments (coming soon)
                         </div>
                     </div>
+
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+                        <Button variant="outline" onClick={() => setIsModalOpen(false)}>
+                            Cancel
+                        </Button>
                         <Button onClick={handleSave}>Finalize Note</Button>
                     </DialogFooter>
                 </DialogContent>

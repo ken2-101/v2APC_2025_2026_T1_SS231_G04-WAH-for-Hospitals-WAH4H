@@ -23,20 +23,26 @@ import { DietaryOrder } from '../../types/monitoring';
 
 interface DietaryTabProps {
   admissionId: string;
-  order: DietaryOrder;
+  order?: DietaryOrder; // optional, may not exist yet
   onUpdateOrder: (order: DietaryOrder) => void;
 }
 
-const API_BASE = '/api';
+const API_BASE = '/api/monitoring/dietary-orders/';
 
 export const DietaryTab: React.FC<DietaryTabProps> = ({
   admissionId,
   order,
   onUpdateOrder,
 }) => {
-  const [dietType, setDietType] = useState(order.dietType);
-  const [activityLevel, setActivityLevel] = useState(order.activityLevel);
-  const [allergies, setAllergies] = useState(order.allergies.join(', '));
+  // Initialize with backend defaults if order is undefined
+  const [dietType, setDietType] = useState(order?.dietType ?? 'Regular');
+  const [activityLevel, setActivityLevel] = useState(
+    order?.activityLevel ?? 'As Tolerated'
+  );
+  const [allergies, setAllergies] = useState(
+    order?.allergies?.join(', ') ?? ''
+  );
+  const [npoResponse, setNpoResponse] = useState(order?.npoResponse ?? false);
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
@@ -48,21 +54,24 @@ export const DietaryTab: React.FC<DietaryTabProps> = ({
         .split(',')
         .map(a => a.trim())
         .filter(Boolean),
-      fluidRestrictions: order.fluidRestrictions,
-      npoResponse: order.npoResponse,
+      npoResponse,
       lastUpdated: new Date().toISOString(),
-      orderedBy: order.orderedBy,
+      orderedBy: order?.orderedBy ?? 'Unknown',
+      id: order?.id,
     };
 
     try {
       setSaving(true);
-      const res = await axios.post(
-        `${API_BASE}/monitoring/dietary/`,
-        payload
-      );
+
+      // Decide POST (new) or PUT (update)
+      const res = order?.id
+        ? await axios.put(`${API_BASE}${order.id}/`, payload)
+        : await axios.post(API_BASE, payload);
+
       onUpdateOrder(res.data);
     } catch (err) {
       console.error('Failed to save dietary order', err);
+      alert('Failed to save dietary order. Please check your connection.');
     } finally {
       setSaving(false);
     }
@@ -124,6 +133,23 @@ export const DietaryTab: React.FC<DietaryTabProps> = ({
             onChange={e => setAllergies(e.target.value)}
             placeholder="e.g. peanuts, shellfish"
           />
+        </div>
+
+        {/* NPO Response */}
+        <div className="space-y-1">
+          <Label>NPO Response</Label>
+          <Select
+            value={npoResponse ? 'Yes' : 'No'}
+            onValueChange={val => setNpoResponse(val === 'Yes')}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select NPO status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Yes">Yes</SelectItem>
+              <SelectItem value="No">No</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </CardContent>
 
