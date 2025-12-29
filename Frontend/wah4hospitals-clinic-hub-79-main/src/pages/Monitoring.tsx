@@ -98,8 +98,6 @@ const Monitoring: React.FC = () => {
         respiratory_rate: newVital.respiratoryRate,
         temperature: newVital.temperature,
         oxygen_saturation: newVital.oxygenSaturation,
-        height: newVital.height,
-        weight: newVital.weight,
         staff_name: newVital.staffName,
       };
       const res = await axios.post(`${API_BASE}/monitoring/vitals/`, payload);
@@ -132,12 +130,27 @@ const Monitoring: React.FC = () => {
 
   // Update dietary order
   const handleUpdateDietary = async (order: DietaryOrder) => {
-    if (!selectedAdmission || !order.id) return;
+    if (!selectedAdmission) return;
+
+    const payload = {
+      admission: order.admissionId,
+      diet_type: order.dietType,
+      allergies: order.allergies,
+      npo_response: order.npoResponse,
+      activity_level: order.activityLevel,
+      ordered_by: order.orderedBy,
+    };
+
     try {
-      const res = await axios.put(`${API_BASE}/monitoring/dietary-orders/${order.id}/`, order);
-      setDietary(res.data);
+      if (order.id) {
+        const res = await axios.put(`${API_BASE}/monitoring/dietary-orders/${order.id}/`, payload);
+        setDietary(res.data);
+      } else {
+        const res = await axios.post(`${API_BASE}/monitoring/dietary-orders/`, payload);
+        setDietary(res.data);
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Error updating dietary order:', err);
     }
   };
 

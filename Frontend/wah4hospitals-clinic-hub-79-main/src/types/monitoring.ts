@@ -51,10 +51,11 @@ export interface HistoryEvent {
     id: string;
     admissionId: string;          // backend: admission
     dateTime: string;             // backend: date_time
-    category: 'Admission' | 'Vitals' | 'Note' | 'Procedure';
+    category: 'Admission' | 'Vitals' | 'Note' | 'Procedure' | 'Medication' | 'Lab';
     description: string;
     details?: string;
 }
+
 
 /* =========================
    MONITORING ADMISSION

@@ -2,7 +2,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, User } from 'lucide-react';
-import { MonitoringPatient, VitalSign, ClinicalNote, DietaryOrder, HistoryEvent } from '../../types/monitoring';
+import { MonitoringAdmission, VitalSign, ClinicalNote, DietaryOrder, HistoryEvent } from '../../types/monitoring';
 
 import { VitalSignsTab } from './VitalSignsTab';
 import { ClinicalNotesTab } from './ClinicalNotesTab';
@@ -10,7 +10,7 @@ import { DietaryTab } from './DietaryTab';
 import { HistoryTab } from './HistoryTab';
 
 interface PatientMonitoringPageProps {
-    patient: MonitoringPatient;
+    patient: MonitoringAdmission;
     vitals: VitalSign[];
     notes: ClinicalNote[];
     history: HistoryEvent[];
@@ -34,7 +34,7 @@ export const PatientMonitoringPage: React.FC<PatientMonitoringPageProps> = ({
 }) => {
     // Provide a default dietary order if none exists
     const defaultDietaryOrder: DietaryOrder = {
-        admissionId: patient.id,
+        admissionId: patient.id.toString(),
         dietType: '',
         allergies: [],
         npoResponse: false,
@@ -52,11 +52,9 @@ export const PatientMonitoringPage: React.FC<PatientMonitoringPageProps> = ({
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">{patient.patientName}</h1>
                     <div className="flex gap-4 text-sm text-gray-500">
-                        {patient.id && (
-                            <span className="flex items-center">
-                                <User className="w-3 h-3 mr-1" /> {patient.id}
-                            </span>
-                        )}
+                        <span className="flex items-center">
+                            <User className="w-3 h-3 mr-1" /> {patient.id}
+                        </span>
                         <span className="font-medium text-gray-700">Room {patient.room}</span>
                         <span>Dr. {patient.doctorName}</span>
                     </div>
@@ -73,38 +71,34 @@ export const PatientMonitoringPage: React.FC<PatientMonitoringPageProps> = ({
 
                 {/* Vitals Tab */}
                 <TabsContent value="vitals" className="mt-6">
-                    {patient.id && (
-                        <VitalSignsTab
-                            vitals={vitals.map(v => ({
-                                ...v,
-                                heartRate: Number(v.heartRate),
-                                respiratoryRate: Number(v.respiratoryRate),
-                                temperature: Number(v.temperature),
-                                oxygenSaturation: Number(v.oxygenSaturation),
-                            }))}
-                            onAddVital={onAddVital}
-                            patientId={patient.id}
-                        />
-                    )}
+                    <VitalSignsTab
+                        vitals={vitals.map(v => ({
+                            ...v,
+                            heartRate: Number(v.heartRate),
+                            respiratoryRate: Number(v.respiratoryRate),
+                            temperature: Number(v.temperature),
+                            oxygenSaturation: Number(v.oxygenSaturation),
+                        }))}
+                        onAddVital={onAddVital}
+                        patientId={patient.id.toString()}
+                    />
                 </TabsContent>
 
                 {/* Clinical Notes Tab */}
                 <TabsContent value="notes" className="mt-6">
-                    {patient.id && (
-                        <ClinicalNotesTab
-                            admissionId={patient.id}
-                            notes={notes}
-                            onAddNote={onAddNote}
-                        />
-                    )}
+                    <ClinicalNotesTab
+                        admissionId={patient.id.toString()}
+                        notes={notes}
+                        onAddNote={onAddNote}
+                    />
                 </TabsContent>
 
                 {/* Dietary Tab */}
                 <TabsContent value="dietary" className="mt-6">
                     <DietaryTab
-                        admissionId={patient.id}
+                        admissionId={patient.id.toString()}
                         order={dietaryOrder ?? defaultDietaryOrder}
-                        onUpdateOrder={onUpdateDietary}
+                        onSaved={onUpdateDietary} // ✅ corrected callback
                     />
                 </TabsContent>
 
