@@ -27,20 +27,22 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
     const [temp, setTemp] = useState('');
     const [o2, setO2] = useState('');
 
-    // Map API response to proper VitalSign type
+    // Map API response to proper VitalSign type, filtered by patientId
     const mappedVitals: VitalSign[] = useMemo(() => {
-        return vitals.map(v => ({
-            id: String(v.id),            // convert id to string
-            admissionId: String(v.admission),
-            dateTime: v.date_time,
-            bloodPressure: v.blood_pressure,
-            heartRate: v.heart_rate,
-            respiratoryRate: v.respiratory_rate,
-            temperature: v.temperature,
-            oxygenSaturation: v.oxygen_saturation,
-            staffName: v.staff_name
-        }));
-    }, [vitals]);
+        return vitals
+            .filter(v => String(v.admission) === patientId) // filter per admission/patient
+            .map(v => ({
+                id: String(v.id),
+                admissionId: String(v.admission),
+                dateTime: v.date_time,
+                bloodPressure: v.blood_pressure,
+                heartRate: v.heart_rate,
+                respiratoryRate: v.respiratory_rate,
+                temperature: v.temperature,
+                oxygenSaturation: v.oxygen_saturation,
+                staffName: v.staff_name
+            }));
+    }, [vitals, patientId]);
 
     const handleSave = () => {
         if (!bpSys || !bpDia || !hr || !rr || !temp || !o2) return;
@@ -96,6 +98,16 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
                     <Button onClick={() => setIsModalOpen(true)}><Plus className="w-4 h-4 mr-2" />Record Vitals</Button>
                 </div>
             </div>
+
+            {mappedVitals.length === 0 && (
+                <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>No Vital Signs Recorded</AlertTitle>
+                    <AlertDescription>
+                        There are no vital signs recorded for this patient yet.
+                    </AlertDescription>
+                </Alert>
+            )}
 
             {mappedVitals.length > 0 && checkAlerts(mappedVitals[mappedVitals.length - 1]).length > 0 && (
                 <Alert variant="destructive">
@@ -197,4 +209,5 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
             </Dialog>
         </div>
     );
-};
+};   
+ 
