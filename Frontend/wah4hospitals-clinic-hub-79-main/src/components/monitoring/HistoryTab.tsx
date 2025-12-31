@@ -27,6 +27,18 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ events }) => {
     }
   };
 
+  const formatDateTime = (dateTime: string) => {
+    const date = new Date(dateTime);
+    return `${date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    })} ${date.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+    })}`;
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -51,7 +63,7 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ events }) => {
                         {event.category}
                       </span>
                       <span className="text-xs text-gray-500">
-                        {new Date(event.dateTime).toLocaleString()}
+                        {formatDateTime(event.dateTime)}
                       </span>
                     </div>
                     <h4 className="text-md font-medium">{event.description}</h4>

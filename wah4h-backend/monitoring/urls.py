@@ -1,10 +1,5 @@
 from rest_framework.routers import DefaultRouter
-from .views import (
-    VitalSignViewSet,
-    ClinicalNoteViewSet,
-    DietaryOrderViewSet,
-    HistoryEventViewSet
-)
+from .views import VitalSignViewSet, ClinicalNoteViewSet, DietaryOrderViewSet, HistoryEventViewSet
 
 router = DefaultRouter()
 router.register("vitals", VitalSignViewSet)
