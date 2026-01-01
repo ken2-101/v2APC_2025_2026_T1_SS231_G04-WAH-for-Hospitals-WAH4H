@@ -6,7 +6,7 @@ import { MonitoringAdmission, VitalSign, ClinicalNote, DietaryOrder, HistoryEven
 
 import { VitalSignsTab } from './VitalSignsTab';
 import { ClinicalNotesTab } from './ClinicalNotesTab';
-import { DietaryTab } from './DietaryTab';
+import { DietaryTab } from "./DietaryTab";
 import { HistoryTab } from './HistoryTab';
 
 interface PatientMonitoringPageProps {
