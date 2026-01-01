@@ -1,6 +1,7 @@
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Eye } from 'lucide-react';
 import { MonitoringAdmission, PatientStatus } from '../../types/monitoring';
 
 interface MonitoringDashboardProps {
@@ -12,54 +13,65 @@ export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({
   admissions = [],
   onSelectAdmission,
 }) => {
-  if (!Array.isArray(admissions) || admissions.length === 0) {
+  if (!admissions.length) {
     return (
-      <Card>
-        <CardContent className="py-12 text-center text-muted-foreground">
-          No patients currently under monitoring.
-        </CardContent>
-      </Card>
+      <div className="text-center text-gray-500 py-6">
+        No patients currently under monitoring.
+      </div>
     );
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {admissions.map((adm) => {
-        const patientName = adm.patientName || 'Unknown Patient';
-        const doctorName = adm.attendingPhysician || 'Unknown Doctor';
-        const nurseName = adm.assignedNurse || 'Unknown Nurse';
-        const room = adm.room || '—';
-        const status: PatientStatus = adm.status || 'Stable';
+    <div className="overflow-x-auto border rounded">
+      <table className="min-w-full text-sm">
+        <thead className="bg-gray-100">
+          <tr>
+            <th className="px-4 py-2 text-left">Patient Name</th>
+            <th className="px-4 py-2 text-left">Room</th>
+            <th className="px-4 py-2 text-left">Doctor</th>
+            <th className="px-4 py-2 text-left">Nurse</th>
+            <th className="px-4 py-2 text-left">Status</th>
+            <th className="px-4 py-2 text-center">Actions</th>
+          </tr>
+        </thead>
 
-        return (
-          <Card
-            key={adm.id}
-            className="cursor-pointer hover:shadow-md transition"
-            onClick={() => onSelectAdmission(adm)}
-          >
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex justify-between items-center">
-                {patientName}
-                <Badge variant={status === 'Critical' ? 'destructive' : 'secondary'}>
-                  {status}
-                </Badge>
-              </CardTitle>
-            </CardHeader>
+        <tbody>
+          {admissions.map((adm) => {
+            const patientName = adm.patientName || 'Unknown';
+            const doctorName = adm.attendingPhysician || 'Unknown';
+            const nurseName = adm.assignedNurse || 'Unknown';
+            const room = adm.room || '—';
+            const status: PatientStatus = adm.status || 'Stable';
 
-            <CardContent className="text-sm space-y-1">
-              <div>
-                <strong>Room:</strong> {room}
-              </div>
-              <div>
-                <strong>Doctor:</strong> Dr. {doctorName}
-              </div>
-              <div>
-                <strong>Nurse:</strong> {nurseName}
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
+            return (
+              <tr key={adm.id} className="border-b hover:bg-gray-50">
+                <td className="px-4 py-2">{patientName}</td>
+                <td className="px-4 py-2">{room}</td>
+                <td className="px-4 py-2">Dr. {doctorName}</td>
+                <td className="px-4 py-2">{nurseName}</td>
+                <td className="px-4 py-2">
+                  <Badge
+                    variant={status === 'Critical' ? 'destructive' : 'secondary'}
+                  >
+                    {status}
+                  </Badge>
+                </td>
+                <td className="px-4 py-2">
+                  <div className="flex justify-center">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onSelectAdmission(adm)}
+                    >
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 };
