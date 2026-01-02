@@ -34,14 +34,17 @@ class Prescription(models.Model):
 
 
 class DispenseLog(models.Model):
-    prescription = models.ForeignKey(Prescription, on_delete=models.CASCADE, related_name='dispenses')
+    prescription = models.ForeignKey(Prescription, on_delete=models.CASCADE, related_name='dispenses', null=True, blank=True)
+    request = models.ForeignKey('MedicationRequest', on_delete=models.CASCADE, related_name='dispenses', null=True, blank=True)
     quantity = models.IntegerField()
     dispensed_by = models.CharField(max_length=255)
     notes = models.TextField(blank=True)
     dispensed_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Dispensed {self.quantity} - {self.prescription.medication}"
+        if self.prescription:
+            return f"Dispensed {self.quantity} - {self.prescription.medication}"
+        return f"Dispensed {self.quantity} - {self.request.medicine_name}"
 
 
 class MedicationRequest(models.Model):
