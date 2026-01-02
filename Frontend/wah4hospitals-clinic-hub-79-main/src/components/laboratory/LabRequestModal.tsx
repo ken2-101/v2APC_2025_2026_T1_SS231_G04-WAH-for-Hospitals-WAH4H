@@ -49,6 +49,8 @@ export const LabRequestModal: React.FC<LabRequestModalProps> = ({ isOpen, onClos
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         
+        console.log('Form data before conversion:', formData);
+        
         // Convert admission to number for backend
         const requestData = {
             admission: parseInt(formData.admission),
@@ -58,6 +60,7 @@ export const LabRequestModal: React.FC<LabRequestModalProps> = ({ isOpen, onClos
             clinical_reason: formData.clinical_reason
         };
 
+        console.log('Submitting lab request:', requestData);
         onSubmit(requestData);
         onClose();
         
@@ -96,15 +99,38 @@ export const LabRequestModal: React.FC<LabRequestModalProps> = ({ isOpen, onClos
                                 <option value="">-- Select an admitted patient --</option>
                                 {admissions.map(admission => (
                                     <option key={admission.id} value={admission.id}>
-                                        {admission.admission_id} - Ward: {admission.ward}, Room: {admission.room}, Bed: {admission.bed}
+                                        {admission.patient_details 
+                                            ? `${admission.patient_details.last_name}, ${admission.patient_details.first_name} ${admission.patient_details.middle_name || ''} - ${admission.admission_id}`
+                                            : `${admission.admission_id} - Ward: ${admission.ward}, Room: ${admission.room}, Bed: ${admission.bed}`
+                                        }
                                     </option>
                                 ))}
                             </select>
                         )}
                         {selectedAdmission && (
-                            <div className="mt-2 p-2 bg-blue-50 rounded text-xs text-gray-600">
-                                <div><strong>Patient ID:</strong> {selectedAdmission.patient}</div>
-                                <div><strong>Location:</strong> Ward {selectedAdmission.ward}, Room {selectedAdmission.room}, Bed {selectedAdmission.bed}</div>
+                            <div className="mt-2 p-3 bg-blue-50 rounded border border-blue-100">
+                                {selectedAdmission.patient_details && (
+                                    <div className="mb-2 pb-2 border-b border-blue-200">
+                                        <div className="font-semibold text-blue-900">
+                                            {selectedAdmission.patient_details.last_name}, {selectedAdmission.patient_details.first_name} {selectedAdmission.patient_details.middle_name || ''}
+                                        </div>
+                                        <div className="text-xs text-gray-600 mt-1">
+                                            <span className="font-medium">Patient ID:</span> {selectedAdmission.patient_details.patient_id} | 
+                                            <span className="font-medium ml-2">Admission ID:</span> {selectedAdmission.admission_id}
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="text-xs text-gray-600 space-y-1">
+                                    <div><strong>Location:</strong> Ward {selectedAdmission.ward}, Room {selectedAdmission.room}, Bed {selectedAdmission.bed}</div>
+                                    {selectedAdmission.patient_details && (
+                                        <>
+                                            <div><strong>Sex:</strong> {selectedAdmission.patient_details.sex === 'M' ? 'Male' : 'Female'}</div>
+                                            {selectedAdmission.patient_details.date_of_birth && (
+                                                <div><strong>Date of Birth:</strong> {new Date(selectedAdmission.patient_details.date_of_birth).toLocaleDateString()}</div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
                             </div>
                         )}
                     </div>

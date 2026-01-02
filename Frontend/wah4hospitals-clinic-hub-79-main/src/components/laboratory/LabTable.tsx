@@ -5,7 +5,7 @@ import { FileText, FlaskConical, Eye, Clock } from 'lucide-react';
 
 interface LabTableProps {
     requests: any[];
-    onAction: (request: any, action: 'encode' | 'view') => void;
+    onAction: (request: any, action: 'start' | 'encode' | 'view') => void;
     statusTab: string;
 }
 
@@ -67,13 +67,19 @@ export const LabTable: React.FC<LabTableProps> = ({ requests, onAction, statusTa
                                 <div className="text-xs text-gray-400">{new Date(req.created_at).toLocaleTimeString()}</div>
                             </td>
                             <td className="px-4 py-3">
-                                {req.status === 'completed' ? (
-                                    <Button size="sm" variant="outline" onClick={() => onAction(req, 'view')} className="text-blue-600 hover:text-blue-700">
-                                        <Eye className="w-4 h-4 mr-1" /> View Result
+                                {req.status === 'pending' && (
+                                    <Button size="sm" onClick={() => onAction(req, 'start')} className="bg-orange-600 hover:bg-orange-700">
+                                        <FlaskConical className="w-4 h-4 mr-1" /> Start Processing
                                     </Button>
-                                ) : (
+                                )}
+                                {req.status === 'in_progress' && (
                                     <Button size="sm" onClick={() => onAction(req, 'encode')} className="bg-blue-600 hover:bg-blue-700">
-                                        <FlaskConical className="w-4 h-4 mr-1" /> Process
+                                        <FileText className="w-4 h-4 mr-1" /> Encode Results
+                                    </Button>
+                                )}
+                                {req.status === 'completed' && (
+                                    <Button size="sm" variant="outline" onClick={() => onAction(req, 'view')} className="text-green-600 hover:text-green-700">
+                                        <Eye className="w-4 h-4 mr-1" /> View Results
                                     </Button>
                                 )}
                             </td>

@@ -57,19 +57,38 @@ const Laboratory = () => {
 
     const handleCreateRequest = async (newRequest: any) => {
         try {
-            await laboratoryService.createLabRequest(newRequest);
+            console.log('Creating lab request with data:', newRequest);
+            const result = await laboratoryService.createLabRequest(newRequest);
+            console.log('Lab request created successfully:', result);
             toast.success('Lab request created successfully');
             fetchLabRequests();
             fetchDashboardStats();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error creating lab request:', error);
-            toast.error('Failed to create lab request');
+            console.error('Error response:', error.response?.data);
+            const errorMessage = error.response?.data?.detail 
+                || error.response?.data?.message 
+                || error.message 
+                || 'Failed to create lab request';
+            toast.error(errorMessage);
         }
     };
 
-    const handleAction = (request: LabRequest, action: 'encode' | 'view') => {
+    const handleAction = async (request: LabRequest, action: 'start' | 'encode' | 'view') => {
         setSelectedRequest(request);
-        if (action === 'encode') {
+        
+        if (action === 'start') {
+            // Move from pending to in_progress
+            try {
+                await laboratoryService.startProcessing(request.id);
+                toast.success('Lab request moved to In-Progress');
+                fetchLabRequests();
+                fetchDashboardStats();
+            } catch (error) {
+                console.error('Error starting processing:', error);
+                toast.error('Failed to start processing');
+            }
+        } else if (action === 'encode') {
             setIsEncodingModalOpen(true);
         } else {
             setIsViewModalOpen(true);
@@ -78,14 +97,22 @@ const Laboratory = () => {
 
     const handleSubmitResults = async (requestId: number, resultsData: any) => {
         try {
-            await laboratoryService.createLabResult(resultsData);
+            console.log('Submitting lab results:', resultsData);
+            const result = await laboratoryService.createLabResult(resultsData);
+            console.log('Lab result created successfully:', result);
             toast.success('Results encoded and finalized');
             setIsEncodingModalOpen(false);
             fetchLabRequests();
             fetchDashboardStats();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error submitting results:', error);
-            toast.error('Failed to submit results');
+            console.error('Error response:', error.response?.data);
+            const errorMessage = error.response?.data?.detail 
+                || error.response?.data?.message 
+                || JSON.stringify(error.response?.data)
+                || error.message 
+                || 'Failed to submit results';
+            toast.error(errorMessage);
         }
     };
 
