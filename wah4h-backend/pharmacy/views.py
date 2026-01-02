@@ -1,13 +1,11 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from django.utils import timezone
-from .models import Prescription, DispenseLog, InventoryItem
-from .serializers import PrescriptionSerializer, DispenseLogSerializer, InventoryItemSerializer
+from .models import Prescription, DispenseLog, InventoryItem, MedicationRequest
+from .serializers import PrescriptionSerializer, DispenseLogSerializer, InventoryItemSerializer, MedicationRequestSerializer
 from monitoring.models import HistoryEvent
 
-# ---------------------------
 # Prescription
-# ---------------------------
 class PrescriptionViewSet(viewsets.ModelViewSet):
     queryset = Prescription.objects.all()
     serializer_class = PrescriptionSerializer
@@ -20,63 +18,39 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
         return qs.order_by('-created_at')
 
 
-# ---------------------------
 # Dispense
-# ---------------------------
 class DispenseViewSet(viewsets.ViewSet):
-    """
-    POST /api/pharmacy/dispense/
-    {
-        "prescription_id": 1,
-        "inventory_id": 5,
-        "quantityDispensed": 5,
-        "pharmacistName": "John Doe",
-        "notes": "Optional"
-    }
-    """
     def create(self, request):
         data = request.data
-
-        # Get prescription
         try:
             prescription = Prescription.objects.get(id=data['prescription_id'])
-        except Prescription.DoesNotExist:
-            return Response({"error": "Prescription not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        # Get inventory
-        try:
             inventory_item = InventoryItem.objects.get(id=data['inventory_id'])
-        except InventoryItem.DoesNotExist:
-            return Response({"error": "Inventory item not found"}, status=status.HTTP_404_NOT_FOUND)
+        except (Prescription.DoesNotExist, InventoryItem.DoesNotExist):
+            return Response({"error": "Prescription or inventory not found"}, status=status.HTTP_404_NOT_FOUND)
 
         qty = int(data['quantityDispensed'])
 
-        # Validations
         if prescription.quantity_dispensed + qty > prescription.quantity_ordered:
             return Response({"error": "Over-dispensing not allowed"}, status=status.HTTP_400_BAD_REQUEST)
         if qty > inventory_item.quantity:
-            return Response({"error": "Not enough stock in selected batch"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Not enough stock in batch"}, status=status.HTTP_400_BAD_REQUEST)
         if inventory_item.expiry_date < timezone.now().date():
             return Response({"error": "Cannot dispense expired batch"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Log dispense
         DispenseLog.objects.create(
             prescription=prescription,
             quantity=qty,
             dispensed_by=data['pharmacistName'],
             notes=data.get('notes', '')
         )
-    
-        # Update prescription
+
         prescription.quantity_dispensed += qty
         prescription.status = 'completed' if prescription.quantity_dispensed >= prescription.quantity_ordered else 'partially-dispensed'
         prescription.save()
 
-        # Update inventory
         inventory_item.quantity -= qty
         inventory_item.save()
 
-        # History
         HistoryEvent.objects.create(
             admission=prescription.admission,
             category='Medication',
@@ -87,9 +61,7 @@ class DispenseViewSet(viewsets.ViewSet):
         return Response({"success": True})
 
 
-# ---------------------------
 # Inventory
-# ---------------------------
 class InventoryViewSet(viewsets.ModelViewSet):
     queryset = InventoryItem.objects.all()
     serializer_class = InventoryItemSerializer
@@ -105,7 +77,6 @@ class InventoryViewSet(viewsets.ModelViewSet):
             return Response({"error": "Missing fields"}, status=status.HTTP_400_BAD_REQUEST)
 
         if item_id:
-            # Update existing item
             try:
                 item = InventoryItem.objects.get(id=item_id)
                 item.quantity += qty
@@ -113,7 +84,6 @@ class InventoryViewSet(viewsets.ModelViewSet):
             except InventoryItem.DoesNotExist:
                 return Response({"error": "Inventory item not found"}, status=status.HTTP_404_NOT_FOUND)
         else:
-            # Create new item
             item = InventoryItem.objects.create(
                 name=name,
                 batch_number=batch,
@@ -122,4 +92,47 @@ class InventoryViewSet(viewsets.ModelViewSet):
             )
 
         serializer = InventoryItemSerializer(item)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+# Medication Requests
+class MedicationRequestViewSet(viewsets.ViewSet):
+    def list(self, request):
+        admission_id = request.query_params.get("admission")
+        if not admission_id:
+            return Response({"error": "admission param required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        requests = MedicationRequest.objects.filter(admission_id=admission_id).order_by('-requested_at')
+        serializer = MedicationRequestSerializer(requests, many=True)
+        return Response(serializer.data)
+
+    def create(self, request):
+        data = request.data
+        admission_id = data.get("admission")
+        medicine_name = data.get("medicine_name")
+        quantity = int(data.get("quantity", 0))
+
+        if not all([admission_id, medicine_name, quantity]):
+            return Response({"error": "Missing fields"}, status=status.HTTP_400_BAD_REQUEST)
+
+        inventory_item = InventoryItem.objects.filter(
+            name=medicine_name,
+            quantity__gte=quantity,
+            expiry_date__gte=timezone.now().date()
+        ).first()
+
+        if not inventory_item:
+            return Response({"error": "Insufficient stock or medicine not found"}, status=status.HTTP_400_BAD_REQUEST)
+
+        inventory_item.quantity -= quantity
+        inventory_item.save()
+
+        med_request = MedicationRequest.objects.create(
+            admission_id=admission_id,
+            medicine_name=medicine_name,
+            quantity=quantity,
+            status='completed'
+        )
+
+        serializer = MedicationRequestSerializer(med_request)
         return Response(serializer.data, status=status.HTTP_201_CREATED)

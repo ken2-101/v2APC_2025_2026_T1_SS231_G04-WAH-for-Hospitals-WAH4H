@@ -7,22 +7,10 @@ import { Badge } from '@/components/ui/badge';
 import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
-interface MedicationRequestTabProps {
-    admissionId: string;
-}
+interface MedicationRequestTabProps { admissionId: string; }
 
-interface Medicine {
-    id: string;
-    name: string;
-    stock: number;
-}
-
-interface Request {
-    id: string;
-    medicineName: string;
-    quantity: number;
-    status: string;
-}
+interface Medicine { id: string; name: string; quantity: number; }
+interface Request { id: number; medicine_name: string; quantity: number; status: string; }
 
 export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admissionId }) => {
     const [medicines, setMedicines] = useState<Medicine[]>([]);
@@ -31,20 +19,24 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
     const [selectedMedicine, setSelectedMedicine] = useState<string>('');
     const [quantity, setQuantity] = useState<number>(1);
 
-    const PHARMACY_API = 'YOUR_PHARMACY_ENDPOINT';
-    const REQUEST_API = 'YOUR_MED_REQUEST_ENDPOINT';
+    const PHARMACY_API = 'https://scaling-memory-jj56p55q79g42qwq5-8000.app.github.dev/api/pharmacy/inventory/';
+    const REQUEST_API = 'https://scaling-memory-jj56p55q79g42qwq5-8000.app.github.dev/api/pharmacy/requests/';
 
+    // Fetch medicines
     useEffect(() => {
         axios.get(PHARMACY_API)
-            .then(res => setMedicines(Array.isArray(res.data) ? res.data : []))
+            .then(res => setMedicines(res.data))
             .catch(() => toast.error('Failed to fetch pharmacy inventory'));
     }, []);
 
-    useEffect(() => {
+    // Fetch requests
+    const fetchRequests = () => {
         axios.get(`${REQUEST_API}?admission=${admissionId}`)
-            .then(res => setRequests(Array.isArray(res.data) ? res.data : []))
+            .then(res => setRequests(res.data))
             .catch(() => toast.error('Failed to fetch requests'));
-    }, [admissionId]);
+    };
+
+    useEffect(() => { fetchRequests(); }, [admissionId]);
 
     const handleRequest = () => {
         if (!selectedMedicine || quantity <= 0) {
@@ -52,19 +44,15 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
             return;
         }
 
-        axios.post(REQUEST_API, {
-            admission: Number(admissionId),
-            medicineName: selectedMedicine,
-            quantity,
-        })
-        .then(res => {
-            toast.success('Request submitted');
-            setRequests(prev => [...prev, res.data]);
-            setIsModalOpen(false);
-            setQuantity(1);
-            setSelectedMedicine('');
-        })
-        .catch(() => toast.error('Failed to submit request'));
+        axios.post(REQUEST_API, { admission: Number(admissionId), medicine_name: selectedMedicine, quantity })
+            .then(res => {
+                toast.success('Request submitted');
+                setRequests(prev => [res.data, ...prev]);
+                setIsModalOpen(false);
+                setQuantity(1);
+                setSelectedMedicine('');
+            })
+            .catch(() => toast.error('Failed to submit request'));
     };
 
     return (
@@ -75,15 +63,13 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
                 </Button>
             </div>
 
-            {requests.length === 0 && (
-                <p className="text-center text-gray-500 py-8">No medication requests yet.</p>
-            )}
+            {requests.length === 0 && <p className="text-center text-gray-500 py-8">No medication requests yet.</p>}
 
             {requests.map(req => (
                 <Card key={req.id} className="border-l-4 border-l-blue-600">
                     <CardHeader>
                         <CardTitle className="text-lg flex justify-between">
-                            {req.medicineName}
+                            {req.medicine_name}
                             <Badge variant="outline">{req.status}</Badge>
                         </CardTitle>
                     </CardHeader>
@@ -108,9 +94,7 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
                         >
                             <option value="">Select medicine</option>
                             {medicines.map(m => (
-                                <option key={m.id} value={m.name}>
-                                    {m.name} (Stock: {m.stock})
-                                </option>
+                                <option key={m.id} value={m.name}>{m.name} (Stock: {m.quantity})</option>
                             ))}
                         </select>
                         <input
