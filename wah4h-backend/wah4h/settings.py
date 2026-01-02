@@ -31,6 +31,8 @@ INSTALLED_APPS = [
     "monitoring",
     "discharge",
     "accounts",
+    "pharmacy",
+    
 
     # Third-party
     "rest_framework",

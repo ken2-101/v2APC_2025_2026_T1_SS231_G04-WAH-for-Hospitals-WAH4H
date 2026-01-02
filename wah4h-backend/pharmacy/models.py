@@ -1,13 +1,11 @@
 from django.db import models
-from monitoring.models import Admission  # adjust import if path differs
-
+from monitoring.models import Admission  # adjust if your path differs
 
 class InventoryItem(models.Model):
     name = models.CharField(max_length=255)
     batch_number = models.CharField(max_length=100)
     quantity = models.IntegerField()
     expiry_date = models.DateField()
-
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -17,7 +15,7 @@ class InventoryItem(models.Model):
 class Prescription(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
-        ('partial', 'Partially Dispensed'),
+        ('partially-dispensed', 'Partially Dispensed'),
         ('completed', 'Completed'),
     ]
 
@@ -58,4 +56,3 @@ class DispenseLog(models.Model):
 
     def __str__(self):
         return f"Dispensed {self.quantity} - {self.prescription.medication}"
-    

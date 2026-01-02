@@ -6,8 +6,9 @@ import { MonitoringAdmission, VitalSign, ClinicalNote, DietaryOrder, HistoryEven
 
 import { VitalSignsTab } from './VitalSignsTab';
 import { ClinicalNotesTab } from './ClinicalNotesTab';
-import { DietaryTab } from "./DietaryTab";
+import { DietaryTab } from './DietaryTab';
 import { HistoryTab } from './HistoryTab';
+import { MedicationRequestTab } from './MedicationRequestTab'; // ✅ fixed import
 
 interface PatientMonitoringPageProps {
     patient: MonitoringAdmission;
@@ -32,7 +33,6 @@ export const PatientMonitoringPage: React.FC<PatientMonitoringPageProps> = ({
     onAddNote,
     onUpdateDietary,
 }) => {
-    // Provide a default dietary order if none exists
     const defaultDietaryOrder: DietaryOrder = {
         admissionId: patient.id.toString(),
         dietType: '',
@@ -62,14 +62,14 @@ export const PatientMonitoringPage: React.FC<PatientMonitoringPageProps> = ({
             </div>
 
             <Tabs defaultValue="vitals" className="w-full">
-                <TabsList className="grid w-full grid-cols-4 lg:w-[600px]">
-                    <TabsTrigger value="vitals">Vital Signs</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-5 lg:w-[750px]">
+                    <TabsTrigger value="vitals">Vitals</TabsTrigger>
                     <TabsTrigger value="notes">Clinical Notes</TabsTrigger>
-                    <TabsTrigger value="dietary">Dietary / Orders</TabsTrigger>
+                    <TabsTrigger value="dietary">Dietary</TabsTrigger>
+                    <TabsTrigger value="medication">Medication</TabsTrigger>
                     <TabsTrigger value="history">History</TabsTrigger>
                 </TabsList>
 
-                {/* Vitals Tab */}
                 <TabsContent value="vitals" className="mt-6">
                     <VitalSignsTab
                         vitals={vitals.map(v => ({
@@ -84,7 +84,6 @@ export const PatientMonitoringPage: React.FC<PatientMonitoringPageProps> = ({
                     />
                 </TabsContent>
 
-                {/* Clinical Notes Tab */}
                 <TabsContent value="notes" className="mt-6">
                     <ClinicalNotesTab
                         admissionId={patient.id.toString()}
@@ -93,16 +92,18 @@ export const PatientMonitoringPage: React.FC<PatientMonitoringPageProps> = ({
                     />
                 </TabsContent>
 
-                {/* Dietary Tab */}
                 <TabsContent value="dietary" className="mt-6">
                     <DietaryTab
                         admissionId={patient.id.toString()}
                         order={dietaryOrder ?? defaultDietaryOrder}
-                        onSaved={onUpdateDietary} // ✅ corrected callback
+                        onSaved={onUpdateDietary}
                     />
                 </TabsContent>
 
-                {/* History Tab */}
+                <TabsContent value="medication" className="mt-6">
+                    <MedicationRequestTab admissionId={patient.id.toString()} />
+                </TabsContent>
+
                 <TabsContent value="history" className="mt-6">
                     <HistoryTab events={history} />
                 </TabsContent>

@@ -15,4 +15,8 @@ urlpatterns = [
 
     # Monitoring module
     path('api/monitoring/', include('monitoring.urls')),  # <- added
+
+    # project/urls.py
+    path('api/pharmacy/', include('pharmacy.urls')),
+
 ]

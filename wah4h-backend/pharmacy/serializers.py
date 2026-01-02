@@ -1,7 +1,6 @@
 from rest_framework import serializers
 from .models import Prescription, DispenseLog, InventoryItem
 
-
 class InventoryItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = InventoryItem
@@ -9,10 +8,7 @@ class InventoryItemSerializer(serializers.ModelSerializer):
 
 
 class PrescriptionSerializer(serializers.ModelSerializer):
-    patient_name = serializers.CharField(
-        source='admission.patient_name',
-        read_only=True
-    )
+    patient_name = serializers.CharField(source='admission.patient_name', read_only=True)
 
     class Meta:
         model = Prescription
