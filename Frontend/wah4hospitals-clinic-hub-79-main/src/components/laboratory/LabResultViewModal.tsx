@@ -45,27 +45,27 @@ export const LabResultViewModal: React.FC<LabResultViewModalProps> = ({ isOpen, 
                     <div className="grid grid-cols-2 gap-x-8 gap-y-4 mb-8 text-sm">
                         <div className="grid grid-cols-3">
                             <span className="font-semibold text-gray-600">Patient Name:</span>
-                            <span className="col-span-2 font-medium">{request.patientName}</span>
+                            <span className="col-span-2 font-medium">{request.patient_name}</span>
                         </div>
                         <div className="grid grid-cols-3">
                             <span className="font-semibold text-gray-600">Patient ID:</span>
-                            <span className="col-span-2 font-medium">{request.patientId}</span>
+                            <span className="col-span-2 font-medium">{request.patient_id}</span>
                         </div>
                         <div className="grid grid-cols-3">
                             <span className="font-semibold text-gray-600">Date Requested:</span>
-                            <span className="col-span-2">{new Date(request.dateRequested).toLocaleDateString()}</span>
+                            <span className="col-span-2">{new Date(request.created_at).toLocaleDateString()}</span>
                         </div>
                         <div className="grid grid-cols-3">
                             <span className="font-semibold text-gray-600">Date Completed:</span>
-                            <span className="col-span-2">{request.dateCompleted ? new Date(request.dateCompleted).toLocaleDateString() : 'N/A'}</span>
+                            <span className="col-span-2">{request.result?.finalized_at ? new Date(request.result.finalized_at).toLocaleDateString() : 'N/A'}</span>
                         </div>
                         <div className="grid grid-cols-3">
                             <span className="font-semibold text-gray-600">Physician:</span>
-                            <span className="col-span-2">{request.doctorName}</span>
+                            <span className="col-span-2">{request.doctor_name || 'N/A'}</span>
                         </div>
                         <div className="grid grid-cols-3">
                             <span className="font-semibold text-gray-600">Test Type:</span>
-                            <span className="col-span-2 font-bold uppercase">{request.testType}</span>
+                            <span className="col-span-2 font-bold uppercase">{request.test_type_display}</span>
                         </div>
                     </div>
 
@@ -81,13 +81,13 @@ export const LabResultViewModal: React.FC<LabResultViewModalProps> = ({ isOpen, 
                             </tr>
                         </thead>
                         <tbody>
-                            {request.results?.map((res, i) => (
+                            {request.result?.parameters?.map((param, i) => (
                                 <tr key={i} className="border-b border-gray-100">
-                                    <td className="py-2 px-2 font-medium">{res.testName}</td>
-                                    <td className="py-2 px-2 text-center font-bold">{res.resultValue}</td>
-                                    <td className="py-2 px-2 text-center text-gray-500">{res.unit}</td>
-                                    <td className="py-2 px-2 text-center text-gray-500">{res.referenceRange}</td>
-                                    <td className="py-2 px-2 text-right">{res.interpretation}</td>
+                                    <td className="py-2 px-2 font-medium">{param.parameter_name}</td>
+                                    <td className="py-2 px-2 text-center font-bold">{param.result_value}</td>
+                                    <td className="py-2 px-2 text-center text-gray-500">{param.unit}</td>
+                                    <td className="py-2 px-2 text-center text-gray-500">{param.reference_range}</td>
+                                    <td className="py-2 px-2 text-right capitalize">{param.interpretation}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -97,9 +97,9 @@ export const LabResultViewModal: React.FC<LabResultViewModalProps> = ({ isOpen, 
                     <div className="mt-12 grid grid-cols-2 gap-12">
                         <div className="text-center">
                             <div className="border-t border-gray-400 w-3/4 mx-auto pt-2">
-                                <p className="font-bold">{request.medicalTechnologist || '_________________'}</p>
+                                <p className="font-bold">{request.result?.medical_technologist || '_________________'}</p>
                                 <p className="text-xs uppercase text-gray-500">Registered Medical Technologist</p>
-                                <p className="text-xs text-gray-500">Lic. No. {request.prcNumber || '__________'}</p>
+                                <p className="text-xs text-gray-500">Lic. No. {request.result?.prc_number || '__________'}</p>
                             </div>
                         </div>
                         <div className="text-center">

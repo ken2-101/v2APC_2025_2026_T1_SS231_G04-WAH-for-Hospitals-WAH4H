@@ -4,7 +4,7 @@ import type { Admission, NewAdmission } from "@/types/admission"; // <- import N
 
 // Create an Axios instance
 const api: AxiosInstance = axios.create({
-  baseURL: "https://scaling-memory-jj56p55q79g42qwq5-8000.app.github.dev/api/admissions/",
+  baseURL: "https://glowing-orbit-wrgjv6x7jpq929j9p-8000.app.github.dev/api/admissions/",
   headers: {
     "Content-Type": "application/json",
   },

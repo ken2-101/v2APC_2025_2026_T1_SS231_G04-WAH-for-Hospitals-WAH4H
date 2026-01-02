@@ -82,7 +82,7 @@ export const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({
     setIsSearching(true);
     try {
       const response = await axios.get(
-        `https://scaling-memory-jj56p55q79g42qwq5-8000.app.github.dev/api/patients/?search=${encodeURIComponent(query)}`
+        `https://glowing-orbit-wrgjv6x7jpq929j9p-8000.app.github.dev/api/patients/?search=${encodeURIComponent(query)}`
       );
       if (Array.isArray(response.data)) {
         setSearchResults(response.data);
