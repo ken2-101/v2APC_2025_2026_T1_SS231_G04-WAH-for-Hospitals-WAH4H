@@ -75,8 +75,6 @@ const Laboratory = () => {
     };
 
     const handleAction = async (request: LabRequest, action: 'start' | 'encode' | 'view') => {
-        setSelectedRequest(request);
-        
         if (action === 'start') {
             // Move from pending to in_progress
             try {
@@ -89,9 +87,18 @@ const Laboratory = () => {
                 toast.error('Failed to start processing');
             }
         } else if (action === 'encode') {
+            setSelectedRequest(request);
             setIsEncodingModalOpen(true);
-        } else {
-            setIsViewModalOpen(true);
+        } else if (action === 'view') {
+            // Fetch full request details including result parameters
+            try {
+                const fullRequest = await laboratoryService.getLabRequest(request.id);
+                setSelectedRequest(fullRequest);
+                setIsViewModalOpen(true);
+            } catch (error) {
+                console.error('Error fetching request details:', error);
+                toast.error('Failed to load result details');
+            }
         }
     };
 
