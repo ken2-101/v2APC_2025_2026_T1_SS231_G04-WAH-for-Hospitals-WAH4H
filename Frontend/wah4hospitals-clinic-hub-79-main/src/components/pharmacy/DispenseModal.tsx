@@ -26,7 +26,7 @@ export const DispenseModal: React.FC<DispenseModalProps> = ({
   const [quantity, setQuantity] = useState<number>(medicationRequest.quantity);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
 
-  // ------------------ Fetch inventory for display ------------------
+  // ------------------ Fetch inventory for this medicine ------------------
   const fetchInventoryItem = async () => {
     try {
       const res = await axios.get<InventoryItem[]>(`${API_BASE}/inventory/`);
@@ -47,7 +47,7 @@ export const DispenseModal: React.FC<DispenseModalProps> = ({
     fetchInventoryItem();
   }, [medicationRequest]);
 
-  // ------------------ Handle "Approve & Update" ------------------
+  // ------------------ Handle Dispense ------------------
   const handleDispense = async () => {
     if (quantity <= 0) {
       toast.error('Quantity must be greater than 0');
@@ -61,28 +61,27 @@ export const DispenseModal: React.FC<DispenseModalProps> = ({
     }
 
     try {
-      // Use POST to /update-status/ (correct endpoint)
-      await axios.post(`${API_BASE}/medication-requests/${medicationRequest.id}/update-status/`, {
+      // POST to the proper dispense endpoint
+      await axios.post(`${API_BASE}/medication-requests/${medicationRequest.id}/dispense/`, {
         quantity,
-        status: 'approved', // mark as approved
       });
 
-      toast.success('Medication request updated successfully');
+      toast.success('Medication dispensed and inventory updated');
       onDispenseSuccess(); // refresh parent state
       onClose();
     } catch (err: any) {
       console.error(err);
-      toast.error(err.response?.data?.error || 'Failed to update request');
+      toast.error(err.response?.data?.error || 'Failed to dispense medication');
     }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[400px]" aria-describedby="dispense-description">
+      <DialogContent className="sm:max-w-[400px]">
         <DialogHeader>
           <DialogTitle>Dispense Medication</DialogTitle>
-          <p id="dispense-description" className="text-sm text-gray-500">
-            Approving will update the request status to approved and adjust the quantity.
+          <p className="text-sm text-gray-500">
+            Dispensing will update the request status to approved and reduce the inventory quantity.
           </p>
         </DialogHeader>
 
@@ -97,7 +96,7 @@ export const DispenseModal: React.FC<DispenseModalProps> = ({
           </div>
 
           <div>
-            <Label>Quantity to approve</Label>
+            <Label>Quantity to dispense</Label>
             <Input
               type="number"
               min={1}
@@ -135,7 +134,11 @@ export const DispenseModal: React.FC<DispenseModalProps> = ({
           <Button
             className="bg-blue-600 hover:bg-blue-700"
             onClick={handleDispense}
-            disabled={inventory.length === 0 || quantity <= 0 || quantity > inventory.reduce((acc, i) => acc + i.quantity, 0)}
+            disabled={
+              inventory.length === 0 ||
+              quantity <= 0 ||
+              quantity > inventory.reduce((acc, i) => acc + i.quantity, 0)
+            }
           >
             Approve & Update
           </Button>
