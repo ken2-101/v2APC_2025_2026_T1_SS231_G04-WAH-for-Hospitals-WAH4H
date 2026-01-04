@@ -1,23 +1,35 @@
 from rest_framework import serializers
-from .models import Prescription, DispenseLog, InventoryItem, MedicationRequest
+from .models import InventoryItem, MedicationRequest, DispenseLog
+
 
 class InventoryItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = InventoryItem
-        fields = '__all__'
+        fields = "__all__"
 
-class PrescriptionSerializer(serializers.ModelSerializer):
-    patient_name = serializers.CharField(source='admission.patient_name', read_only=True)
+
+class MedicationRequestSerializer(serializers.ModelSerializer):
+    inventory_item_detail = InventoryItemSerializer(
+        source="inventory_item",
+        read_only=True
+    )
+
     class Meta:
-        model = Prescription
-        fields = '__all__'
+        model = MedicationRequest
+        fields = [
+            "id",
+            "admission",
+            "inventory_item",
+            "inventory_item_detail",
+            "quantity",
+            "status",
+            "notes",
+            "requested_at",
+            "updated_at",
+        ]
+
 
 class DispenseLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = DispenseLog
-        fields = '__all__'
-
-class MedicationRequestSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = MedicationRequest
-        fields = '__all__'
+        fields = "__all__"

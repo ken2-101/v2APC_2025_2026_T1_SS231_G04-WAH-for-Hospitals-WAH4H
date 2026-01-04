@@ -1,116 +1,123 @@
-from rest_framework import viewsets, status
+from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from django.utils import timezone
-from .models import Prescription, DispenseLog, InventoryItem, MedicationRequest
-from .serializers import PrescriptionSerializer, DispenseLogSerializer, InventoryItemSerializer, MedicationRequestSerializer
-from monitoring.models import HistoryEvent
+from rest_framework import status
+from .models import InventoryItem, MedicationRequest, DispenseLog
+from .serializers import (
+    InventoryItemSerializer,
+    MedicationRequestSerializer
+)
 
-# Prescription
-class PrescriptionViewSet(viewsets.ModelViewSet):
-    queryset = Prescription.objects.all()
-    serializer_class = PrescriptionSerializer
-
-    def get_queryset(self):
-        qs = super().get_queryset()
-        admission_id = self.request.query_params.get("admission_id")
-        if admission_id:
-            qs = qs.filter(admission_id=admission_id)
-        return qs.order_by('-created_at')
-
-
-# Dispense for Prescription or MedicationRequest
-class DispenseViewSet(viewsets.ViewSet):
-    """
-    POST /api/pharmacy/dispense/
-    {
-        "request_id": 1,
-        "dispensed_by": "John Doe",
-        "notes": "Optional"
-    }
-    """
-    def create(self, request):
-        data = request.data
-        request_id = data.get("request_id")
-        dispensed_by = data.get("dispensed_by")
-        notes = data.get("notes", "")
-
-        if not all([request_id, dispensed_by]):
-            return Response({"error": "request_id and dispensed_by required"}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            med_request = MedicationRequest.objects.get(id=request_id, status='pending')
-        except MedicationRequest.DoesNotExist:
-            return Response({"error": "Medication request not found or already completed"}, status=status.HTTP_404_NOT_FOUND)
-
-        # Find inventory
-        inventory_item = InventoryItem.objects.filter(
-            name=med_request.medicine_name,
-            quantity__gte=med_request.quantity,
-            expiry_date__gte=timezone.now().date()
-        ).first()
-
-        if not inventory_item:
-            return Response({"error": "Insufficient stock or medicine not found"}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Deduct stock
-        inventory_item.quantity -= med_request.quantity
-        inventory_item.save()
-
-        # Update request status
-        med_request.status = 'completed'
-        med_request.save()
-
-        # Log dispense
-        DispenseLog.objects.create(
-            request=med_request,
-            quantity=med_request.quantity,
-            dispensed_by=dispensed_by,
-            notes=notes
-        )
-
-        # History
-        HistoryEvent.objects.create(
-            admission=med_request.admission,
-            category='Medication',
-            description=f'{med_request.medicine_name} dispensed',
-            details=f'{med_request.quantity} units by {dispensed_by}'
-        )
-
-        return Response({"success": True})
-
-
-# Inventory
-class InventoryViewSet(viewsets.ModelViewSet):
-    queryset = InventoryItem.objects.all()
-    serializer_class = InventoryItemSerializer
-
-
-# Medication Requests
-class MedicationRequestViewSet(viewsets.ViewSet):
-    def list(self, request):
-        admission_id = request.query_params.get("admission")
-        if not admission_id:
-            return Response({"error": "admission param required"}, status=status.HTTP_400_BAD_REQUEST)
-
-        requests = MedicationRequest.objects.filter(admission_id=admission_id).order_by('-requested_at')
-        serializer = MedicationRequestSerializer(requests, many=True)
+# -------- Inventory List / Create --------
+@api_view(["GET", "POST"])
+def inventory_list(request):
+    if request.method == "GET":
+        items = InventoryItem.objects.all()
+        serializer = InventoryItemSerializer(items, many=True)
         return Response(serializer.data)
 
-    def create(self, request):
-        data = request.data
-        admission_id = data.get("admission")
-        medicine_name = data.get("medicine_name")
-        quantity = int(data.get("quantity", 0))
+    if request.method == "POST":
+        serializer = InventoryItemSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        if not all([admission_id, medicine_name, quantity]):
-            return Response({"error": "Missing fields"}, status=status.HTTP_400_BAD_REQUEST)
 
-        med_request = MedicationRequest.objects.create(
-            admission_id=admission_id,
-            medicine_name=medicine_name,
-            quantity=quantity,
-            status='pending'
+# -------- Restock Inventory --------
+@api_view(["POST"])
+def restock_inventory(request, item_id):
+    try:
+        item = InventoryItem.objects.get(id=item_id)
+    except InventoryItem.DoesNotExist:
+        return Response({"error": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    quantity = request.data.get("quantity")
+    try:
+        quantity = int(quantity)
+        if quantity <= 0:
+            raise ValueError
+    except (TypeError, ValueError):
+        return Response({"error": "Invalid quantity"}, status=status.HTTP_400_BAD_REQUEST)
+
+    item.quantity += quantity
+    item.save()
+
+    return Response({
+        "message": f"{item.generic_name} restocked successfully",
+        "quantity": item.quantity
+    })
+
+
+# -------- Medication Requests --------
+@api_view(["GET", "POST"])
+def medication_requests(request):
+    if request.method == "GET":
+        admission_id = request.GET.get("admission")
+        status_filter = request.GET.get("status")
+
+        qs = MedicationRequest.objects.all()
+        if admission_id:
+            qs = qs.filter(admission_id=admission_id)
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+
+        serializer = MedicationRequestSerializer(qs, many=True)
+        return Response(serializer.data)
+
+    if request.method == "POST":
+        serializer = MedicationRequestSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# -------- Approve / Deny Request --------
+@api_view(["POST"])
+def update_request_status(request, request_id):
+    try:
+        med_request = MedicationRequest.objects.get(id=request_id)
+    except MedicationRequest.DoesNotExist:
+        return Response({"error": "Request not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    new_status = request.data.get("status")
+    if new_status not in ["approved", "denied"]:
+        return Response({"error": "Invalid status"}, status=status.HTTP_400_BAD_REQUEST)
+
+    med_request.status = new_status
+    med_request.save()
+
+    return Response({"message": f"Request {new_status} successfully"})
+
+
+# -------- Dispense Medication --------
+@api_view(["POST"])
+def dispense_medication(request, request_id):
+    try:
+        med_request = MedicationRequest.objects.get(
+            id=request_id,
+            status="approved"
+        )
+    except MedicationRequest.DoesNotExist:
+        return Response(
+            {"error": "Approved request not found"},
+            status=status.HTTP_404_NOT_FOUND
         )
 
-        serializer = MedicationRequestSerializer(med_request)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    if med_request.inventory_item.quantity < med_request.quantity:
+        return Response(
+            {"error": "Not enough stock"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    med_request.inventory_item.quantity -= med_request.quantity
+    med_request.inventory_item.save()
+
+    DispenseLog.objects.create(medication_request=med_request)
+
+    med_request.status = "dispensed"
+    med_request.save()
+
+    return Response({
+        "message": f"{med_request.inventory_item.generic_name} dispensed successfully"
+    })

@@ -1,15 +1,26 @@
-from rest_framework.routers import DefaultRouter
-from .views import PrescriptionViewSet, DispenseViewSet, InventoryViewSet, MedicationRequestViewSet
-
-router = DefaultRouter()
-router.register(r'prescriptions', PrescriptionViewSet, basename='prescriptions')
-router.register(r'dispense', DispenseViewSet, basename='dispense')
-router.register(r'inventory', InventoryViewSet, basename='inventory')
-
-# MedicationRequest uses simple ViewSet
 from django.urls import path
-med_request_list = MedicationRequestViewSet.as_view({'get': 'list', 'post': 'create'})
+from . import views
 
-urlpatterns = router.urls + [
-    path('medication-requests/', med_request_list, name='medication-requests'),
+urlpatterns = [
+    path("inventory/", views.inventory_list, name="inventory-list"),
+    path(
+        "inventory/<int:item_id>/restock/",
+        views.restock_inventory,
+        name="restock-inventory"
+    ),
+    path(
+        "medication-requests/",
+        views.medication_requests,
+        name="medication-requests"
+    ),
+    path(
+        "medication-requests/<int:request_id>/update-status/",
+        views.update_request_status,
+        name="update-request-status"
+    ),
+    path(
+        "medication-requests/<int:request_id>/dispense/",
+        views.dispense_medication,
+        name="dispense-medication"
+    ),
 ]

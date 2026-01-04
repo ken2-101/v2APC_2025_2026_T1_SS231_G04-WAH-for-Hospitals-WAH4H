@@ -1,22 +1,20 @@
 import React, { useState } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PackagePlus } from 'lucide-react';
 import { toast } from 'sonner';
+import axios from 'axios';
+import { InventoryItem } from '@/types/pharmacy';
 
-export interface RestockModalProps {
+interface RestockModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onInventoryUpdate: (item: any) => void; // backend call handled in parent
+  onInventoryUpdate: (item: InventoryItem) => void; // Updated type: full InventoryItem
 }
+
+const API_BASE = 'https://scaling-memory-jj56p55q79g42qwq5-8000.app.github.dev/api/pharmacy';
 
 export const RestockModal: React.FC<RestockModalProps> = ({
   isOpen,
@@ -24,19 +22,20 @@ export const RestockModal: React.FC<RestockModalProps> = ({
   onInventoryUpdate,
 }) => {
   const [itemData, setItemData] = useState({
-    name: '',
+    generic_name: '',
+    brand_name: '',
+    description: '',
     quantity: '',
-    batchNumber: '',
-    expiryDate: '',
+    batch_number: '',
+    expiry_date: '',
   });
 
-  const handleRestock = () => {
+  const handleRestock = async () => {
     const quantity = Number(itemData.quantity);
-    const expiry = new Date(itemData.expiryDate);
 
     // Validation
-    if (!itemData.name || !itemData.batchNumber || !itemData.expiryDate) {
-      toast.error('Please fill in all fields');
+    if (!itemData.generic_name || !itemData.batch_number || !itemData.expiry_date) {
+      toast.error('Please fill in all required fields');
       return;
     }
 
@@ -45,21 +44,41 @@ export const RestockModal: React.FC<RestockModalProps> = ({
       return;
     }
 
-    if (expiry <= new Date()) {
+    if (new Date(itemData.expiry_date) <= new Date()) {
       toast.error('Expiry date must be in the future');
       return;
     }
 
-    onInventoryUpdate({
-      name: itemData.name.trim(),
-      quantity,
-      batchNumber: itemData.batchNumber.trim(),
-      expiryDate: itemData.expiryDate,
-    });
+    try {
+      // Call backend to add stock
+      const payload = {
+        generic_name: itemData.generic_name,
+        brand_name: itemData.brand_name,
+        description: itemData.description,
+        quantity,
+        batch_number: itemData.batch_number,
+        expiry_date: itemData.expiry_date,
+      };
 
-    toast.success('Stock added successfully');
-    setItemData({ name: '', quantity: '', batchNumber: '', expiryDate: '' });
-    onClose();
+      const res = await axios.post<InventoryItem>(`${API_BASE}/inventory/`, payload);
+
+      // Notify parent to update inventory state
+      onInventoryUpdate(res.data);
+
+      toast.success('Stock added successfully');
+      setItemData({
+        generic_name: '',
+        brand_name: '',
+        description: '',
+        quantity: '',
+        batch_number: '',
+        expiry_date: '',
+      });
+      onClose();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.response?.data?.error || 'Failed to add stock');
+    }
   };
 
   return (
@@ -74,12 +93,34 @@ export const RestockModal: React.FC<RestockModalProps> = ({
 
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Medicine Name</Label>
+            <Label htmlFor="generic_name">Medicine Name</Label>
             <Input
-              id="name"
-              value={itemData.name}
+              id="generic_name"
+              value={itemData.generic_name}
               onChange={(e) =>
-                setItemData((prev) => ({ ...prev, name: e.target.value }))
+                setItemData((prev) => ({ ...prev, generic_name: e.target.value }))
+              }
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="brand_name">Brand Name (Optional)</Label>
+            <Input
+              id="brand_name"
+              value={itemData.brand_name}
+              onChange={(e) =>
+                setItemData((prev) => ({ ...prev, brand_name: e.target.value }))
+              }
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="description">Description (Optional)</Label>
+            <Input
+              id="description"
+              value={itemData.description}
+              onChange={(e) =>
+                setItemData((prev) => ({ ...prev, description: e.target.value }))
               }
             />
           </div>
@@ -98,24 +139,24 @@ export const RestockModal: React.FC<RestockModalProps> = ({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="batchNumber">Batch Number</Label>
+            <Label htmlFor="batch_number">Batch Number</Label>
             <Input
-              id="batchNumber"
-              value={itemData.batchNumber}
+              id="batch_number"
+              value={itemData.batch_number}
               onChange={(e) =>
-                setItemData((prev) => ({ ...prev, batchNumber: e.target.value }))
+                setItemData((prev) => ({ ...prev, batch_number: e.target.value }))
               }
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="expiryDate">Expiry Date</Label>
+            <Label htmlFor="expiry_date">Expiry Date</Label>
             <Input
-              id="expiryDate"
+              id="expiry_date"
               type="date"
-              value={itemData.expiryDate}
+              value={itemData.expiry_date}
               onChange={(e) =>
-                setItemData((prev) => ({ ...prev, expiryDate: e.target.value }))
+                setItemData((prev) => ({ ...prev, expiry_date: e.target.value }))
               }
             />
           </div>
@@ -136,3 +177,5 @@ export const RestockModal: React.FC<RestockModalProps> = ({
     </Dialog>
   );
 };
+
+export default RestockModal;

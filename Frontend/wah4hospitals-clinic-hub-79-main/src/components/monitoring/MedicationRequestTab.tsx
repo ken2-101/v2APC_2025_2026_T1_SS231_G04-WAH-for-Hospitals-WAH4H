@@ -7,62 +7,52 @@ import { Badge } from '@/components/ui/badge';
 import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { InventoryItem, MedicationRequest } from '@/types/pharmacy';
+
 interface MedicationRequestTabProps {
   admissionId: string;
 }
 
-interface Medicine {
-  id: string;
-  name: string;
-  quantity: number;
-}
-
-interface Request {
-  id: string;
-  medicineName: string;
-  quantity: number;
-  status: 'pending' | 'completed';
-}
-
-const PHARMACY_API = 'https://scaling-memory-jj56p55q79g42qwq5-8000.app.github.dev/api/pharmacy/inventory/';
-const REQUEST_API = 'https://scaling-memory-jj56p55q79g42qwq5-8000.app.github.dev/api/pharmacy/medication-requests/';
-
 export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admissionId }) => {
-  const [medicines, setMedicines] = useState<Medicine[]>([]);
-  const [requests, setRequests] = useState<Request[]>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [requests, setRequests] = useState<MedicationRequest[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedMedicine, setSelectedMedicine] = useState<string>('');
+  const [selectedInventoryId, setSelectedInventoryId] = useState<number | null>(null);
   const [quantity, setQuantity] = useState<number>(1);
+  const [notes, setNotes] = useState<string>('');
 
-  // Fetch pharmacy inventory
-  const fetchMedicines = async () => {
+  const PHARMACY_API = 'https://scaling-memory-jj56p55q79g42qwq5-8000.app.github.dev/api/pharmacy/inventory/';
+  const REQUEST_API = 'https://scaling-memory-jj56p55q79g42qwq5-8000.app.github.dev/api/pharmacy/medication-requests/';
+
+  // Fetch inventory
+  const fetchInventory = async () => {
     try {
-      const res = await axios.get<Medicine[]>(PHARMACY_API);
-      setMedicines(Array.isArray(res.data) ? res.data : []);
+      const res = await axios.get<InventoryItem[]>(PHARMACY_API);
+      setInventory(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
-      console.error('Failed to fetch inventory:', err);
-      toast.error('Failed to fetch pharmacy inventory');
+      console.error(err);
+      toast.error('Failed to fetch inventory');
     }
   };
 
-  // Fetch requests for this patient/admission
+  // Fetch requests filtered by admission
   const fetchRequests = async () => {
     try {
-      const res = await axios.get<Request[]>(`${REQUEST_API}?admission=${admissionId}`);
+      const res = await axios.get<MedicationRequest[]>(`${REQUEST_API}?admission=${admissionId}`);
       setRequests(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
-      console.error('Failed to fetch requests:', err);
-      toast.error('Failed to fetch requests');
+      console.error(err);
+      toast.error('Failed to fetch medication requests');
     }
   };
 
   useEffect(() => {
-    fetchMedicines();
+    fetchInventory();
     fetchRequests();
   }, [admissionId]);
 
   const handleRequest = async () => {
-    if (!selectedMedicine || quantity <= 0) {
+    if (!selectedInventoryId || quantity <= 0) {
       toast.error('Select medicine and quantity');
       return;
     }
@@ -70,81 +60,97 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
     try {
       const payload = {
         admission: Number(admissionId),
-        medicine_name: selectedMedicine,
+        inventory_item: selectedInventoryId,
         quantity,
+        notes,
       };
 
-      const res = await axios.post(REQUEST_API, payload);
-      setRequests(prev => [...prev, res.data]);
+      const res = await axios.post<MedicationRequest>(REQUEST_API, payload);
+      setRequests((prev) => [...prev, res.data]);
       toast.success('Request submitted');
 
-      setIsModalOpen(false);
+      setSelectedInventoryId(null);
       setQuantity(1);
-      setSelectedMedicine('');
+      setNotes('');
+      setIsModalOpen(false);
     } catch (err) {
-      console.error('Failed to submit request:', err);
+      console.error(err);
       toast.error('Failed to submit request');
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    if (status === 'completed') return <Badge className="bg-green-100 text-green-800">Completed</Badge>;
+  const getStatusBadge = (status: MedicationRequest['status']) => {
+    if (status === 'dispensed') return <Badge className="bg-green-100 text-green-800">Dispensed</Badge>;
+    if (status === 'approved') return <Badge className="bg-blue-100 text-blue-800">Approved</Badge>;
+    if (status === 'denied') return <Badge className="bg-red-100 text-red-800">Denied</Badge>;
     return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>;
   };
 
   return (
     <div className="space-y-6">
+      {/* Request button */}
       <div className="flex justify-end">
         <Button onClick={() => setIsModalOpen(true)}>
           <Plus className="w-4 h-4 mr-2" /> Request Medication
         </Button>
       </div>
 
+      {/* Requests list */}
       {requests.length === 0 && (
         <p className="text-center text-gray-500 py-8">No medication requests yet.</p>
       )}
 
-      {requests.map(req => (
+      {requests.map((req) => (
         <Card key={req.id} className="border-l-4 border-l-blue-600">
           <CardHeader>
-            <CardTitle className="text-lg flex justify-between">
-              {req.medicineName}
+            <CardTitle className="text-lg flex justify-between items-center">
+              {req.inventory_item_detail?.generic_name}
               {getStatusBadge(req.status)}
             </CardTitle>
           </CardHeader>
           <CardContent>Quantity: {req.quantity}</CardContent>
+          {req.notes && <CardContent>Notes: {req.notes}</CardContent>}
           <CardFooter className="text-xs text-gray-400">Request ID: {req.id}</CardFooter>
         </Card>
       ))}
 
+      {/* Request Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent aria-describedby="medication-request-description">
           <DialogHeader>
             <DialogTitle>Request Medication</DialogTitle>
             <p id="medication-request-description" className="text-sm text-gray-500">
-              Select medicine and quantity to request
+              Select medicine, quantity, and optional notes
             </p>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             <select
               className="w-full border rounded p-2"
-              value={selectedMedicine}
-              onChange={(e) => setSelectedMedicine(e.target.value)}
+              value={selectedInventoryId ?? ''}
+              onChange={(e) => setSelectedInventoryId(Number(e.target.value))}
             >
               <option value="">Select medicine</option>
-              {medicines.map(m => (
-                <option key={m.id} value={m.name}>
-                  {m.name} (Stock: {m.quantity})
+              {inventory.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.generic_name} ({m.brand_name}) — Stock: {m.quantity}
                 </option>
               ))}
             </select>
+
             <input
               type="number"
               className="w-full border rounded p-2"
               value={quantity}
               onChange={(e) => setQuantity(Number(e.target.value))}
               min={1}
+            />
+
+            <textarea
+              className="w-full border rounded p-2"
+              placeholder="Optional notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
             />
           </div>
 
