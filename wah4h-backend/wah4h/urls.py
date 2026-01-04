@@ -21,4 +21,7 @@ urlpatterns = [
 
     # Laboratory module
     path('api/laboratory/', include('laboratory.urls')), # added lab
+
+    # Billing module
+    path('api/billing/', include('billing.urls')),
 ]

@@ -7,11 +7,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Receipt, Plus, Trash2, CheckCircle, Lock, FileText, Printer, CreditCard } from 'lucide-react';
+import { Receipt, Plus, Trash2, CheckCircle, Lock, FileText, Printer, CreditCard, RefreshCw, Users } from 'lucide-react';
 import PatientBillPrint from '@/components/billing/PatientBillPrint';
 import { BillingDashboard } from '@/components/billing/BillingDashboard';
 import { PaymentModal } from '@/components/billing/PaymentModal';
 import { Checkbox } from '@/components/ui/checkbox';
+import billingService, { BillingRecord as APIBillingRecord, MedicineItem as APIMedicine, DiagnosticItem as APIDiagnostic } from '@/services/billingService';
+import { admissionService } from '@/services/admissionService';
+import axios from 'axios';
 
 interface Patient {
   id: number;
@@ -79,46 +82,186 @@ const Billing = () => {
   // Modals
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
-  // Sample Data
-  const [patients] = useState<Patient[]>([
-    {
-      id: 1,
-      patientName: 'Maria Santos',
-      room: '202B',
-      admissionDate: '2024-05-28',
-      condition: 'Diabetes',
-      status: 'ready',
-      physician: 'Dr. Juan Cruz',
-      department: 'Endocrinology',
-      age: 45,
-      dischargeDate: '2024-06-10'
-    },
-    {
-      id: 2,
-      patientName: 'Pedro Reyes',
-      room: '301C',
-      admissionDate: '2024-05-30',
-      condition: 'COVID-19',
-      status: 'discharged',
-      physician: 'Dr. Ana Lopez',
-      department: 'Infectious Disease',
-      age: 38,
-      dischargeDate: '2024-06-12'
-    },
-    {
-      id: 3,
-      patientName: 'Carmen dela Cruz',
-      room: '105A',
-      admissionDate: '2024-06-01',
-      condition: 'Heart Surgery',
-      status: 'pending',
-      physician: 'Dr. Roberto Silva',
-      department: 'Cardiology',
-      age: 62,
-    }
-  ]);
-
+  // API Data
   const [billingRecords, setBillingRecords] = useState<BillingRecord[]>([]);
+  const [dashboardData, setDashboardData] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Admitted patients from Admissions module
+  const [admittedPatients, setAdmittedPatients] = useState<any[]>([]);
+  const [showPatientSelector, setShowPatientSelector] = useState(false);
+  const [loadingCharges, setLoadingCharges] = useState(false);
+
+  // Fetch billing records, dashboard data, and admitted patients on mount
+  useEffect(() => {
+    fetchBillingData();
+    fetchAdmittedPatients();
+  }, []);
+
+  const fetchBillingData = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [records, dashboard] = await Promise.all([
+        billingService.getAll(),
+        billingService.getDashboard()
+      ]);
+      setBillingRecords(records.map(convertAPIToLocal));
+      setDashboardData(dashboard);
+    } catch (err) {
+      console.error('Error fetching billing data:', err);
+      setError('Failed to load billing data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Fetch admitted patients from Admissions module
+  const fetchAdmittedPatients = async () => {
+    try {
+      const admissions = await admissionService.getAll();
+      // Filter to only active admissions (not discharged)
+      const activeAdmissions = admissions.filter((adm: any) => 
+        adm.status === 'Active' || adm.status === 'active'
+      );
+      setAdmittedPatients(activeAdmissions);
+    } catch (err) {
+      console.error('Error fetching admitted patients:', err);
+    }
+  };
+
+  // Fetch pharmacy dispensed items for a patient/admission
+  const fetchPharmacyCharges = async (admissionId: number) => {
+    try {
+      const API_BASE = 'https://curly-couscous-wrgjv6x7j6v4hgvrw-8000.app.github.dev/api/pharmacy';
+      const response = await axios.get(`${API_BASE}/medication-requests/?admission=${admissionId}&status=dispensed`);
+      
+      const pharmacyItems: MedicineItem[] = response.data.map((item: any, index: number) => ({
+        id: Date.now() + index,
+        name: item.medication_name || item.item_name,
+        dosage: item.dosage || item.strength || 'N/A',
+        quantity: item.quantity || 1,
+        unitPrice: parseFloat(item.unit_price || item.price || '0')
+      }));
+      
+      return pharmacyItems;
+    } catch (err) {
+      console.error('Error fetching pharmacy charges:', err);
+      return [];
+    }
+  };
+
+  // Fetch laboratory completed tests for a patient/admission
+  const fetchLaboratoryCharges = async (admissionId: number) => {
+    try {
+      const API_BASE = 'https://curly-couscous-wrgjv6x7j6v4hgvrw-8000.app.github.dev/api/laboratory';
+      const response = await axios.get(`${API_BASE}/requests/?admission=${admissionId}&status=completed`);
+      
+      const labItems: DiagnosticItem[] = response.data.results ? 
+        response.data.results.map((item: any, index: number) => ({
+          id: Date.now() + index + 1000,
+          name: item.test_type || item.test_name || 'Lab Test',
+          cost: parseFloat(item.cost || item.price || '0')
+        })) :
+        response.data.map((item: any, index: number) => ({
+          id: Date.now() + index + 1000,
+          name: item.test_type || item.test_name || 'Lab Test',
+          cost: parseFloat(item.cost || item.price || '0')
+        }));
+      
+      return labItems;
+    } catch (err) {
+      console.error('Error fetching laboratory charges:', err);
+      return [];
+    }
+  };
+
+  // Convert API response to local format
+  const convertAPIToLocal = (api: APIBillingRecord): BillingRecord => {
+    return {
+      id: api.id!,
+      patientId: api.patient || 0,
+      isFinalized: api.is_finalized,
+      finalizedDate: api.finalized_date || undefined,
+      patientName: api.patient_name,
+      hospitalId: api.hospital_id,
+      admissionDate: api.admission_date,
+      dischargeDate: api.discharge_date,
+      roomWard: api.room_ward,
+      roomType: api.room_type,
+      numberOfDays: api.number_of_days,
+      ratePerDay: Number(api.rate_per_day),
+      attendingPhysicianFee: Number(api.attending_physician_fee),
+      specialistFee: Number(api.specialist_fee),
+      surgeonFee: Number(api.surgeon_fee),
+      otherProfessionalFees: Number(api.other_professional_fees),
+      medicines: api.medicines.map(m => ({
+        id: m.id!,
+        name: m.name,
+        dosage: m.dosage,
+        quantity: m.quantity,
+        unitPrice: Number(m.unit_price)
+      })),
+      dietType: api.diet_type,
+      mealsPerDay: api.meals_per_day,
+      dietDuration: api.diet_duration,
+      costPerMeal: Number(api.cost_per_meal),
+      diagnostics: api.diagnostics.map(d => ({
+        id: d.id!,
+        name: d.name,
+        cost: Number(d.cost)
+      })),
+      suppliesCharge: Number(api.supplies_charge),
+      procedureCharge: Number(api.procedure_charge),
+      nursingCharge: Number(api.nursing_charge),
+      miscellaneousCharge: Number(api.miscellaneous_charge),
+      discount: Number(api.discount),
+      philhealthCoverage: Number(api.philhealth_coverage)
+    };
+  };
+
+  // Convert local format to API format
+  const convertLocalToAPI = (local: Partial<BillingRecord>): Partial<APIBillingRecord> => {
+    return {
+      patient: local.patientId,
+      patient_name: local.patientName,
+      hospital_id: local.hospitalId,
+      admission_date: local.admissionDate,
+      discharge_date: local.dischargeDate,
+      room_ward: local.roomWard,
+      room_type: local.roomType,
+      number_of_days: local.numberOfDays,
+      rate_per_day: local.ratePerDay?.toString(),
+      attending_physician_fee: local.attendingPhysicianFee?.toString(),
+      specialist_fee: local.specialistFee?.toString(),
+      surgeon_fee: local.surgeonFee?.toString(),
+      other_professional_fees: local.otherProfessionalFees?.toString(),
+      diet_type: local.dietType,
+      meals_per_day: local.mealsPerDay,
+      diet_duration: local.dietDuration,
+      cost_per_meal: local.costPerMeal?.toString(),
+      supplies_charge: local.suppliesCharge?.toString(),
+      procedure_charge: local.procedureCharge?.toString(),
+      nursing_charge: local.nursingCharge?.toString(),
+      miscellaneous_charge: local.miscellaneousCharge?.toString(),
+      discount: local.discount?.toString(),
+      philhealth_coverage: local.philhealthCoverage?.toString(),
+      is_senior: isSenior,
+      is_pwd: isPWD,
+      is_philhealth_member: isPhilHealthMember,
+      medicines: local.medicines?.map(m => ({
+        name: m.name,
+        dosage: m.dosage,
+        quantity: m.quantity,
+        unit_price: m.unitPrice.toString()
+      })),
+      diagnostics: local.diagnostics?.map(d => ({
+        name: d.name,
+        cost: d.cost.toString()
+      }))
+    };
+  };
 
   // Form State
   const [patientName, setPatientName] = useState('');
@@ -193,13 +336,13 @@ const Billing = () => {
 
   // --- Handlers ---
 
-  const handlePatientSelect = (patient: Patient) => {
+  const handlePatientSelect = async (patient: Patient) => {
     setSelectedPatient(patient);
     setCurrentView('billing');
 
     const existing = billingRecords.find(b => b.patientId === patient.id);
     if (existing) {
-      // Load Existing
+      // Load Existing billing record
       setPatientName(existing.patientName);
       setHospitalId(existing.hospitalId);
       setAdmissionDate(existing.admissionDate);
@@ -225,29 +368,86 @@ const Billing = () => {
       setDiscount(existing.discount);
       setPhilhealthCoverage(existing.philhealthCoverage);
     } else {
-      // New Bill
-      setPatientName(patient.patientName);
-      setHospitalId(patient.id.toString());
-      setAdmissionDate(patient.admissionDate);
-      setDischargeDate(patient.dischargeDate || '');
-      setRoomWard(patient.room);
+      // New Bill - populate from patient/admission data and fetch charges
       resetBillingForm();
 
-      // Mock Auto-Add Lab/Pharmacy
-      setMedicines([
-        { id: 1, name: 'Paracetamol 500mg', dosage: '500mg', quantity: 10, unitPrice: 5.00 },
-        { id: 2, name: 'Amoxicillin 500mg', dosage: '500mg', quantity: 21, unitPrice: 15.00 }
-      ]);
-      setDiagnostics([
-        { id: 101, name: 'CBC (Complete Blood Count)', cost: 350 },
-        { id: 102, name: 'Urinalysis', cost: 150 }
-      ]);
-      setSuppliesCharge(500);
-      setRoomType('private');
-      setRatePerDay(2500);
-      // Rough days calc
-      const days = Math.ceil((new Date().getTime() - new Date(patient.admissionDate).getTime()) / (1000 * 3600 * 24));
-      setNumberOfDays(days > 0 ? days : 1);
+      // Auto-fetch charges from other modules
+      setLoadingCharges(true);
+      try {
+        // Find the admission record to get admission ID and full patient details
+        const admission = admittedPatients.find((adm: any) => 
+          parseInt(adm.patient) === patient.id ||
+          adm.id === patient.id
+        );
+
+        if (admission) {
+          // Populate patient information from admission
+          const patientDetails = admission.patient_details;
+          
+          // Use patient_id instead of numeric id
+          setHospitalId(patientDetails?.patient_id || patient.id.toString());
+          setPatientName(patient.patientName);
+          setAdmissionDate(admission.admission_date);
+          setDischargeDate(admission.discharge_date || '');
+          setRoomWard(`${admission.ward || ''} ${admission.room || ''} ${admission.bed || ''}`.trim());
+
+          // Calculate days between admission and today (or discharge date if available)
+          const endDate = admission.discharge_date ? new Date(admission.discharge_date) : new Date();
+          const days = Math.ceil((endDate.getTime() - new Date(admission.admission_date).getTime()) / (1000 * 3600 * 24));
+          setNumberOfDays(days > 0 ? days : 1);
+
+          // Auto-detect PhilHealth membership from patient records
+          if (patientDetails?.philhealth_id && patientDetails.philhealth_id.trim() !== '') {
+            setIsPhilHealthMember(true);
+            // Set default PhilHealth coverage (can be adjusted manually)
+            setPhilhealthCoverage(15000); // Default coverage amount
+          }
+
+          // Fetch charges from Pharmacy and Laboratory modules
+          const [pharmacyItems, labItems] = await Promise.all([
+            fetchPharmacyCharges(admission.id),
+            fetchLaboratoryCharges(admission.id)
+          ]);
+
+          if (pharmacyItems.length > 0) {
+            setMedicines(pharmacyItems);
+          }
+
+          if (labItems.length > 0) {
+            setDiagnostics(labItems);
+          }
+
+          // Set default room rate based on ward type
+          if (admission.ward || admission.room) {
+            const ward = (admission.ward || admission.room || '').toLowerCase();
+            if (ward.includes('private')) {
+              setRoomType('Private');
+              setRatePerDay(3000);
+            } else if (ward.includes('semi')) {
+              setRoomType('Semi-Private');
+              setRatePerDay(2000);
+            } else {
+              setRoomType('Ward');
+              setRatePerDay(1500);
+            }
+          }
+
+          // Set attending physician fee if available
+          if (admission.attending_physician && admission.attending_physician.trim() !== '') {
+            setAttendingPhysicianFee(5000); // Default physician fee
+          }
+
+          // Set default dietary charges based on admission duration
+          setDietType('Regular');
+          setMealsPerDay(3);
+          setDietDuration(days > 0 ? days : 1);
+          setCostPerMeal(150); // Default meal cost
+        }
+      } catch (err) {
+        console.error('Error loading charges:', err);
+      } finally {
+        setLoadingCharges(false);
+      }
     }
   };
 
@@ -300,27 +500,48 @@ const Billing = () => {
     setDiagnostics(diagnostics.map(diag => diag.id === id ? { ...diag, [field]: value } : diag));
   };
 
-  const handleSaveBill = () => {
+  const handleSaveBill = async () => {
     if (!selectedPatient) return;
-    const record: BillingRecord = {
-      id: existingBilling?.id || Date.now(),
-      patientId: selectedPatient.id,
-      isFinalized: true,
-      finalizedDate: new Date().toISOString(),
-      patientName, hospitalId, admissionDate, dischargeDate, roomWard,
-      roomType, numberOfDays, ratePerDay,
-      attendingPhysicianFee, specialistFee, surgeonFee, otherProfessionalFees,
-      medicines, dietType, mealsPerDay, dietDuration, costPerMeal,
-      diagnostics, suppliesCharge, procedureCharge, nursingCharge, miscellaneousCharge,
-      discount, philhealthCoverage
-    };
+    
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const record: Partial<BillingRecord> = {
+        patientId: selectedPatient.id,
+        patientName, hospitalId, admissionDate, dischargeDate, roomWard,
+        roomType, numberOfDays, ratePerDay,
+        attendingPhysicianFee, specialistFee, surgeonFee, otherProfessionalFees,
+        medicines, dietType, mealsPerDay, dietDuration, costPerMeal,
+        diagnostics, suppliesCharge, procedureCharge, nursingCharge, miscellaneousCharge,
+        discount, philhealthCoverage
+      };
 
-    if (existingBilling) {
-      setBillingRecords(prev => prev.map(b => b.id === existingBilling.id ? record : b));
-    } else {
-      setBillingRecords(prev => [...prev, record]);
+      const apiData = convertLocalToAPI(record);
+
+      if (existingBilling) {
+        // Update existing billing record
+        const updated = await billingService.update(existingBilling.id, apiData);
+        const localRecord = convertAPIToLocal(updated);
+        setBillingRecords(prev => prev.map(b => b.id === existingBilling.id ? localRecord : b));
+        alert('Billing record updated successfully.');
+      } else {
+        // Create new billing record
+        const created = await billingService.create(apiData);
+        const localRecord = convertAPIToLocal(created);
+        setBillingRecords(prev => [...prev, localRecord]);
+        alert('Billing record created successfully.');
+      }
+      
+      // Refresh dashboard data
+      await fetchBillingData();
+    } catch (err) {
+      console.error('Error saving billing record:', err);
+      setError('Failed to save billing record');
+      alert('Error saving billing record. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
-    alert('Billing record finalized.');
   };
 
   const handlePrintBill = () => {
@@ -343,29 +564,190 @@ const Billing = () => {
   }
 
   if (currentView === 'list') {
-    const dashboardPatients = patients.map(p => {
-      const billing = billingRecords.find(b => b.patientId === p.id);
-      const balance = billing ? 15000 : 5000; // Mock balance logic
-      const paymentStatus = billing?.isFinalized ? 'Paid' : 'Pending';
-      return {
-        ...p,
-        encounterId: `ENC-${202400 + p.id}`,
-        runningBalance: balance,
-        paymentStatus: paymentStatus as 'Paid' | 'Pending' | 'Partial',
-        lastORDate: billing?.finalizedDate ? billing.finalizedDate.split('T')[0] : undefined,
-        // Required by BillingDashboard Props? No, BillingPatient extends BillingDashboard props
-      };
-    });
+    // Use dashboard data from API
+    const dashboardPatients = dashboardData.map(d => ({
+      id: d.id,
+      patientName: d.patient_name,
+      encounterId: d.encounter_id,
+      runningBalance: Number(d.running_balance),
+      paymentStatus: d.payment_status,
+      lastORDate: d.last_or_date,
+      room: d.room
+    }));
 
     return (
-      <BillingDashboard
-        patients={dashboardPatients}
-        onSelectPatient={(id) => {
-          const p = patients.find(pat => pat.id === id);
-          if (p) handlePatientSelect(p);
-        }}
-        onQuickPay={(p) => handleQuickPay(p as any)}
-      />
+      <div className="space-y-4">
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        {isLoading && (
+          <Alert>
+            <AlertDescription>Loading billing data...</AlertDescription>
+          </Alert>
+        )}
+
+        {/* Patient Selection Card - For Creating New Bills */}
+        {!showPatientSelector ? (
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle>Billing Management</CardTitle>
+                <Button 
+                  onClick={() => setShowPatientSelector(true)}
+                  className="flex items-center gap-2"
+                >
+                  <Users className="w-4 h-4" />
+                  Create New Bill
+                </Button>
+              </div>
+            </CardHeader>
+          </Card>
+        ) : (
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle>Select Patient for Billing</CardTitle>
+                <Button 
+                  variant="outline"
+                  onClick={() => setShowPatientSelector(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {admittedPatients.length === 0 ? (
+                  <Alert>
+                    <AlertDescription>
+                      No admitted patients found. Patients must be admitted first before creating a bill.
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  admittedPatients.map((admission: any) => {
+                    const patientName = admission.patient_name || 
+                                       `${admission.patient_details?.first_name || ''} ${admission.patient_details?.last_name || ''}`.trim() ||
+                                       'Unknown Patient';
+                    
+                    const alreadyBilled = billingRecords.some(b => 
+                      b.hospitalId === admission.admission_id || 
+                      b.patientId === admission.patient_id
+                    );
+
+                    return (
+                      <div 
+                        key={admission.id}
+                        className={`flex items-center justify-between p-4 border rounded-lg transition-colors ${
+                          alreadyBilled 
+                            ? 'bg-gray-50 border-gray-300 cursor-not-allowed' 
+                            : 'hover:bg-blue-50 hover:border-blue-300 cursor-pointer'
+                        }`}
+                        onClick={() => {
+                          if (!alreadyBilled) {
+                            // Calculate age from date_of_birth if available
+                            let age = 0;
+                            if (admission.patient_details?.date_of_birth) {
+                              const birthDate = new Date(admission.patient_details.date_of_birth);
+                              const today = new Date();
+                              age = today.getFullYear() - birthDate.getFullYear();
+                              const monthDiff = today.getMonth() - birthDate.getMonth();
+                              if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                                age--;
+                              }
+                            }
+
+                            const patient: Patient = {
+                              id: parseInt(admission.patient) || admission.id,
+                              patientName: patientName,
+                              room: admission.room || admission.ward || admission.bed || 'N/A',
+                              admissionDate: admission.admission_date,
+                              dischargeDate: admission.discharge_date,
+                              condition: admission.admitting_diagnosis || admission.diagnosis || '',
+                              physician: admission.attending_physician || '',
+                              department: admission.department || '',
+                              age: age,
+                              status: 'ready'
+                            };
+                            handlePatientSelect(patient);
+                            setShowPatientSelector(false);
+                          }
+                        }}
+                      >
+                        <div>
+                          <h3 className="font-semibold flex items-center gap-2">
+                            {patientName}
+                            {alreadyBilled && (
+                              <Badge variant="outline" className="text-green-600 border-green-600">
+                                <CheckCircle className="w-3 h-3 mr-1" />
+                                Billed
+                              </Badge>
+                            )}
+                          </h3>
+                          <p className="text-sm text-gray-600">
+                            Admission: {admission.admission_id} • Room: {admission.room || admission.ward || 'N/A'}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Admitted: {new Date(admission.admission_date).toLocaleDateString()} • 
+                            Diagnosis: {admission.admitting_diagnosis || admission.diagnosis || 'N/A'}
+                          </p>
+                        </div>
+                        <Badge variant={alreadyBilled ? 'outline' : 'secondary'}>
+                          {alreadyBilled ? 'View Bill' : 'Create Bill'}
+                        </Badge>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        <BillingDashboard
+          patients={dashboardPatients}
+          onSelectPatient={(id) => {
+            // Load the billing record by ID
+            const billing = billingRecords.find(b => b.id === id);
+            if (billing) {
+              // Create a patient object from billing data
+              const patient: Patient = {
+                id: billing.patientId,
+                patientName: billing.patientName,
+                room: billing.roomWard,
+                admissionDate: billing.admissionDate,
+                dischargeDate: billing.dischargeDate,
+                condition: '',
+                physician: '',
+                department: '',
+                age: 0,
+                status: 'ready'
+              };
+              handlePatientSelect(patient);
+            }
+          }}
+          onQuickPay={(p) => {
+            // Find billing record by ID from dashboard
+            const billing = billingRecords.find(b => b.id === p.id);
+            if (billing) {
+              const patient: Patient = {
+                id: billing.patientId,
+                patientName: billing.patientName,
+                room: billing.roomWard,
+                admissionDate: billing.admissionDate,
+                dischargeDate: billing.dischargeDate,
+                condition: '',
+                physician: '',
+                department: '',
+                age: 0,
+                status: 'ready'
+              };
+              handleQuickPay(patient);
+            }
+          }}
+        />
+      </div>
     );
   }
 
@@ -381,6 +763,18 @@ const Billing = () => {
         </Button>
       </div>
 
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {isLoading && (
+        <Alert>
+          <AlertDescription>Processing...</AlertDescription>
+        </Alert>
+      )}
+
       {isFinalized && (
         <Alert>
           <CheckCircle className="h-4 w-4" />
@@ -393,33 +787,40 @@ const Billing = () => {
 
       {/* Basic Info */}
       <Card>
-        <CardHeader><CardTitle>Patient Information</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>Patient Information</CardTitle>
+          <p className="text-sm text-gray-500 mt-1">Information automatically populated from Admission records</p>
+        </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div><Label>Name</Label><Input value={patientName} onChange={e => setPatientName(e.target.value)} disabled={isFinalized} /></div>
-          <div><Label>Hospital ID</Label><Input value={hospitalId} onChange={e => setHospitalId(e.target.value)} disabled={isFinalized} /></div>
-          <div><Label>Admission</Label><Input type="date" value={admissionDate} onChange={e => setAdmissionDate(e.target.value)} disabled={isFinalized} /></div>
-          <div><Label>Discharge</Label><Input type="date" value={dischargeDate} onChange={e => setDischargeDate(e.target.value)} disabled={isFinalized} /></div>
-          <div className="md:col-span-2"><Label>Room/Ward</Label><Input value={roomWard} onChange={e => setRoomWard(e.target.value)} disabled={isFinalized} /></div>
+          <div><Label>Patient Name</Label><Input value={patientName} disabled className="bg-gray-50" /></div>
+          <div><Label>Patient ID</Label><Input value={hospitalId} disabled className="bg-gray-50" /></div>
+          <div><Label>Admission Date</Label><Input type="date" value={admissionDate} disabled className="bg-gray-50" /></div>
+          <div><Label>Discharge Date</Label><Input type="date" value={dischargeDate} onChange={e => setDischargeDate(e.target.value)} disabled={isFinalized} /></div>
+          <div className="md:col-span-2"><Label>Room/Ward/Bed</Label><Input value={roomWard} disabled className="bg-gray-50" /></div>
         </CardContent>
       </Card>
 
       {/* Room Charges */}
       <Card>
-        <CardHeader><CardTitle>Room Charges</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>Room Charges</CardTitle>
+          <p className="text-sm text-gray-500 mt-1">Days automatically calculated from admission dates</p>
+        </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <Label>Type</Label>
             <Select value={roomType} onValueChange={setRoomType} disabled={isFinalized}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="private">Private</SelectItem>
-                <SelectItem value="ward">Ward</SelectItem>
+                <SelectItem value="Private">Private</SelectItem>
+                <SelectItem value="Semi-Private">Semi-Private</SelectItem>
+                <SelectItem value="Ward">Ward</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          <div><Label>Days</Label><Input type="number" value={numberOfDays} onChange={e => setNumberOfDays(Number(e.target.value))} disabled={isFinalized} /></div>
-          <div><Label>Rate</Label><Input type="number" value={ratePerDay} onChange={e => setRatePerDay(Number(e.target.value))} disabled={isFinalized} /></div>
-          <div><Label>Total</Label><Input value={totalRoomCharge.toFixed(2)} disabled /></div>
+          <div><Label>Days</Label><Input type="number" value={numberOfDays} disabled className="bg-gray-50" /></div>
+          <div><Label>Rate/Day</Label><Input type="number" value={ratePerDay} onChange={e => setRatePerDay(Number(e.target.value))} disabled={isFinalized} /></div>
+          <div><Label>Total</Label><Input value={`₱${totalRoomCharge.toFixed(2)}`} disabled className="font-semibold" /></div>
         </CardContent>
       </Card>
 
@@ -437,9 +838,45 @@ const Billing = () => {
       {/* Medicines */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex justify-between">
-            Medicines
-            {!isFinalized && <Button size="sm" onClick={addMedicine}><Plus className="w-4 h-4 mr-2" />Add</Button>}
+          <CardTitle className="flex justify-between items-center">
+            <div>
+              <span>Medicines</span>
+              <p className="text-sm text-gray-500 mt-1 font-normal">Automatically loaded from Pharmacy module (dispensed medications)</p>
+            </div>
+            <div className="flex gap-2">
+              {!isFinalized && selectedPatient && (
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={async () => {
+                    setLoadingCharges(true);
+                    try {
+                      const admission = admittedPatients.find((adm: any) => 
+                        adm.patient_id === selectedPatient.id || adm.id === selectedPatient.id
+                      );
+                      if (admission) {
+                        const items = await fetchPharmacyCharges(admission.id);
+                        if (items.length > 0) {
+                          setMedicines(items);
+                          alert(`Loaded ${items.length} medicine items from Pharmacy`);
+                        } else {
+                          alert('No dispensed medicines found in Pharmacy module');
+                        }
+                      }
+                    } catch (err) {
+                      alert('Failed to load pharmacy charges');
+                    } finally {
+                      setLoadingCharges(false);
+                    }
+                  }}
+                  disabled={loadingCharges}
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${loadingCharges ? 'animate-spin' : ''}`} />
+                  Load from Pharmacy
+                </Button>
+              )}
+              {!isFinalized && <Button size="sm" onClick={addMedicine}><Plus className="w-4 h-4 mr-2" />Add</Button>}
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -459,9 +896,45 @@ const Billing = () => {
       {/* Diagnostics */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex justify-between">
-            Diagnostics
-            {!isFinalized && <Button size="sm" onClick={addDiagnostic}><Plus className="w-4 h-4 mr-2" />Add</Button>}
+          <CardTitle className="flex justify-between items-center">
+            <div>
+              <span>Diagnostics / Laboratory</span>
+              <p className="text-sm text-gray-500 mt-1 font-normal">Automatically loaded from Laboratory module (completed tests)</p>
+            </div>
+            <div className="flex gap-2">
+              {!isFinalized && selectedPatient && (
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={async () => {
+                    setLoadingCharges(true);
+                    try {
+                      const admission = admittedPatients.find((adm: any) => 
+                        adm.patient_id === selectedPatient.id || adm.id === selectedPatient.id
+                      );
+                      if (admission) {
+                        const items = await fetchLaboratoryCharges(admission.id);
+                        if (items.length > 0) {
+                          setDiagnostics(items);
+                          alert(`Loaded ${items.length} lab tests from Laboratory`);
+                        } else {
+                          alert('No completed lab tests found in Laboratory module');
+                        }
+                      }
+                    } catch (err) {
+                      alert('Failed to load laboratory charges');
+                    } finally {
+                      setLoadingCharges(false);
+                    }
+                  }}
+                  disabled={loadingCharges}
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${loadingCharges ? 'animate-spin' : ''}`} />
+                  Load from Laboratory
+                </Button>
+              )}
+              {!isFinalized && <Button size="sm" onClick={addDiagnostic}><Plus className="w-4 h-4 mr-2" />Add</Button>}
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -552,9 +1025,31 @@ const Billing = () => {
         onClose={() => setIsPaymentModalOpen(false)}
         patientName={patientName}
         totalBalance={outOfPocketTotal}
-        onPaymentSuccess={(data) => {
-          alert(`Payment Processed! OR: ${data.orNumber}`);
-          // Logic to update status would go here
+        onPaymentSuccess={async (data) => {
+          if (!existingBilling) {
+            alert('Please save the billing record first before adding payment.');
+            return;
+          }
+          
+          setIsLoading(true);
+          try {
+            await billingService.addPayment(existingBilling.id, {
+              amount: data.amount,
+              payment_method: data.method,
+              or_number: data.orNumber,
+              cashier: data.cashier,
+              payment_date: data.date
+            });
+            alert(`Payment Processed! OR: ${data.orNumber}`);
+            // Refresh billing data to get updated balance
+            await fetchBillingData();
+            setIsPaymentModalOpen(false);
+          } catch (err) {
+            console.error('Error processing payment:', err);
+            alert('Failed to process payment. Please try again.');
+          } finally {
+            setIsLoading(false);
+          }
         }}
       />
     </div>

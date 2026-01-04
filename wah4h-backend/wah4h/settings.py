@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     "accounts",
     "pharmacy",
     "laboratory", # added here
+    "billing", # added billing
 
     # Third-party
     "rest_framework",
