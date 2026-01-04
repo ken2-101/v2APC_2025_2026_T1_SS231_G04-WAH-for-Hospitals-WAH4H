@@ -92,6 +92,14 @@ const Billing = () => {
   const [admittedPatients, setAdmittedPatients] = useState<any[]>([]);
   const [showPatientSelector, setShowPatientSelector] = useState(false);
   const [loadingCharges, setLoadingCharges] = useState(false);
+  
+  // Track data fetch status
+  const [pharmacyDataFetched, setPharmacyDataFetched] = useState(false);
+  const [laboratoryDataFetched, setLaboratoryDataFetched] = useState(false);
+  const [pharmacyFetchTime, setPharmacyFetchTime] = useState<string | null>(null);
+  const [laboratoryFetchTime, setLaboratoryFetchTime] = useState<string | null>(null);
+  const [pharmacyItemCount, setPharmacyItemCount] = useState(0);
+  const [laboratoryItemCount, setLaboratoryItemCount] = useState(0);
 
   // Fetch billing records, dashboard data, and admitted patients on mount
   useEffect(() => {
@@ -223,30 +231,49 @@ const Billing = () => {
 
   // Convert local format to API format
   const convertLocalToAPI = (local: Partial<BillingRecord>): Partial<APIBillingRecord> => {
+    // Helper function to format date as YYYY-MM-DD
+    const formatDate = (dateStr: string | undefined): string => {
+      if (!dateStr) return '';
+      
+      // If already in correct format (YYYY-MM-DD), return as is
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        return dateStr;
+      }
+      
+      // Otherwise, parse and format
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return '';
+      
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
     return {
       patient: local.patientId,
-      patient_name: local.patientName,
-      hospital_id: local.hospitalId,
-      admission_date: local.admissionDate,
-      discharge_date: local.dischargeDate,
-      room_ward: local.roomWard,
-      room_type: local.roomType,
-      number_of_days: local.numberOfDays,
-      rate_per_day: local.ratePerDay?.toString(),
-      attending_physician_fee: local.attendingPhysicianFee?.toString(),
-      specialist_fee: local.specialistFee?.toString(),
-      surgeon_fee: local.surgeonFee?.toString(),
-      other_professional_fees: local.otherProfessionalFees?.toString(),
-      diet_type: local.dietType,
-      meals_per_day: local.mealsPerDay,
-      diet_duration: local.dietDuration,
-      cost_per_meal: local.costPerMeal?.toString(),
-      supplies_charge: local.suppliesCharge?.toString(),
-      procedure_charge: local.procedureCharge?.toString(),
-      nursing_charge: local.nursingCharge?.toString(),
-      miscellaneous_charge: local.miscellaneousCharge?.toString(),
-      discount: local.discount?.toString(),
-      philhealth_coverage: local.philhealthCoverage?.toString(),
+      patient_name: local.patientName || '',
+      hospital_id: local.hospitalId || '',
+      admission_date: formatDate(local.admissionDate),
+      discharge_date: formatDate(local.dischargeDate),
+      room_ward: local.roomWard || '',
+      room_type: local.roomType || '',
+      number_of_days: local.numberOfDays || 0,
+      rate_per_day: (local.ratePerDay || 0).toString(),
+      attending_physician_fee: (local.attendingPhysicianFee || 0).toString(),
+      specialist_fee: (local.specialistFee || 0).toString(),
+      surgeon_fee: (local.surgeonFee || 0).toString(),
+      other_professional_fees: (local.otherProfessionalFees || 0).toString(),
+      diet_type: local.dietType || '',
+      meals_per_day: local.mealsPerDay || 0,
+      diet_duration: local.dietDuration || 0,
+      cost_per_meal: (local.costPerMeal || 0).toString(),
+      supplies_charge: (local.suppliesCharge || 0).toString(),
+      procedure_charge: (local.procedureCharge || 0).toString(),
+      nursing_charge: (local.nursingCharge || 0).toString(),
+      miscellaneous_charge: (local.miscellaneousCharge || 0).toString(),
+      discount: (local.discount || 0).toString(),
+      philhealth_coverage: (local.philhealthCoverage || 0).toString(),
       is_senior: isSenior,
       is_pwd: isPWD,
       is_philhealth_member: isPhilHealthMember,
@@ -255,11 +282,11 @@ const Billing = () => {
         dosage: m.dosage,
         quantity: m.quantity,
         unit_price: m.unitPrice.toString()
-      })),
+      })) || [],
       diagnostics: local.diagnostics?.map(d => ({
         name: d.name,
         cost: d.cost.toString()
-      }))
+      })) || []
     };
   };
 
@@ -411,10 +438,16 @@ const Billing = () => {
 
           if (pharmacyItems.length > 0) {
             setMedicines(pharmacyItems);
+            setPharmacyDataFetched(true);
+            setPharmacyFetchTime(new Date().toLocaleTimeString());
+            setPharmacyItemCount(pharmacyItems.length);
           }
 
           if (labItems.length > 0) {
             setDiagnostics(labItems);
+            setLaboratoryDataFetched(true);
+            setLaboratoryFetchTime(new Date().toLocaleTimeString());
+            setLaboratoryItemCount(labItems.length);
           }
 
           // Set default room rate based on ward type
@@ -474,6 +507,14 @@ const Billing = () => {
     setIsSenior(false);
     setIsPWD(false);
     setIsPhilHealthMember(false);
+    
+    // Reset fetch indicators
+    setPharmacyDataFetched(false);
+    setLaboratoryDataFetched(false);
+    setPharmacyFetchTime(null);
+    setLaboratoryFetchTime(null);
+    setPharmacyItemCount(0);
+    setLaboratoryItemCount(0);
   };
 
   const addMedicine = () => {
@@ -503,6 +544,22 @@ const Billing = () => {
   const handleSaveBill = async () => {
     if (!selectedPatient) return;
     
+    // Validation
+    if (!patientName || !hospitalId || !admissionDate) {
+      alert('Please fill in all required patient information fields.');
+      return;
+    }
+    
+    if (!dischargeDate) {
+      alert('Discharge date is required. Please enter the patient discharge date.');
+      return;
+    }
+    
+    if (!roomType) {
+      alert('Please select a room type.');
+      return;
+    }
+    
     setIsLoading(true);
     setError(null);
     
@@ -524,21 +581,38 @@ const Billing = () => {
         const updated = await billingService.update(existingBilling.id, apiData);
         const localRecord = convertAPIToLocal(updated);
         setBillingRecords(prev => prev.map(b => b.id === existingBilling.id ? localRecord : b));
-        alert('Billing record updated successfully.');
+        alert('✓ Billing record updated and finalized successfully.');
       } else {
         // Create new billing record
         const created = await billingService.create(apiData);
         const localRecord = convertAPIToLocal(created);
         setBillingRecords(prev => [...prev, localRecord]);
-        alert('Billing record created successfully.');
+        alert('✓ Billing record created and finalized successfully.');
       }
       
       // Refresh dashboard data
       await fetchBillingData();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving billing record:', err);
-      setError('Failed to save billing record');
-      alert('Error saving billing record. Please try again.');
+      
+      // Extract detailed error message
+      let errorMessage = 'Failed to save billing record. ';
+      if (err.response?.data) {
+        const errors = err.response.data;
+        if (typeof errors === 'object') {
+          const errorDetails = Object.entries(errors)
+            .map(([key, value]) => `${key}: ${value}`)
+            .join(', ');
+          errorMessage += errorDetails;
+        } else {
+          errorMessage += errors;
+        }
+      } else if (err.message) {
+        errorMessage += err.message;
+      }
+      
+      setError(errorMessage);
+      alert('❌ Error: ' + errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -771,7 +845,18 @@ const Billing = () => {
 
       {isLoading && (
         <Alert>
+          <RefreshCw className="h-4 w-4 animate-spin" />
           <AlertDescription>Processing...</AlertDescription>
+        </Alert>
+      )}
+
+      {loadingCharges && (
+        <Alert className="border-blue-200 bg-blue-50">
+          <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
+          <AlertTitle className="text-blue-900">Fetching Charges</AlertTitle>
+          <AlertDescription className="text-blue-700">
+            Loading pharmacy medications and laboratory tests from hospital modules...
+          </AlertDescription>
         </Alert>
       )}
 
@@ -795,7 +880,16 @@ const Billing = () => {
           <div><Label>Patient Name</Label><Input value={patientName} disabled className="bg-gray-50" /></div>
           <div><Label>Patient ID</Label><Input value={hospitalId} disabled className="bg-gray-50" /></div>
           <div><Label>Admission Date</Label><Input type="date" value={admissionDate} disabled className="bg-gray-50" /></div>
-          <div><Label>Discharge Date</Label><Input type="date" value={dischargeDate} onChange={e => setDischargeDate(e.target.value)} disabled={isFinalized} /></div>
+          <div>
+            <Label>Discharge Date <span className="text-red-500">*</span></Label>
+            <Input 
+              type="date" 
+              value={dischargeDate} 
+              onChange={e => setDischargeDate(e.target.value)} 
+              disabled={isFinalized}
+              required
+            />
+          </div>
           <div className="md:col-span-2"><Label>Room/Ward/Bed</Label><Input value={roomWard} disabled className="bg-gray-50" /></div>
         </CardContent>
       </Card>
@@ -808,9 +902,9 @@ const Billing = () => {
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
-            <Label>Type</Label>
+            <Label>Room Type <span className="text-red-500">*</span></Label>
             <Select value={roomType} onValueChange={setRoomType} disabled={isFinalized}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Select room type" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="Private">Private</SelectItem>
                 <SelectItem value="Semi-Private">Semi-Private</SelectItem>
@@ -839,26 +933,43 @@ const Billing = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex justify-between items-center">
-            <div>
-              <span>Medicines</span>
-              <p className="text-sm text-gray-500 mt-1 font-normal">Automatically loaded from Pharmacy module (dispensed medications)</p>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <span>Medicines</span>
+                {pharmacyDataFetched && (
+                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    {pharmacyItemCount} items loaded
+                  </Badge>
+                )}
+              </div>
+              <p className="text-sm text-gray-500 mt-1 font-normal">
+                Automatically loaded from Pharmacy module (dispensed medications)
+                {pharmacyFetchTime && (
+                  <span className="ml-2 text-xs text-blue-600">• Last fetched: {pharmacyFetchTime}</span>
+                )}
+              </p>
             </div>
             <div className="flex gap-2">
               {!isFinalized && selectedPatient && (
                 <Button 
                   size="sm" 
-                  variant="outline"
+                  variant={pharmacyDataFetched ? "outline" : "default"}
                   onClick={async () => {
                     setLoadingCharges(true);
                     try {
                       const admission = admittedPatients.find((adm: any) => 
-                        adm.patient_id === selectedPatient.id || adm.id === selectedPatient.id
+                        parseInt(adm.patient) === selectedPatient.id || adm.id === selectedPatient.id
                       );
                       if (admission) {
                         const items = await fetchPharmacyCharges(admission.id);
+                        setMedicines(items);
+                        setPharmacyDataFetched(true);
+                        setPharmacyFetchTime(new Date().toLocaleTimeString());
+                        setPharmacyItemCount(items.length);
+                        
                         if (items.length > 0) {
-                          setMedicines(items);
-                          alert(`Loaded ${items.length} medicine items from Pharmacy`);
+                          alert(`✓ Loaded ${items.length} medicine items from Pharmacy`);
                         } else {
                           alert('No dispensed medicines found in Pharmacy module');
                         }
@@ -872,7 +983,7 @@ const Billing = () => {
                   disabled={loadingCharges}
                 >
                   <RefreshCw className={`w-4 h-4 mr-2 ${loadingCharges ? 'animate-spin' : ''}`} />
-                  Load from Pharmacy
+                  {pharmacyDataFetched ? 'Refresh Pharmacy' : 'Load from Pharmacy'}
                 </Button>
               )}
               {!isFinalized && <Button size="sm" onClick={addMedicine}><Plus className="w-4 h-4 mr-2" />Add</Button>}
@@ -880,6 +991,13 @@ const Billing = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {medicines.length === 0 && !isFinalized && (
+            <Alert className="border-gray-200 bg-gray-50">
+              <AlertDescription className="text-gray-600">
+                No medicines added yet. Click "Load from Pharmacy" to fetch dispensed medications or "Add" to enter manually.
+              </AlertDescription>
+            </Alert>
+          )}
           {medicines.map(med => (
             <div key={med.id} className="grid grid-cols-5 gap-2 border p-2 rounded">
               <div className="col-span-1"><Label>Name</Label><Input value={med.name} onChange={e => updateMedicine(med.id, 'name', e.target.value)} disabled={isFinalized} /></div>
@@ -897,26 +1015,43 @@ const Billing = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex justify-between items-center">
-            <div>
-              <span>Diagnostics / Laboratory</span>
-              <p className="text-sm text-gray-500 mt-1 font-normal">Automatically loaded from Laboratory module (completed tests)</p>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <span>Diagnostics / Laboratory</span>
+                {laboratoryDataFetched && (
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300">
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    {laboratoryItemCount} tests loaded
+                  </Badge>
+                )}
+              </div>
+              <p className="text-sm text-gray-500 mt-1 font-normal">
+                Automatically loaded from Laboratory module (completed tests)
+                {laboratoryFetchTime && (
+                  <span className="ml-2 text-xs text-blue-600">• Last fetched: {laboratoryFetchTime}</span>
+                )}
+              </p>
             </div>
             <div className="flex gap-2">
               {!isFinalized && selectedPatient && (
                 <Button 
                   size="sm" 
-                  variant="outline"
+                  variant={laboratoryDataFetched ? "outline" : "default"}
                   onClick={async () => {
                     setLoadingCharges(true);
                     try {
                       const admission = admittedPatients.find((adm: any) => 
-                        adm.patient_id === selectedPatient.id || adm.id === selectedPatient.id
+                        parseInt(adm.patient) === selectedPatient.id || adm.id === selectedPatient.id
                       );
                       if (admission) {
                         const items = await fetchLaboratoryCharges(admission.id);
+                        setDiagnostics(items);
+                        setLaboratoryDataFetched(true);
+                        setLaboratoryFetchTime(new Date().toLocaleTimeString());
+                        setLaboratoryItemCount(items.length);
+                        
                         if (items.length > 0) {
-                          setDiagnostics(items);
-                          alert(`Loaded ${items.length} lab tests from Laboratory`);
+                          alert(`✓ Loaded ${items.length} lab tests from Laboratory`);
                         } else {
                           alert('No completed lab tests found in Laboratory module');
                         }
@@ -930,7 +1065,7 @@ const Billing = () => {
                   disabled={loadingCharges}
                 >
                   <RefreshCw className={`w-4 h-4 mr-2 ${loadingCharges ? 'animate-spin' : ''}`} />
-                  Load from Laboratory
+                  {laboratoryDataFetched ? 'Refresh Laboratory' : 'Load from Laboratory'}
                 </Button>
               )}
               {!isFinalized && <Button size="sm" onClick={addDiagnostic}><Plus className="w-4 h-4 mr-2" />Add</Button>}
@@ -938,6 +1073,13 @@ const Billing = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {diagnostics.length === 0 && !isFinalized && (
+            <Alert className="border-gray-200 bg-gray-50">
+              <AlertDescription className="text-gray-600">
+                No diagnostic tests added yet. Click "Load from Laboratory" to fetch completed tests or "Add" to enter manually.
+              </AlertDescription>
+            </Alert>
+          )}
           {diagnostics.map(diag => (
             <div key={diag.id} className="grid grid-cols-3 gap-2 border p-2 rounded">
               <div className="col-span-2"><Label>Name</Label><Input value={diag.name} onChange={e => updateDiagnostic(diag.id, 'name', e.target.value)} disabled={isFinalized} /></div>
@@ -1033,14 +1175,19 @@ const Billing = () => {
           
           setIsLoading(true);
           try {
-            await billingService.addPayment(existingBilling.id, {
+            const response = await billingService.addPayment(existingBilling.id, {
               amount: data.amount,
               payment_method: data.method,
-              or_number: data.orNumber,
               cashier: data.cashier,
               payment_date: data.date
             });
-            alert(`Payment Processed! OR: ${data.orNumber}`);
+            
+            // Extract the OR number from the created payment (in the updated billing record)
+            const payments = response.payments || [];
+            const latestPayment = payments[payments.length - 1];
+            const orNumber = latestPayment?.or_number || 'N/A';
+            
+            alert(`Payment Processed! OR Number: ${orNumber}`);
             // Refresh billing data to get updated balance
             await fetchBillingData();
             setIsPaymentModalOpen(false);

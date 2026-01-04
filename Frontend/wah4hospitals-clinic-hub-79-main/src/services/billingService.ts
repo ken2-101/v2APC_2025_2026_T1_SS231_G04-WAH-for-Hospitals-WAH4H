@@ -194,7 +194,7 @@ export const billingService = {
   },
 
   // Add payment to billing record
-  addPayment: async (id: number, paymentData: Omit<Payment, 'id' | 'billing_record' | 'created_at'>): Promise<BillingRecord> => {
+  addPayment: async (id: number, paymentData: Omit<Payment, 'id' | 'billing_record' | 'created_at' | 'or_number'>): Promise<BillingRecord> => {
     try {
       const { data } = await api.post<BillingRecord>(
         `/api/billing/billing-records/${id}/add_payment/`,
