@@ -78,14 +78,6 @@ class BillingRecordViewSet(viewsets.ModelViewSet):
         
         serializer = PaymentSerializer(data=request.data)
         if serializer.is_valid():
-            # Check if OR number already exists
-            or_number = serializer.validated_data.get('or_number')
-            if Payment.objects.filter(or_number=or_number).exists():
-                return Response(
-                    {'error': 'OR Number already exists'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
             # Check if payment exceeds balance
             amount = serializer.validated_data.get('amount')
             if amount > billing_record.running_balance:

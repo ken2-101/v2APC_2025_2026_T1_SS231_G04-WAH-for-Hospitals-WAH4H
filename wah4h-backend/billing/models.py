@@ -182,11 +182,36 @@ class Payment(models.Model):
     )
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     payment_method = models.CharField(max_length=50, choices=PAYMENT_METHOD_CHOICES)
-    or_number = models.CharField(max_length=50, unique=True)
+    or_number = models.CharField(max_length=50, unique=True, editable=False)
     cashier = models.CharField(max_length=100)
     payment_date = models.DateField()
     
     created_at = models.DateTimeField(default=timezone.now)
+    
+    def save(self, *args, **kwargs):
+        if not self.or_number:
+            # Auto-generate OR number: OR-YYYYMMDD-XXXX
+            from django.db.models import Max
+            today = timezone.now().strftime('%Y%m%d')
+            prefix = f'OR-{today}-'
+            
+            # Get the last OR number for today
+            last_payment = Payment.objects.filter(
+                or_number__startswith=prefix
+            ).aggregate(Max('or_number'))
+            
+            last_or = last_payment['or_number__max']
+            if last_or:
+                # Extract the sequence number and increment
+                last_seq = int(last_or.split('-')[-1])
+                next_seq = last_seq + 1
+            else:
+                # First OR for today
+                next_seq = 1
+            
+            self.or_number = f'{prefix}{str(next_seq).zfill(4)}'
+        
+        super().save(*args, **kwargs)
     
     def __str__(self):
         return f"Payment {self.or_number} - {self.amount}"

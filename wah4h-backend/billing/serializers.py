@@ -23,7 +23,7 @@ class PaymentSerializer(serializers.ModelSerializer):
             'id', 'billing_record', 'amount', 'payment_method',
             'or_number', 'cashier', 'payment_date', 'created_at'
         ]
-        read_only_fields = ['created_at']
+        read_only_fields = ['created_at', 'or_number', 'billing_record']
 
 
 class BillingRecordSerializer(serializers.ModelSerializer):
