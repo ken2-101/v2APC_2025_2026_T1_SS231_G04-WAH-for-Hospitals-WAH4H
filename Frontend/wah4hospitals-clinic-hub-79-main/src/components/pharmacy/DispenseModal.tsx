@@ -15,7 +15,7 @@ interface DispenseModalProps {
   onDispenseSuccess: () => void;
 }
 
-const API_BASE = 'https://scaling-memory-jj56p55q79g42qwq5-8000.app.github.dev/api/pharmacy';
+const API_BASE = 'https://curly-couscous-wrgjv6x7j6v4hgvrw-8000.app.github.dev/api/pharmacy';
 
 export const DispenseModal: React.FC<DispenseModalProps> = ({
   isOpen,

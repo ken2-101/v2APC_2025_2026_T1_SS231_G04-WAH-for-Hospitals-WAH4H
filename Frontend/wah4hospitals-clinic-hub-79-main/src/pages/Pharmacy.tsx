@@ -5,7 +5,7 @@ import { DispenseModal } from '@/components/pharmacy/DispenseModal';
 import { toast } from 'sonner';
 import { InventoryItem, MedicationRequest } from '@/types/pharmacy';
 
-const API_BASE = 'https://scaling-memory-jj56p55q79g42qwq5-8000.app.github.dev/api/pharmacy';
+const API_BASE = 'https://curly-couscous-wrgjv6x7j6v4hgvrw-8000.app.github.dev/api/pharmacy';
 
 const Pharmacy: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'restock' | 'dispense'>('restock');

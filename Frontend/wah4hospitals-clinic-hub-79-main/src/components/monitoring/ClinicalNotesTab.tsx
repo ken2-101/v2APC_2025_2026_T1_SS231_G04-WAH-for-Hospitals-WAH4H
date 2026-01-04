@@ -17,7 +17,7 @@ interface ClinicalNotesTabProps {
 }
 
 const API_BASE =
-    'https://scaling-memory-jj56p55q79g42qwq5-8000.app.github.dev/api/monitoring/notes/';
+    'https://curly-couscous-wrgjv6x7j6v4hgvrw-8000.app.github.dev/api/monitoring/notes/';
 
 export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({
     notes,

@@ -21,8 +21,8 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
   const [quantity, setQuantity] = useState<number>(1);
   const [notes, setNotes] = useState<string>('');
 
-  const PHARMACY_API = 'https://scaling-memory-jj56p55q79g42qwq5-8000.app.github.dev/api/pharmacy/inventory/';
-  const REQUEST_API = 'https://scaling-memory-jj56p55q79g42qwq5-8000.app.github.dev/api/pharmacy/medication-requests/';
+  const PHARMACY_API = 'https://curly-couscous-wrgjv6x7j6v4hgvrw-8000.app.github.dev/api/pharmacy/inventory/';
+  const REQUEST_API = 'https://curly-couscous-wrgjv6x7j6v4hgvrw-8000.app.github.dev/api/pharmacy/medication-requests/';
 
   // Fetch inventory
   const fetchInventory = async () => {

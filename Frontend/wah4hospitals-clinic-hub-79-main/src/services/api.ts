@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'https://scaling-memory-jj56p55q79g42qwq5-8000.app.github.dev/',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'https://curly-couscous-wrgjv6x7j6v4hgvrw-8000.app.github.dev',
   headers: {
     'Content-Type': 'application/json',
   },

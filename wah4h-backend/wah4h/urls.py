@@ -19,4 +19,6 @@ urlpatterns = [
     # project/urls.py
     path('api/pharmacy/', include('pharmacy.urls')),
 
+    # Laboratory module
+    path('api/laboratory/', include('laboratory.urls')), # added lab
 ]
