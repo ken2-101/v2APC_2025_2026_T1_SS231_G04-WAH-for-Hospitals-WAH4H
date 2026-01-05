@@ -147,7 +147,7 @@ Make sure your frontend has the correct API base URL:
 
 **File**: `.env` (create in frontend root if not exists)
 ```
-VITE_API_BASE_URL=https://curly-couscous-wrgjv6x7j6v4hgvrw-8000.app.github.dev
+VITE_API_BASE_URL=https://sturdy-adventure-r4pv79wg54qxc5rwx-8000.app.github.dev
 ```
 
 Or it will default to the hardcoded value in the service files.
