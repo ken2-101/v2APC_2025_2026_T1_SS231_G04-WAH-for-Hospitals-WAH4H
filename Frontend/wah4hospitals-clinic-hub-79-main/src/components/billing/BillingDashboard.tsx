@@ -25,8 +25,8 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ patients, on
     const [searchTerm, setSearchTerm] = React.useState('');
 
     const filteredPatients = patients.filter(p =>
-        p.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.encounterId.toLowerCase().includes(searchTerm.toLowerCase())
+        (p.patientName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (p.encounterId?.toLowerCase() || '').includes(searchTerm.toLowerCase())
     );
 
     const getStatusBadge = (status: string) => {

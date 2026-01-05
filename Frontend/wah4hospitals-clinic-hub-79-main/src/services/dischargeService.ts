@@ -151,4 +151,26 @@ export const dischargeService = {
       return [];
     }
   },
+
+  // Get patients from billing records eligible for discharge
+  getFromBilling: async (): Promise<any> => {
+    try {
+      const { data } = await api.get("from_billing/");
+      return data;
+    } catch (error) {
+      handleError(error);
+      return { count: 0, patients: [] };
+    }
+  },
+
+  // Create discharge records from billing records
+  createFromBilling: async (billingIds: number[]): Promise<any> => {
+    try {
+      const { data } = await api.post("from_billing/", { billing_ids: billingIds });
+      return data;
+    } catch (error) {
+      handleError(error);
+      throw error;
+    }
+  },
 };

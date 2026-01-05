@@ -75,11 +75,11 @@ export interface BillingRecord {
 
 export interface BillingDashboardItem {
   id: number;
-  patient_name: string;
-  encounter_id: string;
-  running_balance: string | number;
-  payment_status: 'Paid' | 'Pending' | 'Partial';
-  last_or_date: string | null;
+  patientName: string;
+  encounterId: string;
+  runningBalance: string | number;
+  paymentStatus: 'Paid' | 'Pending' | 'Partial';
+  lastORDate: string | null;
   room: string;
 }
 

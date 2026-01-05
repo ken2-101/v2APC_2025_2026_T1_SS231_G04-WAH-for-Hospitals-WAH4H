@@ -57,17 +57,16 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             return;
         }
 
-        if (payAmount > totalBalance) {
-            setError('Payment exceeds the current balance.');
-            return;
-        }
-
         if (!method) {
             setError('Please select a payment method.');
             return;
         }
 
         setError('');
+
+        // Calculate change if payment exceeds balance
+        const change = payAmount > totalBalance ? payAmount - totalBalance : 0;
+        const remainingBalance = payAmount >= totalBalance ? 0 : totalBalance - payAmount;
 
         const paymentData = {
             amount: payAmount,
@@ -76,7 +75,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             cashier,
             date,
             patientName,
-            remainingBalance: totalBalance - payAmount
+            remainingBalance,
+            change
         };
 
         setLastPayment(paymentData);
@@ -133,9 +133,15 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                                     <span className="uppercase">{lastPayment.method}</span>
                                 </div>
                             </div>
+                            {lastPayment.change > 0 && (
+                                <div className="flex justify-between text-green-600 font-bold border-t pt-2">
+                                    <span>Change:</span>
+                                    <span>₱{lastPayment.change.toFixed(2)}</span>
+                                </div>
+                            )}
                             <div className="flex justify-between text-gray-600 border-t pt-2">
                                 <span>Remaining Balance:</span>
-                                <span>₱{lastPayment.remainingBalance.toFixed(2)}</span>
+                                <span className={lastPayment.remainingBalance === 0 ? 'text-green-600 font-bold' : ''}>₱{lastPayment.remainingBalance.toFixed(2)}</span>
                             </div>
                         </div>
 
@@ -179,14 +185,20 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="amount" className="text-right">Amount</Label>
-                        <Input
-                            id="amount"
-                            type="number"
-                            placeholder="0.00"
-                            className="col-span-3"
-                            value={amount}
-                            onChange={(e) => setAmount(e.target.value)}
-                        />
+                        <div className="col-span-3">
+                            <Input
+                                id="amount"
+                                type="number"
+                                placeholder="0.00"
+                                value={amount}
+                                onChange={(e) => setAmount(e.target.value)}
+                            />
+                            {amount && Number(amount) > totalBalance && (
+                                <p className="text-xs text-green-600 mt-1">
+                                    Change: ₱{(Number(amount) - totalBalance).toFixed(2)}
+                                </p>
+                            )}
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-4 items-center gap-4">
@@ -196,11 +208,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                                 <SelectValue placeholder="Select method" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="cash">Cash</SelectItem>
-                                <SelectItem value="credit-card">Credit Card</SelectItem>
-                                <SelectItem value="debit-card">Debit Card</SelectItem>
-                                <SelectItem value="cheque">Cheque</SelectItem>
-                                <SelectItem value="insurance">Insurance</SelectItem>
+                                <SelectItem value="Cash">Cash</SelectItem>
+                                <SelectItem value="Credit Card">Credit Card</SelectItem>
+                                <SelectItem value="Debit Card">Debit Card</SelectItem>
+                                <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                                <SelectItem value="Check">Check</SelectItem>
+                                <SelectItem value="PhilHealth">PhilHealth</SelectItem>
+                                <SelectItem value="HMO">HMO</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>

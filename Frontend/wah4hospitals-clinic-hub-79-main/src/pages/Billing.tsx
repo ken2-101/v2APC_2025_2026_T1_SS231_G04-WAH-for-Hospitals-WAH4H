@@ -72,6 +72,8 @@ interface BillingRecord {
   miscellaneousCharge: number;
   discount: number;
   philhealthCoverage: number;
+  paymentStatus?: 'Paid' | 'Pending' | 'Partial';
+  payments?: Array<{id?: number; or_number: string; amount: number | string}>;
 }
 
 const Billing = () => {
@@ -225,7 +227,9 @@ const Billing = () => {
       nursingCharge: Number(api.nursing_charge),
       miscellaneousCharge: Number(api.miscellaneous_charge),
       discount: Number(api.discount),
-      philhealthCoverage: Number(api.philhealth_coverage)
+      philhealthCoverage: Number(api.philhealth_coverage),
+      paymentStatus: api.payment_status,
+      payments: api.payments
     };
   };
 
@@ -641,11 +645,11 @@ const Billing = () => {
     // Use dashboard data from API
     const dashboardPatients = dashboardData.map(d => ({
       id: d.id,
-      patientName: d.patient_name,
-      encounterId: d.encounter_id,
-      runningBalance: Number(d.running_balance),
-      paymentStatus: d.payment_status,
-      lastORDate: d.last_or_date,
+      patientName: d.patientName,
+      encounterId: d.encounterId,
+      runningBalance: Number(d.runningBalance),
+      paymentStatus: d.paymentStatus,
+      lastORDate: d.lastORDate,
       room: d.room
     }));
 
@@ -1155,7 +1159,12 @@ const Billing = () => {
                 <CreditCard className="w-4 h-4 mr-2" /> Pay
               </Button>
             )}
-            <Button variant="outline" className="flex-1" onClick={handlePrintBill} disabled={!isFinalized}>
+            <Button 
+              variant="outline" 
+              className="flex-1" 
+              onClick={handlePrintBill} 
+              disabled={!isFinalized && existingBilling?.paymentStatus !== 'Paid'}
+            >
               <Printer className="w-4 h-4 mr-2" /> Print Bill
             </Button>
           </div>
@@ -1175,17 +1184,20 @@ const Billing = () => {
           
           setIsLoading(true);
           try {
+            // Ensure date is in YYYY-MM-DD format, not ISO datetime
+            const paymentDate = data.date.split('T')[0];
+            
             const response = await billingService.addPayment(existingBilling.id, {
               amount: data.amount,
               payment_method: data.method,
               cashier: data.cashier,
-              payment_date: data.date
+              payment_date: paymentDate
             });
             
             // Extract the OR number from the created payment (in the updated billing record)
             const payments = response.payments || [];
             const latestPayment = payments[payments.length - 1];
-            const orNumber = latestPayment?.or_number || 'N/A';
+            const orNumber = latestPayment?.or_number || 'Unknown';
             
             alert(`Payment Processed! OR Number: ${orNumber}`);
             // Refresh billing data to get updated balance
