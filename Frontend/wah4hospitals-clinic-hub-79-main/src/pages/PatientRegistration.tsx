@@ -13,7 +13,12 @@ import { DeletePatientModal } from '@/components/patients/DeletePatientModal';
 import type { Patient, PatientFormData } from '../types/patient';
 import axios from 'axios';
 
-const API_URL = 'https://sturdy-adventure-r4pv79wg54qxc5rwx-8000.app.github.dev/api/patients/';
+const API_URL =
+  import.meta.env.LOCAL_8080
+    ? `${import.meta.env.LOCAL_8080}/api/patients/`
+    : import.meta.env.BACKEND_PATIENTS
+      ? `${import.meta.env.BACKEND_PATIENTS}/`
+      : 'https://sturdy-adventure-r4pv79wg54qxc5rwx-8000.app.github.dev/api/patients/';
 
 export const PatientRegistration: React.FC = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -83,8 +88,8 @@ export const PatientRegistration: React.FC = () => {
       const q = searchQuery.toLowerCase();
       temp = temp.filter(
         p => `${p.last_name} ${p.first_name} ${p.middle_name || ''}`.toLowerCase().includes(q) ||
-             p.patient_id.toLowerCase().includes(q) ||
-             p.mobile_number.includes(searchQuery)
+          p.patient_id.toLowerCase().includes(q) ||
+          p.mobile_number.includes(searchQuery)
       );
     }
     setFilteredPatients(temp);

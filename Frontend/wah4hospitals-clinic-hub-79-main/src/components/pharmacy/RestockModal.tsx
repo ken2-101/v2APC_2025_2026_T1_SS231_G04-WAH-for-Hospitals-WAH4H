@@ -14,7 +14,11 @@ interface RestockModalProps {
   onInventoryUpdate: (item: InventoryItem) => void; // Updated type: full InventoryItem
 }
 
-const API_BASE = 'https://sturdy-adventure-r4pv79wg54qxc5rwx-8000.app.github.dev/api/pharmacy';
+const API_BASE =
+  import.meta.env.LOCAL_8080
+    ? `${import.meta.env.LOCAL_8080}/api/pharmacy`
+    : import.meta.env.BACKEND_PHARMACY ||
+    'https://sturdy-adventure-r4pv79wg54qxc5rwx-8000.app.github.dev/api/pharmacy';
 
 export const RestockModal: React.FC<RestockModalProps> = ({
   isOpen,

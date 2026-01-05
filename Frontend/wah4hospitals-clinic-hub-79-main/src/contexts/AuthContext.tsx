@@ -4,8 +4,9 @@ import { useToast } from '@/hooks/use-toast';
 import { UserRole } from './RoleContext';
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  'https://sturdy-adventure-r4pv79wg54qxc5rwx-8000.app.github.dev';
+  import.meta.env.LOCAL_8080 ||
+  import.meta.env.STURDY_ADVENTURE_BASE ||
+  'http://localhost:8000';
 
 interface User {
   id: string;
