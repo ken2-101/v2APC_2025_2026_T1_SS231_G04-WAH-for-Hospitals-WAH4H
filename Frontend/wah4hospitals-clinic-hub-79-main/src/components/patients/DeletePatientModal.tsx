@@ -35,7 +35,7 @@ export const DeletePatientModal: React.FC<DeletePatientModalProps> = ({
     try {
       // Use numeric ID for DELETE request
       await axios.delete(
-        `https://scaling-memory-jj56p55q79g42qwq5-8000.app.github.dev/api/patients/${patient.id}/`
+        `https://sturdy-adventure-r4pv79wg54qxc5rwx-8000.app.github.dev/api/patients/${patient.id}/`
       );
       await fetchPatients();
       handleClose();

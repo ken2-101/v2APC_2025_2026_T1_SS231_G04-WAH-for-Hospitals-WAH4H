@@ -13,7 +13,7 @@ import { MonitoringDashboard } from '@/components/monitoring/MonitoringDashboard
 // Detect backend URL dynamically
 const API_BASE =
   process.env.NODE_ENV === 'development'
-    ? 'https://scaling-memory-jj56p55q79g42qwq5-8000.app.github.dev/api'
+    ? 'https://sturdy-adventure-r4pv79wg54qxc5rwx-8000.app.github.dev/api'
     : '/api';
 
 const Monitoring: React.FC = () => {

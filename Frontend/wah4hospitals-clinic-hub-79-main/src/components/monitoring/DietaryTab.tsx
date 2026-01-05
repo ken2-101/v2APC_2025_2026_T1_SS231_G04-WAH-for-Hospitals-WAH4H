@@ -27,7 +27,7 @@ interface DietaryTabProps {
 }
 
 const API_BASE =
-  'https://scaling-memory-jj56p55q79g42qwq5-8000.app.github.dev/api/monitoring/dietary-orders/';
+  'https://sturdy-adventure-r4pv79wg54qxc5rwx-8000.app.github.dev/api/monitoring/dietary-orders/';
 
 export const DietaryTab: React.FC<DietaryTabProps> = ({
   admissionId,

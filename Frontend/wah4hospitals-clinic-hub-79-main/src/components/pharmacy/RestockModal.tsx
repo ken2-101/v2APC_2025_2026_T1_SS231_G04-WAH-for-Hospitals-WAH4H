@@ -14,7 +14,7 @@ interface RestockModalProps {
   onInventoryUpdate: (item: InventoryItem) => void; // Updated type: full InventoryItem
 }
 
-const API_BASE = 'https://scaling-memory-jj56p55q79g42qwq5-8000.app.github.dev/api/pharmacy';
+const API_BASE = 'https://sturdy-adventure-r4pv79wg54qxc5rwx-8000.app.github.dev/api/pharmacy';
 
 export const RestockModal: React.FC<RestockModalProps> = ({
   isOpen,
