@@ -67,9 +67,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         // Calculate change if payment exceeds balance
         const change = payAmount > totalBalance ? payAmount - totalBalance : 0;
         const remainingBalance = payAmount >= totalBalance ? 0 : totalBalance - payAmount;
+        
+        // The actual amount to record in the system (capped at balance)
+        const amountToRecord = Math.min(payAmount, totalBalance);
 
         const paymentData = {
-            amount: payAmount,
+            amount: amountToRecord,  // Amount recorded in system
+            amountReceived: payAmount,  // Actual cash received
             method,
             orNumber,
             cashier,
@@ -124,6 +128,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                                 <span>{lastPayment.cashier}</span>
                             </div>
                             <div className="my-2 border-t border-dashed pt-2">
+                                {lastPayment.change > 0 && (
+                                    <div className="flex justify-between text-sm text-gray-500 mb-1">
+                                        <span>Amount Received:</span>
+                                        <span>₱{lastPayment.amountReceived.toFixed(2)}</span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between font-bold text-lg">
                                     <span>Amount Paid:</span>
                                     <span>₱{lastPayment.amount.toFixed(2)}</span>

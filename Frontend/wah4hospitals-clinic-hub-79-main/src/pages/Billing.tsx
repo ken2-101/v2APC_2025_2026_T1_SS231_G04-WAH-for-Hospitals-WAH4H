@@ -1203,9 +1203,10 @@ const Billing = () => {
             // Refresh billing data to get updated balance
             await fetchBillingData();
             setIsPaymentModalOpen(false);
-          } catch (err) {
+          } catch (err: any) {
             console.error('Error processing payment:', err);
-            alert('Failed to process payment. Please try again.');
+            const errorMessage = err?.response?.data?.error || err?.response?.data?.detail || err?.message || 'Failed to process payment. Please try again.';
+            alert(`Payment Error: ${errorMessage}`);
           } finally {
             setIsLoading(false);
           }
