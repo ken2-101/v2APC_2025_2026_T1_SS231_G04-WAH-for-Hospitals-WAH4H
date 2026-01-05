@@ -142,7 +142,7 @@ const Billing = () => {
   // Fetch pharmacy dispensed items for a patient/admission
   const fetchPharmacyCharges = async (admissionId: number) => {
     try {
-      const API_BASE = 'https://curly-couscous-wrgjv6x7j6v4hgvrw-8000.app.github.dev/api/pharmacy';
+      const API_BASE = 'https://sturdy-adventure-r4pv79wg54qxc5rwx-8000.app.github.dev/api/pharmacy';
       const response = await axios.get(`${API_BASE}/medication-requests/?admission=${admissionId}&status=dispensed`);
       
       const pharmacyItems: MedicineItem[] = response.data.map((item: any, index: number) => ({
@@ -163,7 +163,7 @@ const Billing = () => {
   // Fetch laboratory completed tests for a patient/admission
   const fetchLaboratoryCharges = async (admissionId: number) => {
     try {
-      const API_BASE = 'https://curly-couscous-wrgjv6x7j6v4hgvrw-8000.app.github.dev/api/laboratory';
+      const API_BASE = 'https://sturdy-adventure-r4pv79wg54qxc5rwx-8000.app.github.dev/api/laboratory';
       const response = await axios.get(`${API_BASE}/requests/?admission=${admissionId}&status=completed`);
       
       const labItems: DiagnosticItem[] = response.data.results ? 
