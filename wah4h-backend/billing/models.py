@@ -111,7 +111,9 @@ class BillingRecord(models.Model):
     def running_balance(self):
         """Calculate running balance after payments"""
         total_paid = sum(p.amount for p in self.payments.all())
-        return self.total_amount - total_paid
+        balance = self.total_amount - total_paid
+        # Prevent negative balance (overpayment results in 0 balance)
+        return max(0, balance)
     
     @property
     def payment_status(self):

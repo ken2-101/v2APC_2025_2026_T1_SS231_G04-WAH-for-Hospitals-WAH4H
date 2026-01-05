@@ -73,19 +73,15 @@ class BillingRecordViewSet(viewsets.ModelViewSet):
     def add_payment(self, request, pk=None):
         """
         Add a payment to a billing record
+        Allows overpayments - change will be calculated by frontend
         """
         billing_record = self.get_object()
         
         serializer = PaymentSerializer(data=request.data)
         if serializer.is_valid():
-            # Check if payment exceeds balance
             amount = serializer.validated_data.get('amount')
-            if amount > billing_record.running_balance:
-                return Response(
-                    {'error': 'Payment amount exceeds running balance'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
             
+            # Save payment (allow overpayment)
             serializer.save(billing_record=billing_record)
             
             # Return updated billing record

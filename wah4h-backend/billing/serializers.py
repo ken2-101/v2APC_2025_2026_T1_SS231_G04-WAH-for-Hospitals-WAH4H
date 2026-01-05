@@ -106,20 +106,20 @@ class BillingRecordSerializer(serializers.ModelSerializer):
 
 class BillingDashboardSerializer(serializers.ModelSerializer):
     """Simplified serializer for billing dashboard list view"""
-    patient_name = serializers.CharField()
-    encounter_id = serializers.CharField(source='hospital_id')
-    running_balance = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
-    payment_status = serializers.CharField(read_only=True)
-    last_or_date = serializers.SerializerMethodField()
+    patientName = serializers.CharField(source='patient_name')
+    encounterId = serializers.CharField(source='hospital_id')
+    runningBalance = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True, source='running_balance')
+    paymentStatus = serializers.CharField(read_only=True, source='payment_status')
+    lastORDate = serializers.SerializerMethodField()
     room = serializers.CharField(source='room_ward')
     
     class Meta:
         model = BillingRecord
         fields = [
-            'id', 'patient_name', 'encounter_id', 'running_balance',
-            'payment_status', 'last_or_date', 'room'
+            'id', 'patientName', 'encounterId', 'runningBalance',
+            'paymentStatus', 'lastORDate', 'room'
         ]
     
-    def get_last_or_date(self, obj):
+    def get_lastORDate(self, obj):
         last_payment = obj.payments.first()  # already ordered by date desc
         return last_payment.payment_date.isoformat() if last_payment else None
