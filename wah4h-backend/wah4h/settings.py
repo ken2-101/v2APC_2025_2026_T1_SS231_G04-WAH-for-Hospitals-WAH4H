@@ -32,11 +32,13 @@ INSTALLED_APPS = [
     "discharge",
     "accounts",
     "pharmacy",
-    
+    "laboratory", # added here
+    "billing", # added billing
 
     # Third-party
     "rest_framework",
     "corsheaders",
+    "django_filters",  # ← Add this line
 ]
 
 MIDDLEWARE = [
@@ -113,6 +115,13 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.AllowAny",
     ),
+
+    # Add these lines:
+    "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.SearchFilter",
+        "rest_framework.filters.OrderingFilter",
+    ],
 }
 
 # JWT Settings

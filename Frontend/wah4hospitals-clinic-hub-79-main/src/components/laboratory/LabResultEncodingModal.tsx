@@ -1,55 +1,133 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { X, Plus, Trash2 } from 'lucide-react';
-import { LabRequest, LabResult } from '../../types/laboratory';
+import { LabRequest, TestParameterFormData, LabResultFormData, LabInterpretation } from '../../types/laboratory';
+import { getTestParameters, calculateInterpretation } from './labTestParameters';
 
 interface LabResultEncodingModalProps {
     isOpen: boolean;
     onClose: () => void;
     request: LabRequest | null;
-    onSubmit: (requestId: string, results: LabResult[], metadata: any) => void;
+    onSubmit: (requestId: number, data: LabResultFormData) => void;
 }
 
 export const LabResultEncodingModal: React.FC<LabResultEncodingModalProps> = ({ isOpen, onClose, request, onSubmit }) => {
-    const [results, setResults] = useState<LabResult[]>([
-        { testName: '', resultValue: '', unit: '', referenceRange: '', interpretation: '' }
+    const [parameters, setParameters] = useState<TestParameterFormData[]>([
+        { parameter_name: '', result_value: '', unit: '', reference_range: '', interpretation: '' }
     ]);
+    const [parameterMetadata, setParameterMetadata] = useState<Map<number, { normalMin?: number; normalMax?: number }>>(new Map());
     const [medTech, setMedTech] = useState('');
     const [prcNumber, setPrcNumber] = useState('');
     const [overallRemarks, setOverallRemarks] = useState('');
 
+    // Load predefined parameters when modal opens or request changes
+    useEffect(() => {
+        if (isOpen && request) {
+            const templates = getTestParameters(request.test_type);
+            if (templates.length > 0) {
+                const initialParameters = templates.map(template => ({
+                    parameter_name: template.parameter_name,
+                    result_value: '',
+                    unit: template.unit,
+                    reference_range: template.reference_range,
+                    interpretation: '' as LabInterpretation
+                }));
+                setParameters(initialParameters);
+                
+                // Store metadata for auto-calculation
+                const metadata = new Map();
+                templates.forEach((template, index) => {
+                    metadata.set(index, {
+                        normalMin: template.normalMin,
+                        normalMax: template.normalMax
+                    });
+                });
+                setParameterMetadata(metadata);
+            }
+        }
+    }, [isOpen, request]);
+
     if (!isOpen || !request) return null;
 
     const handleAddRow = () => {
-        setResults([...results, { testName: '', resultValue: '', unit: '', referenceRange: '', interpretation: '' }]);
+        // Add a blank row for custom parameters
+        setParameters([...parameters, { parameter_name: '', result_value: '', unit: '', reference_range: '', interpretation: '' }]);
+        // Custom parameters don't have metadata for auto-calculation
+        const newMetadata = new Map(parameterMetadata);
+        newMetadata.set(parameters.length, { normalMin: undefined, normalMax: undefined });
+        setParameterMetadata(newMetadata);
     };
 
     const handleRemoveRow = (index: number) => {
-        if (results.length > 1) {
-            const newResults = [...results];
-            newResults.splice(index, 1);
-            setResults(newResults);
+        if (parameters.length > 1) {
+            const newParameters = [...parameters];
+            newParameters.splice(index, 1);
+            setParameters(newParameters);
         }
     };
 
-    const updateRow = (index: number, field: keyof LabResult, value: string) => {
-        const newResults = [...results];
-        newResults[index] = { ...newResults[index], [field]: value };
-        setResults(newResults);
+    const updateRow = (index: number, field: keyof TestParameterFormData, value: string) => {
+        const newParameters = [...parameters];
+        newParameters[index] = { ...newParameters[index], [field]: value };
+        
+        // Auto-calculate interpretation when result_value changes
+        if (field === 'result_value') {
+            const metadata = parameterMetadata.get(index);
+            if (metadata) {
+                const interpretation = calculateInterpretation(
+                    value,
+                    metadata.normalMin,
+                    metadata.normalMax
+                );
+                newParameters[index].interpretation = interpretation;
+            }
+        }
+        
+        setParameters(newParameters);
     };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSubmit(request.id, results, {
-            medTech,
-            prcNumber,
-            dateCompleted: new Date().toISOString(),
-            remarks: overallRemarks
-        });
-        onClose();
+        
+        const resultData: LabResultFormData = {
+            lab_request: request.id,
+            medical_technologist: medTech,
+            prc_number: prcNumber,
+            remarks: overallRemarks,
+            // performed_by is optional - don't send it for now (MVP)
+            parameters: parameters
+        };
+
+        onSubmit(request.id, resultData);
+        
+        // Reset form - reload predefined parameters
+        const templates = getTestParameters(request.test_type);
+        if (templates.length > 0) {
+            const resetParameters = templates.map(template => ({
+                parameter_name: template.parameter_name,
+                result_value: '',
+                unit: template.unit,
+                reference_range: template.reference_range,
+                interpretation: '' as LabInterpretation
+            }));
+            setParameters(resetParameters);
+            
+            // Reset metadata
+            const metadata = new Map();
+            templates.forEach((template, index) => {
+                metadata.set(index, {
+                    normalMin: template.normalMin,
+                    normalMax: template.normalMax
+                });
+            });
+            setParameterMetadata(metadata);
+        }
+        setMedTech('');
+        setPrcNumber('');
+        setOverallRemarks('');
     };
 
     return (
@@ -59,8 +137,8 @@ export const LabResultEncodingModal: React.FC<LabResultEncodingModalProps> = ({ 
                     <div>
                         <h2 className="text-xl font-bold text-gray-900">Encode Lab Results</h2>
                         <div className="flex items-center gap-2 mt-1">
-                            <span className="text-sm text-gray-500">Request ID: {request.id}</span>
-                            <Badge variant="secondary">{request.testType}</Badge>
+                            <span className="text-sm text-gray-500">Request ID: {request.request_id}</span>
+                            <Badge variant="secondary">{request.test_type_display}</Badge>
                         </div>
                     </div>
                     <Button variant="ghost" size="sm" onClick={onClose}><X className="w-5 h-5" /></Button>
@@ -70,11 +148,11 @@ export const LabResultEncodingModal: React.FC<LabResultEncodingModalProps> = ({ 
                     <div className="bg-gray-50 p-4 rounded-md grid grid-cols-2 gap-4 text-sm">
                         <div>
                             <span className="text-gray-500 block">Patient</span>
-                            <span className="font-medium">{request.patientName}</span>
+                            <span className="font-medium">{request.patient_name}</span>
                         </div>
                         <div>
                             <span className="text-gray-500 block">Doctor</span>
-                            <span className="font-medium">{request.doctorName}</span>
+                            <span className="font-medium">{request.doctor_name || 'N/A'}</span>
                         </div>
                     </div>
 
@@ -82,27 +160,34 @@ export const LabResultEncodingModal: React.FC<LabResultEncodingModalProps> = ({ 
                         <div className="flex justify-between items-center mb-2">
                             <h3 className="text-lg font-medium">Test Results</h3>
                             <Button type="button" size="sm" variant="outline" onClick={handleAddRow}>
-                                <Plus className="w-4 h-4 mr-1" /> Add Parameter
+                                <Plus className="w-4 h-4 mr-1" /> Add Custom Parameter
                             </Button>
                         </div>
 
                         <div className="space-y-3">
-                            {results.map((row, index) => (
+                            {parameters.map((row, index) => {
+                                const isPredefinedParameter = getTestParameters(request.test_type)
+                                    .some(t => t.parameter_name === row.parameter_name);
+                                const hasAutoInterpretation = parameterMetadata.get(index)?.normalMin !== undefined;
+                                
+                                return (
                                 <div key={index} className="grid grid-cols-12 gap-2 items-start bg-gray-50 p-3 rounded-md">
                                     <div className="col-span-3">
                                         <label className="text-xs font-medium text-gray-500 mb-1 block">Parameter / Test Name</label>
                                         <Input
-                                            value={row.testName}
-                                            onChange={e => updateRow(index, 'testName', e.target.value)}
+                                            value={row.parameter_name}
+                                            onChange={e => updateRow(index, 'parameter_name', e.target.value)}
                                             placeholder="e.g. Hemoglobin"
                                             required
+                                            readOnly={isPredefinedParameter}
+                                            className={isPredefinedParameter ? 'bg-gray-100 cursor-not-allowed' : ''}
                                         />
                                     </div>
                                     <div className="col-span-2">
                                         <label className="text-xs font-medium text-gray-500 mb-1 block">Result</label>
                                         <Input
-                                            value={row.resultValue}
-                                            onChange={e => updateRow(index, 'resultValue', e.target.value)}
+                                            value={row.result_value}
+                                            onChange={e => updateRow(index, 'result_value', e.target.value)}
                                             placeholder="Value"
                                             required
                                         />
@@ -110,39 +195,60 @@ export const LabResultEncodingModal: React.FC<LabResultEncodingModalProps> = ({ 
                                     <div className="col-span-2">
                                         <label className="text-xs font-medium text-gray-500 mb-1 block">Unit</label>
                                         <Input
-                                            value={row.unit}
+                                            value={row.unit || ''}
                                             onChange={e => updateRow(index, 'unit', e.target.value)}
                                             placeholder="e.g. g/dL"
-                                            required
+                                            readOnly={isPredefinedParameter}
+                                            className={isPredefinedParameter ? 'bg-gray-100' : ''}
                                         />
                                     </div>
                                     <div className="col-span-2">
                                         <label className="text-xs font-medium text-gray-500 mb-1 block">Ref. Range</label>
                                         <Input
-                                            value={row.referenceRange}
-                                            onChange={e => updateRow(index, 'referenceRange', e.target.value)}
+                                            value={row.reference_range || ''}
+                                            onChange={e => updateRow(index, 'reference_range', e.target.value)}
                                             placeholder="Min - Max"
-                                            required
+                                            readOnly={isPredefinedParameter}
+                                            className={isPredefinedParameter ? 'bg-gray-100' : ''}
                                         />
                                     </div>
                                     <div className="col-span-2">
                                         <label className="text-xs font-medium text-gray-500 mb-1 block">Interpretation</label>
-                                        <Input
-                                            value={row.interpretation}
-                                            onChange={e => updateRow(index, 'interpretation', e.target.value)}
-                                            placeholder="Normal/High"
-                                            required
-                                        />
+                                        {hasAutoInterpretation ? (
+                                            <div className={`w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm font-medium text-center ${
+                                                row.interpretation === 'high' ? 'text-red-600 bg-red-50' :
+                                                row.interpretation === 'low' ? 'text-orange-600 bg-orange-50' :
+                                                row.interpretation === 'normal' ? 'text-green-600 bg-green-50' : 'text-gray-500'
+                                            }`}>
+                                                {row.interpretation ? row.interpretation.charAt(0).toUpperCase() + row.interpretation.slice(1) : '--'}
+                                            </div>
+                                        ) : (
+                                            <select
+                                                className={`w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm font-medium ${
+                                                    row.interpretation === 'high' ? 'text-red-600 bg-red-50' :
+                                                    row.interpretation === 'low' ? 'text-orange-600 bg-orange-50' :
+                                                    row.interpretation === 'normal' ? 'text-green-600 bg-green-50' : 'text-gray-700'
+                                                }`}
+                                                value={row.interpretation || ''}
+                                                onChange={e => updateRow(index, 'interpretation', e.target.value)}
+                                            >
+                                                <option value="">--</option>
+                                                <option value="normal">Normal</option>
+                                                <option value="high">High</option>
+                                                <option value="low">Low</option>
+                                            </select>
+                                        )}
                                     </div>
                                     <div className="col-span-1 pt-6 text-center">
-                                        {results.length > 1 && (
+                                        {!isPredefinedParameter && (
                                             <Button type="button" variant="ghost" size="sm" className="text-red-500" onClick={() => handleRemoveRow(index)}>
                                                 <Trash2 className="w-4 h-4" />
                                             </Button>
                                         )}
                                     </div>
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
 
