@@ -12,10 +12,10 @@ import { MonitoringDashboard } from '@/components/monitoring/MonitoringDashboard
 
 // Detect backend URL dynamically
 const API_BASE =
-  import.meta.env.LOCAL_8080
-    ? `${import.meta.env.LOCAL_8080}/api`
-    : import.meta.env.BACKEND_MONITORING ||
-    'https://sturdy-adventure-r4pv79wg54qxc5rwx-8000.app.github.dev/api';
+  import.meta.env.BACKEND_MONITORING_8000 ||
+    import.meta.env.LOCAL_8000
+    ? `${import.meta.env.LOCAL_8000}/api`
+    : import.meta.env.BACKEND_MONITORING;
 
 const Monitoring: React.FC = () => {
   const [currentView, setCurrentView] = useState<'dashboard' | 'patient'>('dashboard');

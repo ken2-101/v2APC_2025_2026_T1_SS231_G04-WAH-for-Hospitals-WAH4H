@@ -15,10 +15,10 @@ interface RestockModalProps {
 }
 
 const API_BASE =
-  import.meta.env.LOCAL_8080
-    ? `${import.meta.env.LOCAL_8080}/api/pharmacy`
-    : import.meta.env.BACKEND_PHARMACY ||
-    'https://sturdy-adventure-r4pv79wg54qxc5rwx-8000.app.github.dev/api/pharmacy';
+  import.meta.env.BACKEND_PHARMACY_8000 ||
+    import.meta.env.LOCAL_8000
+    ? `${import.meta.env.LOCAL_8000}/api/pharmacy`
+    : import.meta.env.BACKEND_PHARMACY;
 
 export const RestockModal: React.FC<RestockModalProps> = ({
   isOpen,

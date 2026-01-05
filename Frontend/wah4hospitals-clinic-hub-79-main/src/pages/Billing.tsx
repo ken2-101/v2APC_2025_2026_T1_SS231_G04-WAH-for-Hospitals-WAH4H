@@ -73,7 +73,7 @@ interface BillingRecord {
   discount: number;
   philhealthCoverage: number;
   paymentStatus?: 'Paid' | 'Pending' | 'Partial';
-  payments?: Array<{id?: number; or_number: string; amount: number | string}>;
+  payments?: Array<{ id?: number; or_number: string; amount: number | string }>;
 }
 
 const Billing = () => {
@@ -94,7 +94,7 @@ const Billing = () => {
   const [admittedPatients, setAdmittedPatients] = useState<any[]>([]);
   const [showPatientSelector, setShowPatientSelector] = useState(false);
   const [loadingCharges, setLoadingCharges] = useState(false);
-  
+
   // Track data fetch status
   const [pharmacyDataFetched, setPharmacyDataFetched] = useState(false);
   const [laboratoryDataFetched, setLaboratoryDataFetched] = useState(false);
@@ -132,7 +132,7 @@ const Billing = () => {
     try {
       const admissions = await admissionService.getAll();
       // Filter to only active admissions (not discharged)
-      const activeAdmissions = admissions.filter((adm: any) => 
+      const activeAdmissions = admissions.filter((adm: any) =>
         adm.status === 'Active' || adm.status === 'active'
       );
       setAdmittedPatients(activeAdmissions);
@@ -144,9 +144,11 @@ const Billing = () => {
   // Fetch pharmacy dispensed items for a patient/admission
   const fetchPharmacyCharges = async (admissionId: number) => {
     try {
-      const API_BASE = 'https://sturdy-adventure-r4pv79wg54qxc5rwx-8000.app.github.dev/api/pharmacy';
+      const API_BASE =
+        import.meta.env.BACKEND_PHARMACY_8000 ||
+        (import.meta.env.LOCAL_8000 ? `${import.meta.env.LOCAL_8000}/api/pharmacy` : import.meta.env.BACKEND_PHARMACY);
       const response = await axios.get(`${API_BASE}/medication-requests/?admission=${admissionId}&status=dispensed`);
-      
+
       const pharmacyItems: MedicineItem[] = response.data.map((item: any, index: number) => ({
         id: Date.now() + index,
         name: item.medication_name || item.item_name,
@@ -154,7 +156,7 @@ const Billing = () => {
         quantity: item.quantity || 1,
         unitPrice: parseFloat(item.unit_price || item.price || '0')
       }));
-      
+
       return pharmacyItems;
     } catch (err) {
       console.error('Error fetching pharmacy charges:', err);
@@ -165,10 +167,12 @@ const Billing = () => {
   // Fetch laboratory completed tests for a patient/admission
   const fetchLaboratoryCharges = async (admissionId: number) => {
     try {
-      const API_BASE = 'https://sturdy-adventure-r4pv79wg54qxc5rwx-8000.app.github.dev/api/laboratory';
+      const API_BASE =
+        import.meta.env.BACKEND_LABORATORY_8000 ||
+        (import.meta.env.LOCAL_8000 ? `${import.meta.env.LOCAL_8000}/api/laboratory` : import.meta.env.BACKEND_LABORATORY);
       const response = await axios.get(`${API_BASE}/requests/?admission=${admissionId}&status=completed`);
-      
-      const labItems: DiagnosticItem[] = response.data.results ? 
+
+      const labItems: DiagnosticItem[] = response.data.results ?
         response.data.results.map((item: any, index: number) => ({
           id: Date.now() + index + 1000,
           name: item.test_type || item.test_name || 'Lab Test',
@@ -179,7 +183,7 @@ const Billing = () => {
           name: item.test_type || item.test_name || 'Lab Test',
           cost: parseFloat(item.cost || item.price || '0')
         }));
-      
+
       return labItems;
     } catch (err) {
       console.error('Error fetching laboratory charges:', err);
@@ -238,16 +242,16 @@ const Billing = () => {
     // Helper function to format date as YYYY-MM-DD
     const formatDate = (dateStr: string | undefined): string => {
       if (!dateStr) return '';
-      
+
       // If already in correct format (YYYY-MM-DD), return as is
       if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
         return dateStr;
       }
-      
+
       // Otherwise, parse and format
       const date = new Date(dateStr);
       if (isNaN(date.getTime())) return '';
-      
+
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
@@ -406,7 +410,7 @@ const Billing = () => {
       setLoadingCharges(true);
       try {
         // Find the admission record to get admission ID and full patient details
-        const admission = admittedPatients.find((adm: any) => 
+        const admission = admittedPatients.find((adm: any) =>
           parseInt(adm.patient) === patient.id ||
           adm.id === patient.id
         );
@@ -414,7 +418,7 @@ const Billing = () => {
         if (admission) {
           // Populate patient information from admission
           const patientDetails = admission.patient_details;
-          
+
           // Use patient_id instead of numeric id
           setHospitalId(patientDetails?.patient_id || patient.id.toString());
           setPatientName(patient.patientName);
@@ -511,7 +515,7 @@ const Billing = () => {
     setIsSenior(false);
     setIsPWD(false);
     setIsPhilHealthMember(false);
-    
+
     // Reset fetch indicators
     setPharmacyDataFetched(false);
     setLaboratoryDataFetched(false);
@@ -547,26 +551,26 @@ const Billing = () => {
 
   const handleSaveBill = async () => {
     if (!selectedPatient) return;
-    
+
     // Validation
     if (!patientName || !hospitalId || !admissionDate) {
       alert('Please fill in all required patient information fields.');
       return;
     }
-    
+
     if (!dischargeDate) {
       alert('Discharge date is required. Please enter the patient discharge date.');
       return;
     }
-    
+
     if (!roomType) {
       alert('Please select a room type.');
       return;
     }
-    
+
     setIsLoading(true);
     setError(null);
-    
+
     try {
       const record: Partial<BillingRecord> = {
         patientId: selectedPatient.id,
@@ -593,12 +597,12 @@ const Billing = () => {
         setBillingRecords(prev => [...prev, localRecord]);
         alert('✓ Billing record created and finalized successfully.');
       }
-      
+
       // Refresh dashboard data
       await fetchBillingData();
     } catch (err: any) {
       console.error('Error saving billing record:', err);
-      
+
       // Extract detailed error message
       let errorMessage = 'Failed to save billing record. ';
       if (err.response?.data) {
@@ -614,7 +618,7 @@ const Billing = () => {
       } else if (err.message) {
         errorMessage += err.message;
       }
-      
+
       setError(errorMessage);
       alert('❌ Error: ' + errorMessage);
     } finally {
@@ -672,7 +676,7 @@ const Billing = () => {
             <CardHeader>
               <div className="flex justify-between items-center">
                 <CardTitle>Billing Management</CardTitle>
-                <Button 
+                <Button
                   onClick={() => setShowPatientSelector(true)}
                   className="flex items-center gap-2"
                 >
@@ -687,7 +691,7 @@ const Billing = () => {
             <CardHeader>
               <div className="flex justify-between items-center">
                 <CardTitle>Select Patient for Billing</CardTitle>
-                <Button 
+                <Button
                   variant="outline"
                   onClick={() => setShowPatientSelector(false)}
                 >
@@ -705,23 +709,22 @@ const Billing = () => {
                   </Alert>
                 ) : (
                   admittedPatients.map((admission: any) => {
-                    const patientName = admission.patient_name || 
-                                       `${admission.patient_details?.first_name || ''} ${admission.patient_details?.last_name || ''}`.trim() ||
-                                       'Unknown Patient';
-                    
-                    const alreadyBilled = billingRecords.some(b => 
-                      b.hospitalId === admission.admission_id || 
+                    const patientName = admission.patient_name ||
+                      `${admission.patient_details?.first_name || ''} ${admission.patient_details?.last_name || ''}`.trim() ||
+                      'Unknown Patient';
+
+                    const alreadyBilled = billingRecords.some(b =>
+                      b.hospitalId === admission.admission_id ||
                       b.patientId === admission.patient_id
                     );
 
                     return (
-                      <div 
+                      <div
                         key={admission.id}
-                        className={`flex items-center justify-between p-4 border rounded-lg transition-colors ${
-                          alreadyBilled 
-                            ? 'bg-gray-50 border-gray-300 cursor-not-allowed' 
-                            : 'hover:bg-blue-50 hover:border-blue-300 cursor-pointer'
-                        }`}
+                        className={`flex items-center justify-between p-4 border rounded-lg transition-colors ${alreadyBilled
+                          ? 'bg-gray-50 border-gray-300 cursor-not-allowed'
+                          : 'hover:bg-blue-50 hover:border-blue-300 cursor-pointer'
+                          }`}
                         onClick={() => {
                           if (!alreadyBilled) {
                             // Calculate age from date_of_birth if available
@@ -767,7 +770,7 @@ const Billing = () => {
                             Admission: {admission.admission_id} • Room: {admission.room || admission.ward || 'N/A'}
                           </p>
                           <p className="text-xs text-gray-500">
-                            Admitted: {new Date(admission.admission_date).toLocaleDateString()} • 
+                            Admitted: {new Date(admission.admission_date).toLocaleDateString()} •
                             Diagnosis: {admission.admitting_diagnosis || admission.diagnosis || 'N/A'}
                           </p>
                         </div>
@@ -886,10 +889,10 @@ const Billing = () => {
           <div><Label>Admission Date</Label><Input type="date" value={admissionDate} disabled className="bg-gray-50" /></div>
           <div>
             <Label>Discharge Date <span className="text-red-500">*</span></Label>
-            <Input 
-              type="date" 
-              value={dischargeDate} 
-              onChange={e => setDischargeDate(e.target.value)} 
+            <Input
+              type="date"
+              value={dischargeDate}
+              onChange={e => setDischargeDate(e.target.value)}
               disabled={isFinalized}
               required
             />
@@ -956,13 +959,13 @@ const Billing = () => {
             </div>
             <div className="flex gap-2">
               {!isFinalized && selectedPatient && (
-                <Button 
-                  size="sm" 
+                <Button
+                  size="sm"
                   variant={pharmacyDataFetched ? "outline" : "default"}
                   onClick={async () => {
                     setLoadingCharges(true);
                     try {
-                      const admission = admittedPatients.find((adm: any) => 
+                      const admission = admittedPatients.find((adm: any) =>
                         parseInt(adm.patient) === selectedPatient.id || adm.id === selectedPatient.id
                       );
                       if (admission) {
@@ -971,7 +974,7 @@ const Billing = () => {
                         setPharmacyDataFetched(true);
                         setPharmacyFetchTime(new Date().toLocaleTimeString());
                         setPharmacyItemCount(items.length);
-                        
+
                         if (items.length > 0) {
                           alert(`✓ Loaded ${items.length} medicine items from Pharmacy`);
                         } else {
@@ -1038,13 +1041,13 @@ const Billing = () => {
             </div>
             <div className="flex gap-2">
               {!isFinalized && selectedPatient && (
-                <Button 
-                  size="sm" 
+                <Button
+                  size="sm"
                   variant={laboratoryDataFetched ? "outline" : "default"}
                   onClick={async () => {
                     setLoadingCharges(true);
                     try {
-                      const admission = admittedPatients.find((adm: any) => 
+                      const admission = admittedPatients.find((adm: any) =>
                         parseInt(adm.patient) === selectedPatient.id || adm.id === selectedPatient.id
                       );
                       if (admission) {
@@ -1053,7 +1056,7 @@ const Billing = () => {
                         setLaboratoryDataFetched(true);
                         setLaboratoryFetchTime(new Date().toLocaleTimeString());
                         setLaboratoryItemCount(items.length);
-                        
+
                         if (items.length > 0) {
                           alert(`✓ Loaded ${items.length} lab tests from Laboratory`);
                         } else {
@@ -1159,10 +1162,10 @@ const Billing = () => {
                 <CreditCard className="w-4 h-4 mr-2" /> Pay
               </Button>
             )}
-            <Button 
-              variant="outline" 
-              className="flex-1" 
-              onClick={handlePrintBill} 
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={handlePrintBill}
               disabled={!isFinalized && existingBilling?.paymentStatus !== 'Paid'}
             >
               <Printer className="w-4 h-4 mr-2" /> Print Bill
@@ -1181,24 +1184,24 @@ const Billing = () => {
             alert('Please save the billing record first before adding payment.');
             return;
           }
-          
+
           setIsLoading(true);
           try {
             // Ensure date is in YYYY-MM-DD format, not ISO datetime
             const paymentDate = data.date.split('T')[0];
-            
+
             const response = await billingService.addPayment(existingBilling.id, {
               amount: data.amount,
               payment_method: data.method,
               cashier: data.cashier,
               payment_date: paymentDate
             });
-            
+
             // Extract the OR number from the created payment (in the updated billing record)
             const payments = response.payments || [];
             const latestPayment = payments[payments.length - 1];
             const orNumber = latestPayment?.or_number || 'Unknown';
-            
+
             alert(`Payment Processed! OR Number: ${orNumber}`);
             // Refresh billing data to get updated balance
             await fetchBillingData();

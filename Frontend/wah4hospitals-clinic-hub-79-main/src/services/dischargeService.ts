@@ -12,11 +12,13 @@ import type {
 // Create an Axios instance
 const api: AxiosInstance = axios.create({
   baseURL:
-    import.meta.env.LOCAL_8080
-      ? `${import.meta.env.LOCAL_8080}/api/discharge/discharge-records/`
-      : import.meta.env.BACKEND_DISCHARGE
-        ? `${import.meta.env.BACKEND_DISCHARGE}/discharge-records/`
-        : "https://sturdy-adventure-r4pv79wg54qxc5rwx-8000.app.github.dev/api/discharge/discharge-records/",
+    import.meta.env.BACKEND_DISCHARGE_8000
+      ? `${import.meta.env.BACKEND_DISCHARGE_8000}discharge-records/`
+      : import.meta.env.LOCAL_8000
+        ? `${import.meta.env.LOCAL_8000}/api/discharge/discharge-records/`
+        : import.meta.env.BACKEND_DISCHARGE
+          ? `${import.meta.env.BACKEND_DISCHARGE}discharge-records/`
+          : undefined,
   headers: {
     "Content-Type": "application/json",
   },

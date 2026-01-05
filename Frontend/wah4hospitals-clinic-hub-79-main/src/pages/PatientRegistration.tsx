@@ -14,11 +14,10 @@ import type { Patient, PatientFormData } from '../types/patient';
 import axios from 'axios';
 
 const API_URL =
-  import.meta.env.LOCAL_8080
-    ? `${import.meta.env.LOCAL_8080}/api/patients/`
-    : import.meta.env.BACKEND_PATIENTS
-      ? `${import.meta.env.BACKEND_PATIENTS}/`
-      : 'https://sturdy-adventure-r4pv79wg54qxc5rwx-8000.app.github.dev/api/patients/';
+  import.meta.env.BACKEND_PATIENTS_8000 ||
+    import.meta.env.LOCAL_8000
+    ? `${import.meta.env.LOCAL_8000}/api/patients/`
+    : import.meta.env.BACKEND_PATIENTS;
 
 export const PatientRegistration: React.FC = () => {
   const [patients, setPatients] = useState<Patient[]>([]);

@@ -5,10 +5,8 @@ import type { Admission, NewAdmission } from "@/types/admission"; // <- import N
 // Create an Axios instance
 const api: AxiosInstance = axios.create({
   baseURL:
-    import.meta.env.LOCAL_8080
-      ? `${import.meta.env.LOCAL_8080}/api/admissions/`
-      : import.meta.env.BACKEND_ADMISSIONS ||
-      "https://sturdy-adventure-r4pv79wg54qxc5rwx-8000.app.github.dev/api/admissions/",
+    import.meta.env.BACKEND_ADMISSIONS_8000 ||
+    import.meta.env.BACKEND_ADMISSIONS,
   headers: {
     "Content-Type": "application/json",
   },

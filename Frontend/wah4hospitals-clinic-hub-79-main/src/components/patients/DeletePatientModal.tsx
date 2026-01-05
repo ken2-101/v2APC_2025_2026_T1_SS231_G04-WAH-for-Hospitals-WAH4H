@@ -34,8 +34,12 @@ export const DeletePatientModal: React.FC<DeletePatientModalProps> = ({
 
     try {
       // Use numeric ID for DELETE request
+      const API_URL =
+        import.meta.env.BACKEND_PATIENTS_8000 ||
+        (import.meta.env.LOCAL_8000 ? `${import.meta.env.LOCAL_8000}/api/patients/` : import.meta.env.BACKEND_PATIENTS);
+
       await axios.delete(
-        `https://sturdy-adventure-r4pv79wg54qxc5rwx-8000.app.github.dev/api/patients/${patient.id}/`
+        `${API_URL}${patient.id}/`
       );
       await fetchPatients();
       handleClose();
