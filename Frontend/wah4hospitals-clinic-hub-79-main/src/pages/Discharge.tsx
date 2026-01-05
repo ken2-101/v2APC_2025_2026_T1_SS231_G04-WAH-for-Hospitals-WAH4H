@@ -65,123 +65,9 @@ interface DischargedPatient {
 }
 
 const Discharge = () => {
-  const [pendingDischarges, setPendingDischarges] = useState<PendingPatient[]>([
-    {
-      id: 1,
-      patientName: 'Maria Santos',
-      room: '202B',
-      admissionDate: '2024-05-28',
-      condition: 'Diabetes',
-      status: 'ready',
-      physician: 'Dr. Juan Cruz',
-      department: 'Endocrinology',
-      age: 45,
-      estimatedDischarge: '2024-06-10',
-      requirements: {
-        finalDiagnosis: true,
-        physicianSignature: true,
-        medicationReconciliation: true,
-        dischargeSummary: true,
-        billingClearance: true,
-        nursingNotes: true,
-        followUpScheduled: false
-      }
-    },
-    {
-      id: 2,
-      patientName: 'Pedro Reyes',
-      room: '301C',
-      admissionDate: '2024-05-30',
-      condition: 'COVID-19',
-      status: 'pending',
-      physician: 'Dr. Ana Lopez',
-      department: 'Infectious Disease',
-      age: 38,
-      estimatedDischarge: '2024-06-12',
-      requirements: {
-        finalDiagnosis: false,
-        physicianSignature: false,
-        medicationReconciliation: true,
-        dischargeSummary: false,
-        billingClearance: false,
-        nursingNotes: true,
-        followUpScheduled: false
-      }
-    },
-    {
-      id: 3,
-      patientName: 'Ana Rodriguez',
-      room: '105A',
-      admissionDate: '2024-06-01',
-      condition: 'Appendectomy',
-      status: 'ready',
-      physician: 'Dr. Carlos Mendoza',
-      department: 'Surgery',
-      age: 29,
-      estimatedDischarge: '2024-06-11',
-      requirements: {
-        finalDiagnosis: true,
-        physicianSignature: true,
-        medicationReconciliation: true,
-        dischargeSummary: true,
-        billingClearance: true,
-        nursingNotes: true,
-        followUpScheduled: true
-      }
-    },
-    {
-      id: 4,
-      patientName: 'Jose Dela Cruz',
-      room: '403D',
-      admissionDate: '2024-05-25',
-      condition: 'Heart Surgery',
-      status: 'pending',
-      physician: 'Dr. Sofia Martinez',
-      department: 'Cardiology',
-      age: 62,
-      estimatedDischarge: '2024-06-15',
-      requirements: {
-        finalDiagnosis: false,
-        physicianSignature: true,
-        medicationReconciliation: false,
-        dischargeSummary: false,
-        billingClearance: false,
-        nursingNotes: false,
-        followUpScheduled: false
-      }
-    }
-  ]);
+  const [pendingDischarges, setPendingDischarges] = useState<PendingPatient[]>([]);
 
-  const [dischargedPatients, setDischargedPatients] = useState<DischargedPatient[]>([
-    {
-      id: 101,
-      patientName: 'Juan Dela Cruz',
-      room: '201A',
-      admissionDate: '2024-05-20',
-      dischargeDate: '2024-06-08',
-      condition: 'Hypertension',
-      physician: 'Dr. Maria Santos',
-      department: 'Cardiology',
-      age: 65,
-      finalDiagnosis: 'Essential hypertension, controlled',
-      dischargeSummary: 'Patient responded well to treatment. Blood pressure stabilized.',
-      followUpRequired: true
-    },
-    {
-      id: 102,
-      patientName: 'Rosa Martinez',
-      room: '305B',
-      admissionDate: '2024-05-25',
-      dischargeDate: '2024-06-07',
-      condition: 'Gallbladder Surgery',
-      physician: 'Dr. Carlos Mendoza',
-      department: 'Surgery',
-      age: 42,
-      finalDiagnosis: 'Laparoscopic cholecystectomy, successful',
-      dischargeSummary: 'Successful laparoscopic procedure. Patient recovering well.',
-      followUpRequired: true
-    }
-  ]);
+  const [dischargedPatients, setDischargedPatients] = useState<DischargedPatient[]>([]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilters, setActiveFilters] = useState({
@@ -201,6 +87,19 @@ const Discharge = () => {
     followUpPlan: '',
     billingStatus: '',
     pendingItems: ''
+  });
+
+  const [isAddRecordModalOpen, setIsAddRecordModalOpen] = useState(false);
+  const [newRecordForm, setNewRecordForm] = useState({
+    patient: '',
+    patientName: '',
+    room: '',
+    admissionDate: '',
+    condition: '',
+    physician: '',
+    department: '',
+    age: '',
+    estimatedDischarge: ''
   });
 
   const handlePrintDischarge = () => {
@@ -237,6 +136,52 @@ const Discharge = () => {
       pendingItems: ''
     });
     setIsDischargeModalOpen(true);
+  };
+
+  const handleAddNewRecord = () => {
+    if (!newRecordForm.patientName || !newRecordForm.room || !newRecordForm.admissionDate || 
+        !newRecordForm.condition || !newRecordForm.physician || !newRecordForm.department || 
+        !newRecordForm.age) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    const newRecord: PendingPatient = {
+      id: Date.now(),
+      patientName: newRecordForm.patientName,
+      room: newRecordForm.room,
+      admissionDate: newRecordForm.admissionDate,
+      condition: newRecordForm.condition,
+      status: 'pending',
+      physician: newRecordForm.physician,
+      department: newRecordForm.department,
+      age: parseInt(newRecordForm.age),
+      estimatedDischarge: newRecordForm.estimatedDischarge || '',
+      requirements: {
+        finalDiagnosis: false,
+        physicianSignature: false,
+        medicationReconciliation: false,
+        dischargeSummary: false,
+        billingClearance: false,
+        nursingNotes: false,
+        followUpScheduled: false
+      }
+    };
+
+    setPendingDischarges(prev => [...prev, newRecord]);
+    setIsAddRecordModalOpen(false);
+    setNewRecordForm({
+      patient: '',
+      patientName: '',
+      room: '',
+      admissionDate: '',
+      condition: '',
+      physician: '',
+      department: '',
+      age: '',
+      estimatedDischarge: ''
+    });
+    alert(`Discharge record created successfully for ${newRecordForm.patientName}`);
   };
 
   const handleSubmitDischarge = () => {
@@ -323,19 +268,28 @@ const Discharge = () => {
           <h1 className="text-2xl font-bold text-foreground">Patient Discharge Management</h1>
           <p className="text-muted-foreground">Manage patient discharge procedures with comprehensive status tracking</p>
         </div>
-        {canPrint() ? (
-          <PrintButton 
-            onPrint={handlePrintDischarge} 
-            className="bg-green-600 hover:bg-green-700"
+        <div className="flex items-center gap-2">
+          <Button 
+            onClick={() => setIsAddRecordModalOpen(true)}
+            className="bg-primary hover:bg-primary/90"
           >
-            Print Available - {dischargedPatients.length} Patients
-          </PrintButton>
-        ) : (
-          <Button disabled variant="outline" className="cursor-not-allowed">
-            <FileText className="w-4 h-4 mr-2" />
-            No Discharged Patients to Print
+            <Plus className="w-4 h-4 mr-2" />
+            Add Discharge Record
           </Button>
-        )}
+          {canPrint() ? (
+            <PrintButton 
+              onPrint={handlePrintDischarge} 
+              className="bg-green-600 hover:bg-green-700"
+            >
+              Print Available - {dischargedPatients.length} Patients
+            </PrintButton>
+          ) : (
+            <Button disabled variant="outline" className="cursor-not-allowed">
+              <FileText className="w-4 h-4 mr-2" />
+              No Discharged Patients to Print
+            </Button>
+          )}
+        </div>
       </div>
 
       <Tabs defaultValue="active" className="space-y-6">
@@ -657,6 +611,129 @@ const Discharge = () => {
               </Button>
               <Button onClick={handleSubmitDischarge} className="bg-primary hover:bg-primary/90">
                 Complete Discharge
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add New Discharge Record Modal */}
+      <Dialog open={isAddRecordModalOpen} onOpenChange={setIsAddRecordModalOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add New Discharge Record</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="patientName">Patient Name *</Label>
+                <Input
+                  id="patientName"
+                  value={newRecordForm.patientName}
+                  onChange={(e) => setNewRecordForm({ ...newRecordForm, patientName: e.target.value })}
+                  placeholder="Enter patient name"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="room">Room *</Label>
+                <Input
+                  id="room"
+                  value={newRecordForm.room}
+                  onChange={(e) => setNewRecordForm({ ...newRecordForm, room: e.target.value })}
+                  placeholder="e.g., 101A"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="admissionDate">Admission Date *</Label>
+                <Input
+                  id="admissionDate"
+                  type="date"
+                  value={newRecordForm.admissionDate}
+                  onChange={(e) => setNewRecordForm({ ...newRecordForm, admissionDate: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="age">Age *</Label>
+                <Input
+                  id="age"
+                  type="number"
+                  value={newRecordForm.age}
+                  onChange={(e) => setNewRecordForm({ ...newRecordForm, age: e.target.value })}
+                  placeholder="Enter age"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="condition">Condition *</Label>
+                <Input
+                  id="condition"
+                  value={newRecordForm.condition}
+                  onChange={(e) => setNewRecordForm({ ...newRecordForm, condition: e.target.value })}
+                  placeholder="e.g., Pneumonia"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="physician">Physician *</Label>
+                <Input
+                  id="physician"
+                  value={newRecordForm.physician}
+                  onChange={(e) => setNewRecordForm({ ...newRecordForm, physician: e.target.value })}
+                  placeholder="e.g., Dr. Smith"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="department">Department *</Label>
+                <Input
+                  id="department"
+                  value={newRecordForm.department}
+                  onChange={(e) => setNewRecordForm({ ...newRecordForm, department: e.target.value })}
+                  placeholder="e.g., Cardiology"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="estimatedDischarge">Estimated Discharge Date</Label>
+                <Input
+                  id="estimatedDischarge"
+                  type="date"
+                  value={newRecordForm.estimatedDischarge}
+                  onChange={(e) => setNewRecordForm({ ...newRecordForm, estimatedDischarge: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription className="text-sm">
+                New discharge records will be created with "Pending" status. All discharge requirements will need to be completed before the patient can be discharged.
+              </AlertDescription>
+            </Alert>
+
+            <div className="flex justify-end space-x-3 pt-4">
+              <Button variant="outline" onClick={() => {
+                setIsAddRecordModalOpen(false);
+                setNewRecordForm({
+                  patient: '',
+                  patientName: '',
+                  room: '',
+                  admissionDate: '',
+                  condition: '',
+                  physician: '',
+                  department: '',
+                  age: '',
+                  estimatedDischarge: ''
+                });
+              }}>
+                Cancel
+              </Button>
+              <Button onClick={handleAddNewRecord} className="bg-primary hover:bg-primary/90">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Record
               </Button>
             </div>
           </div>
