@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,7 +23,6 @@ import {
 import { DischargeStatusBadge } from '@/components/discharge/DischargeStatusBadge';
 import { PendingItemsSection } from '@/components/discharge/PendingItemsSection';
 import { DischargedPatientsReport } from '@/components/discharge/DischargedPatientsReport';
-import { dischargeService, DischargeRecord } from '@/services/dischargeService';
 
 interface DischargeRequirements {
   finalDiagnosis: boolean;
@@ -65,85 +64,131 @@ interface DischargedPatient {
   followUpPlan?: string;
 }
 
-// Helper function to convert backend data to frontend format
-const convertToDischargedPatient = (record: DischargeRecord): DischargedPatient => ({
-  id: record.id || 0,
-  patientName: record.patient_name,
-  room: record.room,
-  admissionDate: record.admission_date,
-  dischargeDate: record.discharge_date || '',
-  condition: record.condition,
-  physician: record.physician,
-  department: record.department,
-  age: record.age,
-  finalDiagnosis: record.final_diagnosis,
-  dischargeSummary: record.discharge_summary,
-  followUpRequired: record.follow_up_required,
-  followUpPlan: record.follow_up_plan || undefined
-});
-
-const convertToPendingPatient = (record: DischargeRecord): PendingPatient => ({
-  id: record.id || 0,
-  patientName: record.patient_name,
-  room: record.room,
-  admissionDate: record.admission_date,
-  condition: record.condition,
-  status: record.status,
-  physician: record.physician,
-  department: record.department,
-  age: record.age,
-  estimatedDischarge: record.discharge_date || '',
-  requirements: {
-    finalDiagnosis: record.requirements?.final_diagnosis || false,
-    physicianSignature: record.requirements?.physician_signature || false,
-    medicationReconciliation: record.requirements?.medication_reconciliation || false,
-    dischargeSummary: record.requirements?.discharge_summary || false,
-    billingClearance: record.requirements?.billing_clearance || false,
-    nursingNotes: record.requirements?.nursing_notes || false,
-    followUpScheduled: record.requirements?.follow_up_scheduled || false
-  }
-});
-
 const Discharge = () => {
-  const [pendingDischarges, setPendingDischarges] = useState<PendingPatient[]>([]);
-  const [dischargedPatients, setDischargedPatients] = useState<DischargedPatient[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [pendingDischarges, setPendingDischarges] = useState<PendingPatient[]>([
+    {
+      id: 1,
+      patientName: 'Maria Santos',
+      room: '202B',
+      admissionDate: '2024-05-28',
+      condition: 'Diabetes',
+      status: 'ready',
+      physician: 'Dr. Juan Cruz',
+      department: 'Endocrinology',
+      age: 45,
+      estimatedDischarge: '2024-06-10',
+      requirements: {
+        finalDiagnosis: true,
+        physicianSignature: true,
+        medicationReconciliation: true,
+        dischargeSummary: true,
+        billingClearance: true,
+        nursingNotes: true,
+        followUpScheduled: false
+      }
+    },
+    {
+      id: 2,
+      patientName: 'Pedro Reyes',
+      room: '301C',
+      admissionDate: '2024-05-30',
+      condition: 'COVID-19',
+      status: 'pending',
+      physician: 'Dr. Ana Lopez',
+      department: 'Infectious Disease',
+      age: 38,
+      estimatedDischarge: '2024-06-12',
+      requirements: {
+        finalDiagnosis: false,
+        physicianSignature: false,
+        medicationReconciliation: true,
+        dischargeSummary: false,
+        billingClearance: false,
+        nursingNotes: true,
+        followUpScheduled: false
+      }
+    },
+    {
+      id: 3,
+      patientName: 'Ana Rodriguez',
+      room: '105A',
+      admissionDate: '2024-06-01',
+      condition: 'Appendectomy',
+      status: 'ready',
+      physician: 'Dr. Carlos Mendoza',
+      department: 'Surgery',
+      age: 29,
+      estimatedDischarge: '2024-06-11',
+      requirements: {
+        finalDiagnosis: true,
+        physicianSignature: true,
+        medicationReconciliation: true,
+        dischargeSummary: true,
+        billingClearance: true,
+        nursingNotes: true,
+        followUpScheduled: true
+      }
+    },
+    {
+      id: 4,
+      patientName: 'Jose Dela Cruz',
+      room: '403D',
+      admissionDate: '2024-05-25',
+      condition: 'Heart Surgery',
+      status: 'pending',
+      physician: 'Dr. Sofia Martinez',
+      department: 'Cardiology',
+      age: 62,
+      estimatedDischarge: '2024-06-15',
+      requirements: {
+        finalDiagnosis: false,
+        physicianSignature: true,
+        medicationReconciliation: false,
+        dischargeSummary: false,
+        billingClearance: false,
+        nursingNotes: false,
+        followUpScheduled: false
+      }
+    }
+  ]);
+
+  const [dischargedPatients, setDischargedPatients] = useState<DischargedPatient[]>([
+    {
+      id: 101,
+      patientName: 'Juan Dela Cruz',
+      room: '201A',
+      admissionDate: '2024-05-20',
+      dischargeDate: '2024-06-08',
+      condition: 'Hypertension',
+      physician: 'Dr. Maria Santos',
+      department: 'Cardiology',
+      age: 65,
+      finalDiagnosis: 'Essential hypertension, controlled',
+      dischargeSummary: 'Patient responded well to treatment. Blood pressure stabilized.',
+      followUpRequired: true
+    },
+    {
+      id: 102,
+      patientName: 'Rosa Martinez',
+      room: '305B',
+      admissionDate: '2024-05-25',
+      dischargeDate: '2024-06-07',
+      condition: 'Gallbladder Surgery',
+      physician: 'Dr. Carlos Mendoza',
+      department: 'Surgery',
+      age: 42,
+      finalDiagnosis: 'Laparoscopic cholecystectomy, successful',
+      dischargeSummary: 'Successful laparoscopic procedure. Patient recovering well.',
+      followUpRequired: true
+    }
+  ]);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilters, setActiveFilters] = useState({
     status: [] as string[],
     department: [] as string[],
     condition: [] as string[]
   });
-
-  // Fetch data from backend on mount
-  useEffect(() => {
-    fetchDischargeData();
-  }, []);
-
-  const fetchDischargeData = async () => {
-    try {
-      setLoading(true);
-      
-      // Fetch all records
-      const allRecords = await dischargeService.getAllRecords();
-      
-      // Separate into pending and discharged
-      const pending = allRecords
-        .filter(r => r.status === 'pending' || r.status === 'ready')
-        .map(convertToPendingPatient);
-      
-      const discharged = allRecords
-        .filter(r => r.status === 'discharged')
-        .map(convertToDischargedPatient);
-      
-      setPendingDischarges(pending);
-      setDischargedPatients(discharged);
-    } catch (error) {
-      console.error('Error fetching discharge data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const [isDischargeModalOpen, setIsDischargeModalOpen] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<PendingPatient | null>(null);
@@ -194,7 +239,7 @@ const Discharge = () => {
     setIsDischargeModalOpen(true);
   };
 
-  const handleSubmitDischarge = async () => {
+  const handleSubmitDischarge = () => {
     if (!selectedPatient) return;
     
     if (!dischargeForm.finalDiagnosis || !dischargeForm.hospitalStaySummary) {
@@ -215,30 +260,39 @@ const Discharge = () => {
       return;
     }
 
-    try {
-      // Call the backend API to mark as discharged
-      await dischargeService.markAsDischarge(selectedPatient.id);
-      
-      // Refresh data
-      await fetchDischargeData();
+    // Move patient to discharged list
+    const dischargedPatient: DischargedPatient = {
+      id: Date.now(),
+      patientName: selectedPatient.patientName,
+      room: selectedPatient.room,
+      admissionDate: selectedPatient.admissionDate,
+      dischargeDate: new Date().toISOString().split('T')[0],
+      condition: selectedPatient.condition,
+      physician: selectedPatient.physician,
+      department: selectedPatient.department,
+      age: selectedPatient.age,
+      finalDiagnosis: dischargeForm.finalDiagnosis,
+      dischargeSummary: dischargeForm.hospitalStaySummary,
+      followUpRequired: !!dischargeForm.followUpPlan,
+      followUpPlan: dischargeForm.followUpPlan
+    };
 
-      alert(`Discharge completed successfully for ${selectedPatient.patientName}`);
-      setIsDischargeModalOpen(false);
-      setSelectedPatient(null);
-      setDischargeForm({
-        patientId: '',
-        finalDiagnosis: '',
-        hospitalStaySummary: '',
-        dischargeMedications: '',
-        dischargeInstructions: '',
-        followUpPlan: '',
-        billingStatus: '',
-        pendingItems: ''
-      });
-    } catch (error) {
-      console.error('Error processing discharge:', error);
-      alert('Failed to process discharge. Please try again.');
-    }
+    setDischargedPatients(prev => [...prev, dischargedPatient]);
+    setPendingDischarges(prev => prev.filter(p => p.id !== selectedPatient.id));
+
+    alert(`Discharge completed successfully for ${selectedPatient.patientName}`);
+    setIsDischargeModalOpen(false);
+    setSelectedPatient(null);
+    setDischargeForm({
+      patientId: '',
+      finalDiagnosis: '',
+      hospitalStaySummary: '',
+      dischargeMedications: '',
+      dischargeInstructions: '',
+      followUpPlan: '',
+      billingStatus: '',
+      pendingItems: ''
+    });
   };
 
   const canPrint = () => {
@@ -264,11 +318,6 @@ const Discharge = () => {
 
   return (
     <div className="space-y-6">
-      {loading && (
-        <Alert>
-          <AlertDescription>Loading discharge data...</AlertDescription>
-        </Alert>
-      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Patient Discharge Management</h1>

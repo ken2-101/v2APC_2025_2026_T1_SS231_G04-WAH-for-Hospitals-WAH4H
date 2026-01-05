@@ -24,7 +24,4 @@ urlpatterns = [
 
     # Billing module
     path('api/billing/', include('billing.urls')),
-
-    # Discharge module
-    path('api/discharge/', include('discharge.urls')),
 ]
