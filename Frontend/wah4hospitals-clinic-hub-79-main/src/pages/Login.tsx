@@ -34,8 +34,8 @@ const Login = () => {
 
   const handleDemoLogin = async () => {
     if (isLoading) return;
-    const demoEmail = 'demo@hospital.com';
-    const demoPassword = 'demo123';
+    const demoEmail = 'doctor@gmail.com';
+    const demoPassword = 'Doctor123';
     setEmail(demoEmail);
     setPassword(demoPassword);
     const success = await login(demoEmail, demoPassword);
