@@ -146,9 +146,9 @@ const Discharge = () => {
   };
 
   const handleAddNewRecord = () => {
-    if (!newRecordForm.patientName || !newRecordForm.room || !newRecordForm.admissionDate || 
-        !newRecordForm.condition || !newRecordForm.physician || !newRecordForm.department || 
-        !newRecordForm.age) {
+    if (!newRecordForm.patientName || !newRecordForm.room || !newRecordForm.admissionDate ||
+      !newRecordForm.condition || !newRecordForm.physician || !newRecordForm.department ||
+      !newRecordForm.age) {
       alert('Please fill in all required fields');
       return;
     }
@@ -207,8 +207,8 @@ const Discharge = () => {
   };
 
   const handleToggleBillingPatient = (billingId: number) => {
-    setSelectedBillingIds(prev => 
-      prev.includes(billingId) 
+    setSelectedBillingIds(prev =>
+      prev.includes(billingId)
         ? prev.filter(id => id !== billingId)
         : [...prev, billingId]
     );
@@ -223,7 +223,7 @@ const Discharge = () => {
     try {
       const response = await dischargeService.createFromBilling(selectedBillingIds);
       alert(`Successfully imported ${response.created} patient(s) for discharge`);
-      
+
       // Reload the discharge records
       // In a real app, you'd fetch from the API here
       if (response.records && response.records.length > 0) {
@@ -242,7 +242,7 @@ const Discharge = () => {
         }));
         setPendingDischarges(prev => [...prev, ...newRecords]);
       }
-      
+
       setIsBillingImportModalOpen(false);
       setBillingPatients([]);
       setSelectedBillingIds([]);
@@ -254,14 +254,14 @@ const Discharge = () => {
 
   const handleSubmitDischarge = () => {
     if (!selectedPatient) return;
-    
+
     if (!dischargeForm.finalDiagnosis || !dischargeForm.hospitalStaySummary) {
       alert('Please fill in all required fields');
       return;
     }
 
     // Check if all required items are completed
-    const allRequiredCompleted = selectedPatient.requirements && 
+    const allRequiredCompleted = selectedPatient.requirements &&
       selectedPatient.requirements.finalDiagnosis &&
       selectedPatient.requirements.physicianSignature &&
       selectedPatient.requirements.medicationReconciliation &&
@@ -331,13 +331,13 @@ const Discharge = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Patient Discharge Management</h1>
           <p className="text-muted-foreground">Manage patient discharge procedures with comprehensive status tracking</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button 
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <Button
             onClick={handleLoadBillingPatients}
             disabled={isLoadingBilling}
             variant="outline"
@@ -346,16 +346,16 @@ const Discharge = () => {
             <Download className="w-4 h-4 mr-2" />
             {isLoadingBilling ? 'Loading...' : 'Import from Billing'}
           </Button>
-          <Button 
+          <Button
             onClick={() => setIsAddRecordModalOpen(true)}
-            className="bg-primary hover:bg-primary/90"
+            className="bg-primary hover:bg-primary/90 flex-1 sm:flex-none"
           >
             <Plus className="w-4 h-4 mr-2" />
-            Add Discharge Record
+            Add Record
           </Button>
           {canPrint() ? (
-            <PrintButton 
-              onPrint={handlePrintDischarge} 
+            <PrintButton
+              onPrint={handlePrintDischarge}
               className="bg-green-600 hover:bg-green-700"
             >
               Print Available - {dischargedPatients.length} Patients
@@ -370,7 +370,7 @@ const Discharge = () => {
       </div>
 
       <Tabs defaultValue="active" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 h-auto">
           <TabsTrigger value="active" className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4" />
             Active Discharges
@@ -450,21 +450,21 @@ const Discharge = () => {
             <div className="lg:col-span-2">
               <Card>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <CardTitle>Active Discharge Queue</CardTitle>
-                    <div className="flex items-center space-x-2">
-                      <div className="relative">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                      <div className="relative w-full sm:w-80">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                         <Input
                           placeholder="Search patients, room, condition..."
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
-                          className="pl-10 w-80"
+                          className="pl-10 w-full"
                         />
                       </div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="sm">
+                          <Button variant="outline" size="sm" className="w-full sm:w-auto">
                             <Filter className="w-4 h-4 mr-2" />
                             Filter
                             {hasActiveFilters && (
@@ -525,8 +525,8 @@ const Discharge = () => {
                           </div>
                         </div>
                         <div className="flex justify-end">
-                          <Button 
-                            size="sm" 
+                          <Button
+                            size="sm"
                             onClick={() => handleProcessDischarge(patient)}
                             className="bg-primary hover:bg-primary/90"
                           >
@@ -547,19 +547,19 @@ const Discharge = () => {
 
             <div>
               {selectedPatient && (
-                <PendingItemsSection 
+                <PendingItemsSection
                   requirements={selectedPatient.requirements}
                   className="mb-6"
                 />
               )}
-              
+
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">Quick Actions</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="w-full justify-start"
                     onClick={() => {
                       const readyPatients = pendingDischarges.filter(p => p.status === 'ready');
@@ -572,7 +572,7 @@ const Discharge = () => {
                     <CheckCircle className="w-4 h-4 mr-2" />
                     Process Next Ready Patient
                   </Button>
-                  
+
                   <Alert>
                     <AlertTriangle className="h-4 w-4" />
                     <AlertDescription className="text-sm">
@@ -641,12 +641,12 @@ const Discharge = () => {
           </DialogHeader>
           <div className="space-y-6">
             {selectedPatient && (
-              <PendingItemsSection 
+              <PendingItemsSection
                 requirements={selectedPatient.requirements}
                 className="mb-6"
               />
             )}
-            
+
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="finalDiagnosis">Final Diagnosis *</Label>
@@ -701,7 +701,7 @@ const Discharge = () => {
             <DialogTitle>Add New Discharge Record</DialogTitle>
           </DialogHeader>
           <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="patientName">Patient Name *</Label>
                 <Input
@@ -883,14 +883,14 @@ const Discharge = () => {
                           </div>
                           <div>
                             <span className="font-medium">Payment:</span>{' '}
-                            <Badge 
-                              variant="outline" 
+                            <Badge
+                              variant="outline"
                               className={
-                                patient.payment_status === 'Paid' 
+                                patient.payment_status === 'Paid'
                                   ? 'bg-green-100 text-green-800 border-green-200'
                                   : patient.payment_status === 'Partial'
-                                  ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
-                                  : 'bg-red-100 text-red-800 border-red-200'
+                                    ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
+                                    : 'bg-red-100 text-red-800 border-red-200'
                               }
                             >
                               {patient.payment_status}
@@ -910,8 +910,8 @@ const Discharge = () => {
             )}
 
             <div className="flex justify-end space-x-3 pt-4">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => {
                   setIsBillingImportModalOpen(false);
                   setBillingPatients([]);
@@ -920,7 +920,7 @@ const Discharge = () => {
               >
                 Cancel
               </Button>
-              <Button 
+              <Button
                 onClick={handleImportFromBilling}
                 disabled={selectedBillingIds.length === 0}
                 className="bg-primary hover:bg-primary/90"
