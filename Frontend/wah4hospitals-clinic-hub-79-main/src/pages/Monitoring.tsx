@@ -173,7 +173,15 @@ const Monitoring: React.FC = () => {
   }
 
   // Render dashboard
-  return <MonitoringDashboard admissions={admissions} onSelectAdmission={handleSelectAdmission} />;
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">Patient Monitoring</h1>
+        <p className="text-muted-foreground">Track vital signs, clinical notes, and dietary orders for admitted patients</p>
+      </div>
+      <MonitoringDashboard admissions={admissions} onSelectAdmission={handleSelectAdmission} />
+    </div>
+  );
 };
 
 export default Monitoring;
