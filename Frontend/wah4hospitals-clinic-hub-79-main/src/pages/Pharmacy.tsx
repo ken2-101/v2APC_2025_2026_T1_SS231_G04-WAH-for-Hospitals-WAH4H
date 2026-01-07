@@ -1,282 +1,177 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Filter, Pill, Package, AlertCircle, Check, Clock, Plus } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+import RestockModal from '@/components/pharmacy/RestockModal';
 import { DispenseModal } from '@/components/pharmacy/DispenseModal';
-import { RestockModal } from '@/components/pharmacy/RestockModal';
 import { toast } from 'sonner';
+import { InventoryItem, MedicationRequest } from '@/types/pharmacy';
 
-const Pharmacy = () => {
-    const [activeTab, setActiveTab] = useState('prescriptions');
-    const [searchTerm, setSearchTerm] = useState('');
+const API_BASE =
+  import.meta.env.BACKEND_PHARMACY_8000 ||
+    import.meta.env.LOCAL_8000
+    ? `${import.meta.env.LOCAL_8000}/api/pharmacy`
+    : import.meta.env.BACKEND_PHARMACY;
 
-    // Mock Data
-    const [prescriptions, setPrescriptions] = useState([
-        {
-            id: 'RX-2024-001',
-            patientName: 'Juan Dela Cruz',
-            doctorName: 'Dr. Santos',
-            medication: 'Amoxicillin 500mg',
-            dosage: '500mg',
-            route: 'Oral',
-            frequency: '3x a day',
-            quantity: 21,
-            dispensed: 0,
-            status: 'pending',
-            date: '2024-05-20'
-        },
-        {
-            id: 'RX-2024-002',
-            patientName: 'Maria Santos',
-            doctorName: 'Dr. Reyes',
-            medication: 'Paracetamol 500mg',
-            dosage: '500mg',
-            route: 'Oral',
-            frequency: 'As needed',
-            quantity: 10,
-            dispensed: 0,
-            status: 'pending',
-            date: '2024-05-20'
-        },
-        {
-            id: 'RX-2024-003',
-            patientName: 'Pedro Reyes',
-            doctorName: 'Dr. Lim',
-            medication: 'Metformin 500mg',
-            dosage: '500mg',
-            route: 'Oral',
-            frequency: '2x a day',
-            quantity: 60,
-            dispensed: 30,
-            status: 'partially-dispensed',
-            date: '2024-05-19'
-        },
-        {
-            id: 'RX-2024-004',
-            patientName: 'Ana Rodriguez',
-            doctorName: 'Dr. Santos',
-            medication: 'Ibuprofen 400mg',
-            dosage: '400mg',
-            route: 'Oral',
-            frequency: 'Every 6 hours',
-            quantity: 15,
-            dispensed: 15,
-            status: 'completed',
-            date: '2024-05-18'
-        }
-    ]);
+const Pharmacy: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'restock' | 'dispense'>('restock');
 
-    const [inventory, setInventory] = useState([
-        { id: 'MED-001', name: 'Amoxicillin 500mg', quantity: 500, batchNumber: 'B-101', expiryDate: '2025-12-31' },
-        { id: 'MED-002', name: 'Paracetamol 500mg', quantity: 1000, batchNumber: 'B-102', expiryDate: '2026-06-30' },
-        { id: 'MED-003', name: 'Metformin 500mg', quantity: 300, batchNumber: 'B-103', expiryDate: '2025-08-15' },
-        { id: 'MED-004', name: 'Ibuprofen 400mg', quantity: 50, batchNumber: 'B-104', expiryDate: '2024-12-01' },
-    ]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [isRestockOpen, setIsRestockOpen] = useState(false);
+  const [loadingInventory, setLoadingInventory] = useState(true);
 
-    const [selectedPrescription, setSelectedPrescription] = useState<any>(null);
-    const [isDispenseModalOpen, setIsDispenseModalOpen] = useState(false);
-    const [isRestockModalOpen, setIsRestockModalOpen] = useState(false);
+  const [requests, setRequests] = useState<MedicationRequest[]>([]);
+  const [loadingRequests, setLoadingRequests] = useState(true);
 
-    const handleDispenseClick = (prescription: any) => {
-        setSelectedPrescription(prescription);
-        setIsDispenseModalOpen(true);
-    };
+  const [dispenseOpen, setDispenseOpen] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState<MedicationRequest | null>(null);
 
-    const handleDispenseSubmit = (id: string, data: any) => {
-        setPrescriptions(prev => prev.map(p => {
-            if (p.id === id) {
-                const newDispensed = p.dispensed + data.quantityDispensed;
-                const newStatus = newDispensed >= p.quantity ? 'completed' : 'partially-dispensed';
-                return { ...p, dispensed: newDispensed, status: newStatus };
-            }
-            return p;
-        }));
+  // ------------------ Fetch Inventory ------------------
+  const fetchInventory = async () => {
+    try {
+      setLoadingInventory(true);
+      const res = await axios.get<InventoryItem[]>(`${API_BASE}/inventory/`);
+      setInventory(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      toast.error('Failed to load inventory');
+    } finally {
+      setLoadingInventory(false);
+    }
+  };
 
-        // Update inventory
-        const medName = prescriptions.find(p => p.id === id)?.medication;
-        if (medName) {
-            setInventory(prev => prev.map(item => {
-                if (item.name === medName) {
-                    return { ...item, quantity: Math.max(0, item.quantity - data.quantityDispensed) };
-                }
-                return item;
-            }));
-        }
+  // ------------------ Fetch Pending Requests ------------------
+  const fetchRequests = async () => {
+    try {
+      setLoadingRequests(true);
+      const res = await axios.get<MedicationRequest[]>(`${API_BASE}/medication-requests/?status=pending`);
+      setRequests(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      toast.error('Failed to load pending requests');
+    } finally {
+      setLoadingRequests(false);
+    }
+  };
 
-        toast.success('Medicine dispensed successfully');
-    };
+  useEffect(() => {
+    fetchInventory();
+    fetchRequests();
+  }, []);
 
-    const handleRestockSubmit = (item: any) => {
-        setInventory(prev => {
-            const existing = prev.find(i => i.name === item.name && i.batchNumber === item.batchNumber);
-            if (existing) {
-                return prev.map(i => i.id === existing.id ? { ...i, quantity: i.quantity + item.quantity } : i);
-            }
-            return [...prev, item];
-        });
-        toast.success('Inventory updated successfully');
-    };
+  const handleInventoryUpdate = (item: InventoryItem) => {
+    (async () => {
+      try {
+        const res = await axios.post<InventoryItem>(`${API_BASE}/inventory/`, item);
+        setInventory((prev) => [...prev, res.data]);
+        toast.success('Stock added successfully');
+      } catch (err: any) {
+        toast.error(err.response?.data?.error || 'Failed to add stock');
+      }
+    })();
+  };
 
-    const getStatusBadge = (status: string) => {
-        switch (status) {
-            case 'completed':
-                return <Badge className="bg-green-100 text-green-800"><Check className="w-3 h-3 mr-1" /> Completed</Badge>;
-            case 'partially-dispensed':
-                return <Badge className="bg-blue-100 text-blue-800"><Clock className="w-3 h-3 mr-1" /> Partial</Badge>;
-            case 'pending':
-                return <Badge className="bg-yellow-100 text-yellow-800"><AlertCircle className="w-3 h-3 mr-1" /> Pending</Badge>;
-            default:
-                return <Badge>{status}</Badge>;
-        }
-    };
+  const openDispenseModal = (request: MedicationRequest) => {
+    setSelectedRequest(request);
+    setDispenseOpen(true);
+  };
 
-    const filteredPrescriptions = prescriptions.filter(p =>
-        p.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.medication.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.id.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+  return (
+    <div className="p-4">
+      <h1 className="text-2xl font-bold mb-4">Pharmacy</h1>
 
-    const filteredInventory = inventory.filter(i =>
-        i.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        i.batchNumber.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+      {/* Tabs */}
+      <div className="flex gap-2 mb-4">
+        <button
+          className={`px-4 py-2 rounded ${activeTab === 'restock' ? 'bg-green-600 text-white' : 'bg-gray-200'}`}
+          onClick={() => setActiveTab('restock')}
+        >
+          Inventory Management
+        </button>
+        <button
+          className={`px-4 py-2 rounded ${activeTab === 'dispense' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+          onClick={() => setActiveTab('dispense')}
+        >
+          Dispense Requests
+        </button>
+      </div>
 
-    return (
-        <div className="space-y-6 p-6">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Pharmacy Dashboard</h1>
-                    <p className="text-gray-600">Manage prescriptions and inventory</p>
+      {/* Restock Tab */}
+      {activeTab === 'restock' && (
+        <div>
+          <div className="mb-4">
+            <button
+              className="bg-green-600 text-white px-4 py-2 rounded"
+              onClick={() => setIsRestockOpen(true)}
+            >
+              Restock Inventory
+            </button>
+          </div>
+
+          {loadingInventory ? (
+            <p>Loading inventory...</p>
+          ) : inventory.length > 0 ? (
+            <div className="space-y-2">
+              {inventory.map((item) => (
+                <div
+                  key={item.id}
+                  className="p-2 border rounded flex flex-col sm:flex-row justify-between items-start sm:items-center"
+                >
+                  <div>
+                    <p className="font-semibold">{item.generic_name}</p>
+                    <p className="text-sm text-gray-600">
+                      Brand: {item.brand_name || '-'} | Qty: {item.quantity} | Batch: {item.batch_number} | Expiry: {item.expiry_date}
+                    </p>
+                    {item.description && <p className="text-sm text-gray-500 italic">Description: {item.description}</p>}
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                        <Input
-                            placeholder="Search..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-10 w-64"
-                        />
-                    </div>
-                </div>
+              ))}
             </div>
+          ) : (
+            <p>No inventory available</p>
+          )}
 
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList>
-                    <TabsTrigger value="prescriptions" className="flex items-center gap-2">
-                        <Pill className="w-4 h-4" /> Prescriptions
-                    </TabsTrigger>
-                    <TabsTrigger value="inventory" className="flex items-center gap-2">
-                        <Package className="w-4 h-4" /> Inventory
-                    </TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="prescriptions" className="mt-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Prescription Orders</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="overflow-x-auto">
-                                <table className="w-full">
-                                    <thead>
-                                        <tr className="border-b text-left text-sm font-medium text-gray-500">
-                                            <th className="py-3 px-4">ID</th>
-                                            <th className="py-3 px-4">Patient</th>
-                                            <th className="py-3 px-4">Doctor</th>
-                                            <th className="py-3 px-4">Medication</th>
-                                            <th className="py-3 px-4">Qty (Ord/Disp)</th>
-                                            <th className="py-3 px-4">Status</th>
-                                            <th className="py-3 px-4">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {filteredPrescriptions.map((p) => (
-                                            <tr key={p.id} className="border-b hover:bg-gray-50">
-                                                <td className="py-3 px-4 font-medium">{p.id}</td>
-                                                <td className="py-3 px-4">{p.patientName}</td>
-                                                <td className="py-3 px-4">{p.doctorName}</td>
-                                                <td className="py-3 px-4">
-                                                    <div>{p.medication}</div>
-                                                    <div className="text-xs text-gray-500">{p.dosage} | {p.frequency}</div>
-                                                </td>
-                                                <td className="py-3 px-4">
-                                                    {p.quantity} / <span className={p.dispensed < p.quantity ? 'text-orange-600' : 'text-green-600'}>{p.dispensed}</span>
-                                                </td>
-                                                <td className="py-3 px-4">{getStatusBadge(p.status)}</td>
-                                                <td className="py-3 px-4">
-                                                    {p.status !== 'completed' && (
-                                                        <Button size="sm" onClick={() => handleDispenseClick(p)}>
-                                                            Dispense
-                                                        </Button>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-
-                <TabsContent value="inventory" className="mt-6">
-                    <div className="flex justify-end mb-4">
-                        <Button onClick={() => setIsRestockModalOpen(true)} className="bg-green-600 hover:bg-green-700">
-                            <Plus className="w-4 h-4 mr-2" /> Add Stock
-                        </Button>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                        {filteredInventory.map((item) => (
-                            <Card key={item.id} className={item.quantity < 100 ? 'border-red-200 bg-red-50' : ''}>
-                                <CardContent className="p-4">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <div className="p-2 bg-white rounded-lg border">
-                                            <Pill className="w-5 h-5 text-blue-600" />
-                                        </div>
-                                        {item.quantity < 100 && (
-                                            <Badge variant="destructive">Low Stock</Badge>
-                                        )}
-                                    </div>
-                                    <h3 className="font-semibold text-lg">{item.name}</h3>
-                                    <div className="mt-2 space-y-1 text-sm text-gray-600">
-                                        <div className="flex justify-between">
-                                            <span>Quantity:</span>
-                                            <span className="font-bold text-gray-900">{item.quantity}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span>Batch:</span>
-                                            <span>{item.batchNumber}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span>Expiry:</span>
-                                            <span className={new Date(item.expiryDate) < new Date() ? 'text-red-600 font-bold' : ''}>{item.expiryDate}</span>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
-                </TabsContent>
-            </Tabs>
-
-            <DispenseModal
-                isOpen={isDispenseModalOpen}
-                onClose={() => setIsDispenseModalOpen(false)}
-                prescription={selectedPrescription}
-                onDispense={handleDispenseSubmit}
-            />
-
-            <RestockModal
-                isOpen={isRestockModalOpen}
-                onClose={() => setIsRestockModalOpen(false)}
-                onRestock={handleRestockSubmit}
-            />
+          <RestockModal isOpen={isRestockOpen} onClose={() => setIsRestockOpen(false)} onInventoryUpdate={handleInventoryUpdate} />
         </div>
-    );
+      )}
+
+      {/* Dispense Tab */}
+      {activeTab === 'dispense' && (
+        <div>
+          {loadingRequests ? (
+            <p>Loading pending requests...</p>
+          ) : requests.length > 0 ? (
+            <div className="space-y-2">
+              {requests.map((req) => (
+                <div key={req.id} className="p-2 border rounded flex justify-between items-center">
+                  <div>
+                    <p className="font-semibold">{req.inventory_item_detail?.generic_name}</p>
+                    <p className="text-sm text-gray-600">
+                      Qty: {req.quantity} | Status: {req.status}
+                    </p>
+                  </div>
+                  <button className="bg-blue-600 text-white px-3 py-1 rounded" onClick={() => openDispenseModal(req)}>
+                    Dispense
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p>No pending requests</p>
+          )}
+        </div>
+      )}
+
+      {/* Dispense Modal */}
+      {selectedRequest && (
+        <DispenseModal
+          isOpen={dispenseOpen}
+          onClose={() => setDispenseOpen(false)}
+          medicationRequest={selectedRequest}
+          onDispenseSuccess={() => {
+            fetchRequests();
+            fetchInventory();
+          }}
+        />
+      )}
+    </div>
+  );
 };
 
 export default Pharmacy;

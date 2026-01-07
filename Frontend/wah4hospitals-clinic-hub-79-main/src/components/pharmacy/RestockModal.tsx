@@ -5,94 +5,181 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PackagePlus } from 'lucide-react';
 import { toast } from 'sonner';
+import axios from 'axios';
+import { InventoryItem } from '@/types/pharmacy';
 
 interface RestockModalProps {
-    isOpen: boolean;
-    onClose: () => void;
-    onRestock: (itemData: any) => void;
+  isOpen: boolean;
+  onClose: () => void;
+  onInventoryUpdate: (item: InventoryItem) => void; // Updated type: full InventoryItem
 }
 
-export const RestockModal: React.FC<RestockModalProps> = ({ isOpen, onClose, onRestock }) => {
-    const [itemData, setItemData] = useState({
-        name: '',
+const API_BASE =
+  import.meta.env.BACKEND_PHARMACY_8000 ||
+    import.meta.env.LOCAL_8000
+    ? `${import.meta.env.LOCAL_8000}/api/pharmacy`
+    : import.meta.env.BACKEND_PHARMACY;
+
+export const RestockModal: React.FC<RestockModalProps> = ({
+  isOpen,
+  onClose,
+  onInventoryUpdate,
+}) => {
+  const [itemData, setItemData] = useState({
+    generic_name: '',
+    brand_name: '',
+    description: '',
+    quantity: '',
+    batch_number: '',
+    expiry_date: '',
+  });
+
+  const handleRestock = async () => {
+    const quantity = Number(itemData.quantity);
+
+    // Validation
+    if (!itemData.generic_name || !itemData.batch_number || !itemData.expiry_date) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    if (isNaN(quantity) || quantity <= 0) {
+      toast.error('Quantity must be greater than zero');
+      return;
+    }
+
+    if (new Date(itemData.expiry_date) <= new Date()) {
+      toast.error('Expiry date must be in the future');
+      return;
+    }
+
+    try {
+      // Call backend to add stock
+      const payload = {
+        generic_name: itemData.generic_name,
+        brand_name: itemData.brand_name,
+        description: itemData.description,
+        quantity,
+        batch_number: itemData.batch_number,
+        expiry_date: itemData.expiry_date,
+      };
+
+      const res = await axios.post<InventoryItem>(`${API_BASE}/inventory/`, payload);
+
+      // Notify parent to update inventory state
+      onInventoryUpdate(res.data);
+
+      toast.success('Stock added successfully');
+      setItemData({
+        generic_name: '',
+        brand_name: '',
+        description: '',
         quantity: '',
-        batchNumber: '',
-        expiryDate: ''
-    });
+        batch_number: '',
+        expiry_date: '',
+      });
+      onClose();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.response?.data?.error || 'Failed to add stock');
+    }
+  };
 
-    const handleRestock = () => {
-        if (!itemData.name || !itemData.quantity || !itemData.batchNumber || !itemData.expiryDate) {
-            toast.error('Please fill in all fields');
-            return;
-        }
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <PackagePlus className="w-5 h-5 text-green-600" />
+            Restock Inventory
+          </DialogTitle>
+        </DialogHeader>
 
-        onRestock({
-            ...itemData,
-            quantity: parseInt(itemData.quantity),
-            id: `MED-${Date.now()}`
-        });
-        onClose();
-        setItemData({ name: '', quantity: '', batchNumber: '', expiryDate: '' });
-    };
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="generic_name">Medicine Name</Label>
+            <Input
+              id="generic_name"
+              value={itemData.generic_name}
+              onChange={(e) =>
+                setItemData((prev) => ({ ...prev, generic_name: e.target.value }))
+              }
+            />
+          </div>
 
-    return (
-        <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <PackagePlus className="w-5 h-5 text-green-600" />
-                        Restock Inventory
-                    </DialogTitle>
-                </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="brand_name">Brand Name (Optional)</Label>
+            <Input
+              id="brand_name"
+              value={itemData.brand_name}
+              onChange={(e) =>
+                setItemData((prev) => ({ ...prev, brand_name: e.target.value }))
+              }
+            />
+          </div>
 
-                <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="name">Medicine Name</Label>
-                        <Input
-                            id="name"
-                            value={itemData.name}
-                            onChange={(e) => setItemData(prev => ({ ...prev, name: e.target.value }))}
-                            placeholder="e.g., Amoxicillin 500mg"
-                        />
-                    </div>
+          <div className="space-y-2">
+            <Label htmlFor="description">Description (Optional)</Label>
+            <Input
+              id="description"
+              value={itemData.description}
+              onChange={(e) =>
+                setItemData((prev) => ({ ...prev, description: e.target.value }))
+              }
+            />
+          </div>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="quantity">Quantity to Add</Label>
-                        <Input
-                            id="quantity"
-                            type="number"
-                            value={itemData.quantity}
-                            onChange={(e) => setItemData(prev => ({ ...prev, quantity: e.target.value }))}
-                            placeholder="Enter quantity"
-                        />
-                    </div>
+          <div className="space-y-2">
+            <Label htmlFor="quantity">Quantity</Label>
+            <Input
+              id="quantity"
+              type="number"
+              min={1}
+              value={itemData.quantity}
+              onChange={(e) =>
+                setItemData((prev) => ({ ...prev, quantity: e.target.value }))
+              }
+            />
+          </div>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="batchNumber">Batch Number</Label>
-                        <Input
-                            id="batchNumber"
-                            value={itemData.batchNumber}
-                            onChange={(e) => setItemData(prev => ({ ...prev, batchNumber: e.target.value }))}
-                            placeholder="e.g., BATCH-001"
-                        />
-                    </div>
+          <div className="space-y-2">
+            <Label htmlFor="batch_number">Batch Number</Label>
+            <Input
+              id="batch_number"
+              value={itemData.batch_number}
+              onChange={(e) =>
+                setItemData((prev) => ({ ...prev, batch_number: e.target.value }))
+              }
+            />
+          </div>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="expiryDate">Expiry Date</Label>
-                        <Input
-                            id="expiryDate"
-                            type="date"
-                            value={itemData.expiryDate}
-                            onChange={(e) => setItemData(prev => ({ ...prev, expiryDate: e.target.value }))}
-                        />
-                    </div>
-                </div>
+          <div className="space-y-2">
+            <Label htmlFor="expiry_date">Expiry Date</Label>
+            <Input
+              id="expiry_date"
+              type="date"
+              value={itemData.expiry_date}
+              onChange={(e) =>
+                setItemData((prev) => ({ ...prev, expiry_date: e.target.value }))
+              }
+            />
+          </div>
+        </div>
 
-                <DialogFooter>
-                    <Button variant="outline" onClick={onClose}>Cancel</Button>
-                    <Button onClick={handleRestock} className="bg-green-600 hover:bg-green-700">Add to Inventory</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleRestock}
+            className="bg-green-600 hover:bg-green-700"
+          >
+            Add Stock
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 };
+
+export default RestockModal;

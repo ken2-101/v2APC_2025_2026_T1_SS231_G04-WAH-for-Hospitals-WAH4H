@@ -1,66 +1,83 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { FileText } from 'lucide-react';
+import { Pencil, Trash2, Eye } from 'lucide-react';
 import type { Patient } from '../../types/patient';
 
 interface PatientTableProps {
   patients: Patient[];
   handleViewDetails: (patient: Patient) => void;
+  handleEdit: (patient: Patient) => void;
+  handleDelete: (patient: Patient) => void;
 }
 
 export const PatientTable: React.FC<PatientTableProps> = ({
   patients,
-  handleViewDetails
+  handleViewDetails,
+  handleEdit,
+  handleDelete,
 }) => {
+  if (!patients.length) {
+    return (
+      <div className="text-center text-gray-500 py-6">
+        No patients found
+      </div>
+    );
+  }
+
   return (
     <div className="overflow-x-auto">
-      <table className="w-full border-collapse">
-        <thead>
-          <tr className="border-b">
-            <th className="text-left py-3 px-4 font-medium">Patient ID</th>
-            <th className="text-left py-3 px-4 font-medium">Full Name</th>
-            <th className="text-left py-3 px-4 font-medium">Age</th>
-            <th className="text-left py-3 px-4 font-medium">Mobile Number</th>
-            <th className="text-left py-3 px-4 font-medium">Department</th>
-            <th className="text-left py-3 px-4 font-medium">Room</th>
-            <th className="text-left py-3 px-4 font-medium">Status</th>
-            <th className="text-left py-3 px-4 font-medium">Actions</th>
+      <table className="min-w-full text-sm">
+        <thead className="bg-gray-100">
+          <tr>
+            <th className="px-4 py-2 text-left">Patient ID</th>
+            <th className="px-4 py-2 text-left">Name</th>
+            <th className="px-4 py-2 text-left">Sex</th>
+            <th className="px-4 py-2 text-left">Status</th>
+            <th className="px-4 py-2 text-center">Actions</th>
           </tr>
         </thead>
+
         <tbody>
-          {patients.map((patient) => (
+          {patients.map(patient => (
             <tr key={patient.id} className="border-b hover:bg-gray-50">
-              <td className="py-4 px-4 font-medium">{patient.id}</td>
-              <td className="py-4 px-4">{`${patient.last_name}, ${patient.first_name} ${patient.middle_name || ''} ${patient.suffix || ''}`}</td>
-              <td className="py-4 px-4">{new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear()}</td>
-              <td className="py-4 px-4">{patient.mobile_number}</td>
-              <td className="py-4 px-4">{patient.department}</td>
-              <td className="py-4 px-4">{patient.room}</td>
-              <td className="py-4 px-4">
-                <Badge className={patient.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
-                  {patient.status}
-                </Badge>
+              <td className="px-4 py-2 font-mono">{patient.patient_id}</td>
+              <td className="px-4 py-2">
+                {patient.last_name}, {patient.first_name}
               </td>
-              <td className="py-4 px-4">
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  onClick={() => handleViewDetails(patient)}
-                >
-                  <FileText className="w-4 h-4 mr-1" />
-                  Details
-                </Button>
+              <td className="px-4 py-2">{patient.sex}</td>
+              <td className="px-4 py-2">{patient.status}</td>
+
+              <td className="px-4 py-2">
+                <div className="flex justify-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleViewDetails(patient)}
+                  >
+                    <Eye className="w-4 h-4" />
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleEdit(patient)}
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => handleDelete(patient)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
-      {patients.length === 0 && (
-        <div className="text-center py-8 text-gray-500">
-          No patients found matching your search criteria.
-        </div>
-      )}
     </div>
   );
 };

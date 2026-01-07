@@ -3,7 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2, Eye, EyeOff, UserPlus } from 'lucide-react';
@@ -18,66 +24,63 @@ const Register = () => {
   const [role, setRole] = useState<UserRole | ''>('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
   const navigate = useNavigate();
   const { register, isLoading } = useAuth();
 
-  const roleOptions = [
+  /**
+   * 🔥 BACKEND-ALIGNED ROLE VALUES
+   * These MUST match Django ROLE_CHOICES exactly
+   */
+  const roleOptions: { value: UserRole; label: string }[] = [
     { value: 'doctor', label: 'Doctor' },
     { value: 'nurse', label: 'Nurse' },
     { value: 'pharmacist', label: 'Pharmacist' },
     { value: 'lab-technician', label: 'Lab Technician' },
-    { value: 'radiologist', label: 'Radiologist' },
-    { value: 'billing-staff', label: 'Billing Staff' },
-    { value: 'administrator', label: 'Administrator' }
+    { value: 'billing_clerk', label: 'Billing Staff' },
+    { value: 'administrator', label: 'Administrator' },
   ];
 
-  const handleRoleChange = (value: string) => {
-    setRole(value as UserRole);
-  };
-
   const validateForm = () => {
-    const newErrors: { [key: string]: string } = {};
-    
+    const newErrors: Record<string, string> = {};
+
     if (!firstName.trim()) newErrors.firstName = 'First name is required';
     if (!lastName.trim()) newErrors.lastName = 'Last name is required';
-    if (!email) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(email)) {
+
+    if (!email) newErrors.email = 'Email is required';
+    else if (!/\S+@\S+\.\S+/.test(email))
       newErrors.email = 'Please enter a valid email';
-    }
-    if (!password) {
-      newErrors.password = 'Password is required';
-    } else if (password.length < 6) {
+
+    if (!password) newErrors.password = 'Password is required';
+    else if (password.length < 6)
       newErrors.password = 'Password must be at least 6 characters';
-    }
-    if (!confirmPassword) {
+
+    if (!confirmPassword)
       newErrors.confirmPassword = 'Please confirm your password';
-    } else if (password !== confirmPassword) {
+    else if (password !== confirmPassword)
       newErrors.confirmPassword = 'Passwords do not match';
-    }
-    if (!role) {
-      newErrors.role = 'Please select your role';
-    }
-    
+
+    if (!role) newErrors.role = 'Please select your role';
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
-    
+
     const success = await register({
       firstName,
       lastName,
       email,
       password,
       confirmPassword,
-      role: role as UserRole
+      role: role as UserRole,
     });
-    
+
     if (success) {
       navigate('/login');
     }
@@ -91,34 +94,32 @@ const Register = () => {
             <UserPlus className="text-white w-8 h-8" />
           </div>
           <CardTitle className="text-2xl">Create Account</CardTitle>
-          <p className="text-gray-600">Join WAH4</p>
+          <p className="text-gray-600">Join WAH4H</p>
         </CardHeader>
-        <CardContent className="space-y-4">
+
+        <CardContent>
           <form onSubmit={handleRegister} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div>
                 <Label htmlFor="firstName">First Name</Label>
                 <Input
                   id="firstName"
-                  type="text"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   className={errors.firstName ? 'border-red-500' : ''}
-                  placeholder="First name"
                 />
                 {errors.firstName && (
                   <p className="text-sm text-red-500">{errors.firstName}</p>
                 )}
               </div>
-              <div className="space-y-2">
+
+              <div>
                 <Label htmlFor="lastName">Last Name</Label>
                 <Input
                   id="lastName"
-                  type="text"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   className={errors.lastName ? 'border-red-500' : ''}
-                  placeholder="Last name"
                 />
                 {errors.lastName && (
                   <p className="text-sm text-red-500">{errors.lastName}</p>
@@ -126,31 +127,29 @@ const Register = () => {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+            <div>
+              <Label>Email</Label>
               <Input
-                id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className={errors.email ? 'border-red-500' : ''}
-                placeholder="Enter email"
               />
               {errors.email && (
                 <p className="text-sm text-red-500">{errors.email}</p>
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="role">Role</Label>
-              <Select value={role} onValueChange={handleRoleChange}>
+            <div>
+              <Label>Role</Label>
+              <Select value={role} onValueChange={(v) => setRole(v as UserRole)}>
                 <SelectTrigger className={errors.role ? 'border-red-500' : ''}>
                   <SelectValue placeholder="Select your role" />
                 </SelectTrigger>
                 <SelectContent>
-                  {roleOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
+                  {roleOptions.map((r) => (
+                    <SelectItem key={r.value} value={r.value}>
+                      {r.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -160,29 +159,23 @@ const Register = () => {
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+            <div>
+              <Label>Password</Label>
               <div className="relative">
                 <Input
-                  id="password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className={errors.password ? 'border-red-500 pr-10' : 'pr-10'}
-                  placeholder="Enter password"
                 />
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  className="absolute right-0 top-0 h-full"
                   onClick={() => setShowPassword(!showPassword)}
                 >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4 text-gray-400" />
-                  ) : (
-                    <Eye className="h-4 w-4 text-gray-400" />
-                  )}
+                  {showPassword ? <EyeOff /> : <Eye />}
                 </Button>
               </div>
               {errors.password && (
@@ -190,38 +183,38 @@ const Register = () => {
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
+            <div>
+              <Label>Confirm Password</Label>
               <div className="relative">
                 <Input
-                  id="confirmPassword"
                   type={showConfirmPassword ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className={errors.confirmPassword ? 'border-red-500 pr-10' : 'pr-10'}
-                  placeholder="Confirm password"
+                  className={
+                    errors.confirmPassword ? 'border-red-500 pr-10' : 'pr-10'
+                  }
                 />
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-0 top-0 h-full"
+                  onClick={() =>
+                    setShowConfirmPassword(!showConfirmPassword)
+                  }
                 >
-                  {showConfirmPassword ? (
-                    <EyeOff className="h-4 w-4 text-gray-400" />
-                  ) : (
-                    <Eye className="h-4 w-4 text-gray-400" />
-                  )}
+                  {showConfirmPassword ? <EyeOff /> : <Eye />}
                 </Button>
               </div>
               {errors.confirmPassword && (
-                <p className="text-sm text-red-500">{errors.confirmPassword}</p>
+                <p className="text-sm text-red-500">
+                  {errors.confirmPassword}
+                </p>
               )}
             </div>
 
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="w-full bg-blue-600 hover:bg-blue-700"
               disabled={isLoading}
             >
@@ -235,10 +228,10 @@ const Register = () => {
               )}
             </Button>
           </form>
-          
-          <div className="text-center">
+
+          <div className="text-center mt-4">
             <Button variant="link" onClick={() => navigate('/login')}>
-              Already have an account? Sign in here
+              Already have an account? Sign in
             </Button>
           </div>
         </CardContent>

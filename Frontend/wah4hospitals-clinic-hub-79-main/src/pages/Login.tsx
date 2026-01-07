@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,44 +17,32 @@ const Login = () => {
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
-    
-    if (!email) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(email)) {
-      newErrors.email = 'Please enter a valid email';
-    }
-    
-    if (!password) {
-      newErrors.password = 'Password is required';
-    }
-    
+    if (!email) newErrors.email = 'Email is required';
+    else if (!/\S+@\S+\.\S+/.test(email)) newErrors.email = 'Please enter a valid email';
+    if (!password) newErrors.password = 'Password is required';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!validateForm()) return;
-    
+    if (!validateForm() || isLoading) return;
+
     const success = await login(email, password);
-    if (success) {
-      navigate('/dashboard');
-    }
+    if (success) navigate('/dashboard');
   };
 
   const handleDemoLogin = async () => {
-    setEmail('demo@hospital.com');
-    setPassword('demo123');
-    
-    const success = await login('demo@hospital.com', 'demo123');
-    if (success) {
-      navigate('/dashboard');
-    }
+    if (isLoading) return;
+    const demoEmail = 'doctor@gmail.com';
+    const demoPassword = 'Doctor123';
+    setEmail(demoEmail);
+    setPassword(demoPassword);
+    const success = await login(demoEmail, demoPassword);
+    if (success) navigate('/dashboard');
   };
 
   const handleForgotPassword = () => {
-    // For now, just show an alert with demo credentials
     alert('Demo credentials:\nEmail: demo@hospital.com\nPassword: demo123');
   };
 
@@ -69,6 +56,7 @@ const Login = () => {
           <CardTitle className="text-2xl">Welcome Back</CardTitle>
           <p className="text-gray-600">Sign in to WAH4H</p>
         </CardHeader>
+
         <CardContent className="space-y-4">
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
@@ -81,10 +69,9 @@ const Login = () => {
                 className={errors.email ? 'border-red-500' : ''}
                 placeholder="Enter your email"
               />
-              {errors.email && (
-                <p className="text-sm text-red-500">{errors.email}</p>
-              )}
+              {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <div className="relative">
@@ -103,32 +90,19 @@ const Login = () => {
                   className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                   onClick={() => setShowPassword(!showPassword)}
                 >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4 text-gray-400" />
-                  ) : (
-                    <Eye className="h-4 w-4 text-gray-400" />
-                  )}
+                  {showPassword ? <EyeOff className="h-4 w-4 text-gray-400" /> : <Eye className="h-4 w-4 text-gray-400" />}
                 </Button>
               </div>
-              {errors.password && (
-                <p className="text-sm text-red-500">{errors.password}</p>
-              )}
+              {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
             </div>
+
             <div className="flex items-center justify-between">
-              <Button
-                type="button"
-                variant="link"
-                className="p-0 h-auto text-sm"
-                onClick={handleForgotPassword}
-              >
+              <Button type="button" variant="link" className="p-0 h-auto text-sm" onClick={handleForgotPassword}>
                 Forgot password?
               </Button>
             </div>
-            <Button 
-              type="submit" 
-              className="w-full bg-blue-600 hover:bg-blue-700"
-              disabled={isLoading}
-            >
+
+            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={isLoading}>
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -139,26 +113,21 @@ const Login = () => {
               )}
             </Button>
           </form>
-          
-          <div className="relative">
+
+          <div className="relative my-2">
             <div className="absolute inset-0 flex items-center">
               <span className="w-full border-t" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">Or</span>
+              <span className="bg-white px-2 text-gray-500">Or</span>
             </div>
           </div>
-          
-          <Button 
-            variant="outline" 
-            className="w-full"
-            onClick={handleDemoLogin}
-            disabled={isLoading}
-          >
+
+          <Button variant="outline" className="w-full" onClick={handleDemoLogin} disabled={isLoading}>
             Try Demo Account
           </Button>
-          
-          <div className="text-center">
+
+          <div className="text-center mt-2">
             <Button variant="link" onClick={() => navigate('/register')}>
               Don't have an account? Register here
             </Button>

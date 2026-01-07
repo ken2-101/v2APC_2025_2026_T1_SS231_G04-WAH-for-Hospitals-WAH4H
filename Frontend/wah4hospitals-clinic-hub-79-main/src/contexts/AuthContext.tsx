@@ -1,8 +1,12 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { useToast } from '@/hooks/use-toast';
 import { UserRole } from './RoleContext';
+
+const API_BASE_URL =
+  import.meta.env.STURDY_ADVENTURE_BASE_8000 ||
+  import.meta.env.LOCAL_8000 ||
+  import.meta.env.STURDY_ADVENTURE_BASE;
 
 interface User {
   id: string;
@@ -10,14 +14,6 @@ interface User {
   firstName: string;
   lastName: string;
   role: UserRole;
-}
-
-interface AuthContextType {
-  user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
-  register: (userData: RegisterData) => Promise<boolean>;
-  logout: () => void;
-  isLoading: boolean;
 }
 
 interface RegisterData {
@@ -29,14 +25,20 @@ interface RegisterData {
   role: UserRole;
 }
 
+interface AuthContextType {
+  user: User | null;
+  login: (email: string, password: string) => Promise<boolean>;
+  register: (data: RegisterData) => Promise<boolean>;
+  logout: () => void;
+  isLoading: boolean;
+}
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -44,66 +46,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  // Check for existing session on mount
   useEffect(() => {
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
+    const saved = localStorage.getItem('currentUser');
+    if (saved) setUser(JSON.parse(saved));
   }, []);
+
+  const axiosInstance = axios.create({
+    baseURL: API_BASE_URL,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
 
   const login = async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
-    
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Get users from localStorage or create demo user
-      const users = JSON.parse(localStorage.getItem('users') || '[]');
-      let foundUser = users.find((u: any) => u.email === email && u.password === password);
-      
-      // If no users exist, create a demo user for first login
-      if (users.length === 0 && email === 'demo@hospital.com' && password === 'demo123') {
-        foundUser = {
-          id: '1',
-          email: 'demo@hospital.com',
-          firstName: 'Demo',
-          lastName: 'User',
-          password: 'demo123',
-          role: 'administrator'
-        };
-        users.push(foundUser);
-        localStorage.setItem('users', JSON.stringify(users));
-      }
-      
-      if (foundUser) {
-        const { password: _, ...userWithoutPassword } = foundUser;
-        setUser(userWithoutPassword);
-        localStorage.setItem('currentUser', JSON.stringify(userWithoutPassword));
-        
-        // Set the user's role in the role context
-        localStorage.setItem('userRole', foundUser.role);
-        
-        toast({
-          title: "Welcome back!",
-          description: `Successfully logged in as ${foundUser.firstName} ${foundUser.lastName}`,
-        });
-        
-        return true;
-      } else {
-        toast({
-          title: "Login failed",
-          description: "Invalid email or password. Try demo@hospital.com / demo123",
-          variant: "destructive"
-        });
-        return false;
-      }
-    } catch (error) {
+      const res = await axiosInstance.post('/accounts/login/', {
+        email,
+        password,
+      });
+
+      const { tokens, user: userData } = res.data;
+
+      localStorage.setItem('accessToken', tokens.access);
+      localStorage.setItem('refreshToken', tokens.refresh);
+      localStorage.setItem('currentUser', JSON.stringify(userData));
+      localStorage.setItem('userRole', userData.role);
+
+      setUser(userData);
+
       toast({
-        title: "Login error",
-        description: "An unexpected error occurred. Please try again.",
-        variant: "destructive"
+        title: 'Welcome back!',
+        description: `${userData.firstName} ${userData.lastName}`,
+      });
+
+      return true;
+    } catch (err: any) {
+      toast({
+        title: 'Login failed',
+        description: err.response?.data?.detail || 'Invalid credentials',
+        variant: 'destructive',
       });
       return false;
     } finally {
@@ -111,68 +93,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const register = async (userData: RegisterData): Promise<boolean> => {
+  const register = async (data: RegisterData): Promise<boolean> => {
     setIsLoading(true);
-    
+
     try {
-      // Validate passwords match
-      if (userData.password !== userData.confirmPassword) {
-        toast({
-          title: "Registration failed",
-          description: "Passwords do not match",
-          variant: "destructive"
-        });
-        return false;
-      }
-
-      // Validate password strength
-      if (userData.password.length < 6) {
-        toast({
-          title: "Registration failed",
-          description: "Password must be at least 6 characters long",
-          variant: "destructive"
-        });
-        return false;
-      }
-
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Check if user already exists
-      const users = JSON.parse(localStorage.getItem('users') || '[]');
-      if (users.find((u: any) => u.email === userData.email)) {
-        toast({
-          title: "Registration failed",
-          description: "An account with this email already exists",
-          variant: "destructive"
-        });
-        return false;
-      }
-      
-      // Create new user
-      const newUser = {
-        id: Date.now().toString(),
-        email: userData.email,
-        firstName: userData.firstName,
-        lastName: userData.lastName,
-        password: userData.password,
-        role: userData.role
-      };
-      
-      users.push(newUser);
-      localStorage.setItem('users', JSON.stringify(users));
-      
-      toast({
-        title: "Registration successful!",
-        description: `Account created with ${userData.role} role. Please log in.`,
+      const res = await axiosInstance.post('/accounts/register/', {
+        first_name: data.firstName,
+        last_name: data.lastName,
+        email: data.email,
+        password: data.password,
+        confirm_password: data.confirmPassword, // 🔥 REQUIRED
+        role: data.role,
       });
-      
-      return true;
-    } catch (error) {
+
       toast({
-        title: "Registration error",
-        description: "An unexpected error occurred. Please try again.",
-        variant: "destructive"
+        title: 'Registration successful',
+        description: 'You may now log in',
+      });
+
+      return true;
+    } catch (err: any) {
+      console.error('REGISTER ERROR:', err.response?.data);
+
+      toast({
+        title: 'Registration failed',
+        description:
+          err.response?.data?.detail ||
+          JSON.stringify(err.response?.data) ||
+          'Unable to register',
+        variant: 'destructive',
       });
       return false;
     } finally {
@@ -182,22 +131,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('currentUser');
-    localStorage.removeItem('userRole');
-    localStorage.removeItem('adminMode');
+    localStorage.clear();
+
     toast({
-      title: "Logged out",
-      description: "You have been successfully logged out",
+      title: 'Logged out',
+      description: 'You have been logged out',
     });
   };
 
-  const value = {
-    user,
-    login,
-    register,
-    logout,
-    isLoading
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ user, login, register, logout, isLoading }}>
+      {children}
+    </AuthContext.Provider>
+  );
 };

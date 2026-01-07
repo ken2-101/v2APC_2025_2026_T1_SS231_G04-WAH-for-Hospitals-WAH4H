@@ -6,9 +6,27 @@ import type { Admission } from '../../types/admission';
 
 interface AdmissionTableProps {
   admissions: Admission[];
+  onDetailsClick?: (admission: Admission) => void; // optional callback
 }
 
-export const AdmissionTable: React.FC<AdmissionTableProps> = ({ admissions }) => {
+// Helper to get badge class based on status
+const getStatusBadgeClass = (status: string) => {
+  switch (status) {
+    case 'Active':
+      return 'bg-green-100 text-green-800';
+    case 'Discharged':
+      return 'bg-gray-100 text-gray-800';
+    case 'Transferred':
+      return 'bg-yellow-100 text-yellow-800';
+    default:
+      return 'bg-gray-100 text-gray-800';
+  }
+};
+
+export const AdmissionTable: React.FC<AdmissionTableProps> = ({
+  admissions,
+  onDetailsClick,
+}) => {
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse">
@@ -24,34 +42,41 @@ export const AdmissionTable: React.FC<AdmissionTableProps> = ({ admissions }) =>
           </tr>
         </thead>
         <tbody>
+          {admissions.length === 0 && (
+            <tr>
+              <td colSpan={7} className="text-center py-8 text-gray-500">
+                No admissions found matching your search criteria.
+              </td>
+            </tr>
+          )}
+
           {admissions.map((admission) => (
             <tr key={admission.id} className="border-b hover:bg-gray-50">
               <td className="py-4 px-4 font-medium">
-                {admission.patient_details 
+                {admission.patient_details
                   ? `${admission.patient_details.last_name}, ${admission.patient_details.first_name}`
                   : 'Unknown Patient'}
               </td>
-              <td className="py-4 px-4">{admission.id}</td>
-              <td className="py-4 px-4">{new Date(admission.admission_date).toLocaleString()}</td>
-              <td className="py-4 px-4">{admission.attending_physician}</td>
+              {/* Display backend admission_id */}
+              <td className="py-4 px-4">{admission.admission_id ?? admission.id}</td>
+              <td className="py-4 px-4">
+                {new Date(admission.admission_date).toLocaleString()}
+              </td>
+              <td className="py-4 px-4">{admission.attending_physician || 'N/A'}</td>
               <td className="py-4 px-4">
                 {admission.ward} - {admission.room} / {admission.bed}
               </td>
               <td className="py-4 px-4">
-                <Badge
-                  className={
-                    admission.status === 'Active'
-                      ? 'bg-green-100 text-green-800'
-                      : admission.status === 'Discharged'
-                      ? 'bg-gray-100 text-gray-800'
-                      : 'bg-yellow-100 text-yellow-800'
-                  }
-                >
+                <Badge className={getStatusBadgeClass(admission.status)}>
                   {admission.status}
                 </Badge>
               </td>
               <td className="py-4 px-4">
-                <Button size="sm" variant="outline">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onDetailsClick?.(admission)}
+                >
                   <FileText className="w-4 h-4 mr-1" />
                   Details
                 </Button>
@@ -60,11 +85,6 @@ export const AdmissionTable: React.FC<AdmissionTableProps> = ({ admissions }) =>
           ))}
         </tbody>
       </table>
-      {admissions.length === 0 && (
-        <div className="text-center py-8 text-gray-500">
-          No admissions found matching your search criteria.
-        </div>
-      )}
     </div>
   );
 };

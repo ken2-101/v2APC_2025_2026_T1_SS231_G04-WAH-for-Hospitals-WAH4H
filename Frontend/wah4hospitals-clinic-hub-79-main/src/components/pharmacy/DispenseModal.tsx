@@ -1,124 +1,153 @@
-import React, { useState } from 'react';
+// src/components/pharmacy/DispenseModal.tsx
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Pill, AlertCircle } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
+import { InventoryItem, MedicationRequest } from '@/types/pharmacy';
 
 interface DispenseModalProps {
-    isOpen: boolean;
-    onClose: () => void;
-    prescription: any;
-    onDispense: (prescriptionId: string, dispensedData: any) => void;
+  isOpen: boolean;
+  onClose: () => void;
+  medicationRequest: MedicationRequest; // full request object
+  onDispenseSuccess: () => void;
 }
 
-export const DispenseModal: React.FC<DispenseModalProps> = ({ isOpen, onClose, prescription, onDispense }) => {
-    const [dispenseData, setDispenseData] = useState({
-        quantityDispensed: '',
-        pharmacistName: '',
-        notes: ''
-    });
+const API_BASE =
+  import.meta.env.BACKEND_PHARMACY_8000 ||
+    import.meta.env.LOCAL_8000
+    ? `${import.meta.env.LOCAL_8000}/api/pharmacy`
+    : import.meta.env.BACKEND_PHARMACY;
 
-    if (!prescription) return null;
+export const DispenseModal: React.FC<DispenseModalProps> = ({
+  isOpen,
+  onClose,
+  medicationRequest,
+  onDispenseSuccess,
+}) => {
+  const [quantity, setQuantity] = useState<number>(medicationRequest.quantity);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
 
-    const handleDispense = () => {
-        if (!dispenseData.quantityDispensed || !dispenseData.pharmacistName) {
-            toast.error('Please fill in all required fields');
-            return;
-        }
+  // ------------------ Fetch inventory for this medicine ------------------
+  const fetchInventoryItem = async () => {
+    try {
+      const res = await axios.get<InventoryItem[]>(`${API_BASE}/inventory/`);
+      const filtered = res.data.filter(
+        (item) =>
+          item.id === medicationRequest.inventory_item ||
+          item.generic_name === medicationRequest.inventory_item_detail?.generic_name
+      );
+      setInventory(filtered);
+    } catch (err) {
+      toast.error('Failed to fetch inventory');
+      setInventory([]);
+    }
+  };
 
-        const qty = parseInt(dispenseData.quantityDispensed);
-        if (qty > prescription.quantity) {
-            toast.error('Cannot dispense more than ordered quantity');
-            return;
-        }
+  useEffect(() => {
+    setQuantity(medicationRequest.quantity);
+    fetchInventoryItem();
+  }, [medicationRequest]);
 
-        onDispense(prescription.id, {
-            ...dispenseData,
-            quantityDispensed: qty,
-            status: qty < prescription.quantity ? 'partially-dispensed' : 'completed'
-        });
-        onClose();
-        setDispenseData({ quantityDispensed: '', pharmacistName: '', notes: '' });
-    };
+  // ------------------ Handle Dispense ------------------
+  const handleDispense = async () => {
+    if (quantity <= 0) {
+      toast.error('Quantity must be greater than 0');
+      return;
+    }
 
-    return (
-        <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[500px]">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <Pill className="w-5 h-5 text-blue-600" />
-                        Dispense Medicine
-                    </DialogTitle>
-                </DialogHeader>
+    const totalStock = inventory.reduce((acc, i) => acc + i.quantity, 0);
+    if (quantity > totalStock) {
+      toast.error(`Not enough stock. Available: ${totalStock}`);
+      return;
+    }
 
-                <div className="space-y-4 py-4">
-                    <div className="bg-blue-50 p-4 rounded-lg space-y-2 text-sm">
-                        <div className="flex justify-between">
-                            <span className="text-gray-600">Patient:</span>
-                            <span className="font-medium">{prescription.patientName}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span className="text-gray-600">Medication:</span>
-                            <span className="font-medium">{prescription.medication}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span className="text-gray-600">Dosage:</span>
-                            <span className="font-medium">{prescription.dosage}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span className="text-gray-600">Frequency:</span>
-                            <span className="font-medium">{prescription.frequency}</span>
-                        </div>
-                        <div className="flex justify-between border-t border-blue-200 pt-2 mt-2">
-                            <span className="text-gray-600">Quantity Ordered:</span>
-                            <span className="font-bold text-blue-700">{prescription.quantity} units</span>
-                        </div>
-                    </div>
+    try {
+      // POST to the proper dispense endpoint
+      await axios.post(`${API_BASE}/medication-requests/${medicationRequest.id}/dispense/`, {
+        quantity,
+      });
 
-                    <div className="space-y-2">
-                        <Label htmlFor="quantityDispensed">Quantity to Dispense</Label>
-                        <Input
-                            id="quantityDispensed"
-                            type="number"
-                            value={dispenseData.quantityDispensed}
-                            onChange={(e) => setDispenseData(prev => ({ ...prev, quantityDispensed: e.target.value }))}
-                            placeholder="Enter quantity"
-                        />
-                        {parseInt(dispenseData.quantityDispensed) < prescription.quantity && dispenseData.quantityDispensed !== '' && (
-                            <p className="text-xs text-orange-600 flex items-center">
-                                <AlertCircle className="w-3 h-3 mr-1" /> Partial dispensing
-                            </p>
-                        )}
-                    </div>
+      toast.success('Medication dispensed and inventory updated');
+      onDispenseSuccess(); // refresh parent state
+      onClose();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.response?.data?.error || 'Failed to dispense medication');
+    }
+  };
 
-                    <div className="space-y-2">
-                        <Label htmlFor="pharmacistName">Pharmacist / Med Tech Name</Label>
-                        <Input
-                            id="pharmacistName"
-                            value={dispenseData.pharmacistName}
-                            onChange={(e) => setDispenseData(prev => ({ ...prev, pharmacistName: e.target.value }))}
-                            placeholder="Enter your name"
-                        />
-                    </div>
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[400px]">
+        <DialogHeader>
+          <DialogTitle>Dispense Medication</DialogTitle>
+          <p className="text-sm text-gray-500">
+            Dispensing will update the request status to approved and reduce the inventory quantity.
+          </p>
+        </DialogHeader>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="notes">Notes (Optional)</Label>
-                        <Input
-                            id="notes"
-                            value={dispenseData.notes}
-                            onChange={(e) => setDispenseData(prev => ({ ...prev, notes: e.target.value }))}
-                            placeholder="Additional instructions or notes"
-                        />
-                    </div>
-                </div>
+        <div className="space-y-4 py-4">
+          <div>
+            <Label>Medicine</Label>
+            <div className="font-semibold">
+              {medicationRequest.inventory_item_detail
+                ? `${medicationRequest.inventory_item_detail.generic_name} (${medicationRequest.inventory_item_detail.brand_name})`
+                : 'Unknown Medicine'}
+            </div>
+          </div>
 
-                <DialogFooter>
-                    <Button variant="outline" onClick={onClose}>Cancel</Button>
-                    <Button onClick={handleDispense} className="bg-blue-600 hover:bg-blue-700">Confirm Dispense</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
+          <div>
+            <Label>Quantity to dispense</Label>
+            <Input
+              type="number"
+              min={1}
+              max={inventory.reduce((acc, i) => acc + i.quantity, 0) || 1}
+              value={quantity}
+              onChange={(e) => setQuantity(Number(e.target.value))}
+            />
+            {inventory.length > 0 && (
+              <p className="text-sm text-gray-500">
+                Available stock: {inventory.reduce((acc, i) => acc + i.quantity, 0)}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <Label>Inventory Batches</Label>
+            <ul className="text-sm text-gray-500 list-disc ml-4">
+              {inventory.length > 0 ? (
+                inventory.map((item) => (
+                  <li key={item.id}>
+                    Batch {item.batch_number} - Qty: {item.quantity} - Exp: {item.expiry_date}
+                  </li>
+                ))
+              ) : (
+                <li>No stock available</li>
+              )}
+            </ul>
+          </div>
+        </div>
+
+        <DialogFooter className="flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            className="bg-blue-600 hover:bg-blue-700"
+            onClick={handleDispense}
+            disabled={
+              inventory.length === 0 ||
+              quantity <= 0 ||
+              quantity > inventory.reduce((acc, i) => acc + i.quantity, 0)
+            }
+          >
+            Approve & Update
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 };
