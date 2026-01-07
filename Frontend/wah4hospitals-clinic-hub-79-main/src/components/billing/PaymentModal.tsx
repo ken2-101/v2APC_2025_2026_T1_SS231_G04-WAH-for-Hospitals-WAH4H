@@ -94,15 +94,15 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         window.print();
     };
 
-    const handleClose = () => {
+    const handleCloseReceipt = () => {
         resetForm();
         onClose();
     };
 
     if (showReceipt && lastPayment) {
         return (
-            <Dialog open={isOpen} onOpenChange={handleClose}>
-                <DialogContent className="max-w-md print:shadow-none print:border-none">
+            <Dialog open={isOpen} onOpenChange={() => {}}>
+                <DialogContent className="max-w-md print:shadow-none print:border-none" onInteractOutside={(e) => e.preventDefault()}>
                     <DialogHeader>
                         <DialogTitle className="text-center print:hidden">Payment Successful</DialogTitle>
                     </DialogHeader>
@@ -165,7 +165,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                         <Button variant="outline" onClick={handlePrint}>
                             <Printer className="w-4 h-4 mr-2" /> Print Receipt
                         </Button>
-                        <Button onClick={handleClose}>Close</Button>
+                        <Button onClick={handleCloseReceipt}>Close</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

@@ -13,6 +13,7 @@ import { BillingDashboard } from '@/components/billing/BillingDashboard';
 import { PaymentModal } from '@/components/billing/PaymentModal';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DiscountCheckboxGroup, DiscountType } from '@/components/billing/DiscountCheckboxGroup';
+import { useToast } from '@/hooks/use-toast';
 import billingService, { BillingRecord as APIBillingRecord, MedicineItem as APIMedicine, DiagnosticItem as APIDiagnostic } from '@/services/billingService';
 import { admissionService } from '@/services/admissionService';
 import axios from 'axios';
@@ -78,6 +79,8 @@ interface BillingRecord {
 }
 
 const Billing = () => {
+  const { toast } = useToast();
+  
   // Patient & View State
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [currentView, setCurrentView] = useState<'list' | 'billing' | 'print'>('list');
@@ -556,17 +559,29 @@ const Billing = () => {
 
     // Validation
     if (!patientName || !hospitalId || !admissionDate) {
-      alert('Please fill in all required patient information fields.');
+      toast({
+        variant: 'destructive',
+        title: 'Validation Error',
+        description: 'Please fill in all required patient information fields.',
+      });
       return;
     }
 
     if (!dischargeDate) {
-      alert('Discharge date is required. Please enter the patient discharge date.');
+      toast({
+        variant: 'destructive',
+        title: 'Validation Error',
+        description: 'Discharge date is required. Please enter the patient discharge date.',
+      });
       return;
     }
 
     if (!roomType) {
-      alert('Please select a room type.');
+      toast({
+        variant: 'destructive',
+        title: 'Validation Error',
+        description: 'Please select a room type.',
+      });
       return;
     }
 
@@ -591,17 +606,24 @@ const Billing = () => {
         const updated = await billingService.update(existingBilling.id, apiData);
         const localRecord = convertAPIToLocal(updated);
         setBillingRecords(prev => prev.map(b => b.id === existingBilling.id ? localRecord : b));
-        alert('✓ Billing record updated and finalized successfully.');
+        toast({
+          title: 'Success',
+          description: 'Billing record updated and finalized successfully.',
+        });
       } else {
         // Create new billing record
         const created = await billingService.create(apiData);
         const localRecord = convertAPIToLocal(created);
         setBillingRecords(prev => [...prev, localRecord]);
-        alert('✓ Billing record created and finalized successfully.');
+        toast({
+          title: 'Success',
+          description: 'Billing record created and finalized successfully.',
+        });
       }
 
-      // Refresh dashboard data
+      // Refresh dashboard data and redirect to dashboard
       await fetchBillingData();
+      setCurrentView('list');
     } catch (err: any) {
       console.error('Error saving billing record:', err);
 
@@ -622,7 +644,11 @@ const Billing = () => {
       }
 
       setError(errorMessage);
-      alert('❌ Error: ' + errorMessage);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: errorMessage,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -630,7 +656,11 @@ const Billing = () => {
 
   const handlePrintBill = () => {
     if (!isFinalized) {
-      alert('Please save the bill first before printing.');
+      toast({
+        variant: 'destructive',
+        title: 'Cannot Print',
+        description: 'Please save the bill first before printing.',
+      });
       return;
     }
     setCurrentView('print');
@@ -978,13 +1008,23 @@ const Billing = () => {
                         setPharmacyItemCount(items.length);
 
                         if (items.length > 0) {
-                          alert(`✓ Loaded ${items.length} medicine items from Pharmacy`);
+                          toast({
+                            title: 'Success',
+                            description: `Loaded ${items.length} medicine items from Pharmacy`,
+                          });
                         } else {
-                          alert('No dispensed medicines found in Pharmacy module');
+                          toast({
+                            title: 'Info',
+                            description: 'No dispensed medicines found in Pharmacy module',
+                          });
                         }
                       }
                     } catch (err) {
-                      alert('Failed to load pharmacy charges');
+                      toast({
+                        variant: 'destructive',
+                        title: 'Error',
+                        description: 'Failed to load pharmacy charges',
+                      });
                     } finally {
                       setLoadingCharges(false);
                     }
@@ -1060,13 +1100,23 @@ const Billing = () => {
                         setLaboratoryItemCount(items.length);
 
                         if (items.length > 0) {
-                          alert(`✓ Loaded ${items.length} lab tests from Laboratory`);
+                          toast({
+                            title: 'Success',
+                            description: `Loaded ${items.length} lab tests from Laboratory`,
+                          });
                         } else {
-                          alert('No completed lab tests found in Laboratory module');
+                          toast({
+                            title: 'Info',
+                            description: 'No completed lab tests found in Laboratory module',
+                          });
                         }
                       }
                     } catch (err) {
-                      alert('Failed to load laboratory charges');
+                      toast({
+                        variant: 'destructive',
+                        title: 'Error',
+                        description: 'Failed to load laboratory charges',
+                      });
                     } finally {
                       setLoadingCharges(false);
                     }
@@ -1173,7 +1223,11 @@ const Billing = () => {
         totalBalance={outOfPocketTotal}
         onPaymentSuccess={async (data) => {
           if (!existingBilling) {
-            alert('Please save the billing record first before adding payment.');
+            toast({
+              variant: 'destructive',
+              title: 'Error',
+              description: 'Please save the billing record first before adding payment.',
+            });
             return;
           }
 
@@ -1194,14 +1248,21 @@ const Billing = () => {
             const latestPayment = payments[payments.length - 1];
             const orNumber = latestPayment?.or_number || 'Unknown';
 
-            alert(`Payment Processed! OR Number: ${orNumber}`);
+            toast({
+              title: 'Payment Processed',
+              description: `OR Number: ${orNumber}`,
+            });
             // Refresh billing data to get updated balance
             await fetchBillingData();
-            setIsPaymentModalOpen(false);
+            // Don't close modal - let user view receipt and close manually
           } catch (err: any) {
             console.error('Error processing payment:', err);
             const errorMessage = err?.response?.data?.error || err?.response?.data?.detail || err?.message || 'Failed to process payment. Please try again.';
-            alert(`Payment Error: ${errorMessage}`);
+            toast({
+              variant: 'destructive',
+              title: 'Payment Error',
+              description: errorMessage,
+            });
           } finally {
             setIsLoading(false);
           }
