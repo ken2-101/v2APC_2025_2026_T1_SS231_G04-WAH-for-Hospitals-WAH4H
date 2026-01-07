@@ -3,12 +3,12 @@ import { Bell, User, Search, HelpCircle, X, Plus, Crown, Pencil, Grid } from 'lu
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator 
+  DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,11 +31,11 @@ interface ModernLayoutProps {
   onTabChange: (tabId: string) => void;
 }
 
-const ModernLayout: React.FC<ModernLayoutProps> = ({ 
-  children, 
-  activeTab, 
-  tabs, 
-  onTabChange 
+const ModernLayout: React.FC<ModernLayoutProps> = ({
+  children,
+  activeTab,
+  tabs,
+  onTabChange
 }) => {
   const { isAdminMode, currentRole, availableTabs } = useRole();
   const { user, logout } = useAuth();
@@ -58,7 +58,7 @@ const ModernLayout: React.FC<ModernLayoutProps> = ({
     e.stopPropagation();
     const newOpenTabs = openTabs.filter(id => id !== tabId);
     setOpenTabs(newOpenTabs);
-    
+
     // If closing active tab, switch to another tab
     if (tabId === activeTab) {
       if (newOpenTabs.length > 0) {
@@ -74,7 +74,7 @@ const ModernLayout: React.FC<ModernLayoutProps> = ({
     if (!availableTabs.includes(tabId)) {
       return;
     }
-    
+
     if (!openTabs.includes(tabId)) {
       setOpenTabs([...openTabs, tabId]);
     }
@@ -151,8 +151,8 @@ const ModernLayout: React.FC<ModernLayoutProps> = ({
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {filteredTabs.map((tab) => (
-          <Card 
-            key={tab.id} 
+          <Card
+            key={tab.id}
             className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105"
             onClick={() => handleTabClick(tab.id)}
           >
@@ -193,7 +193,7 @@ const ModernLayout: React.FC<ModernLayoutProps> = ({
       <header className="glass-card border-b border-white/20 sticky top-0 z-40">
         {/* Grid Container: 3 columns on desktop, 2x2 on mobile */}
         <div className="px-6 py-4 grid grid-cols-2 gap-2.5 sm:grid-cols-[1fr_1fr_1fr] items-center">
-          
+
           {/* Item 1: Logo + Title (grid area: one) */}
           <div className="col-start-1 col-end-2 row-start-1 row-end-2 sm:col-start-1 sm:col-end-2">
             <div className="flex items-center space-x-4">
@@ -248,13 +248,12 @@ const ModernLayout: React.FC<ModernLayoutProps> = ({
                       <DropdownMenuItem key={notification.id} className="p-4 border-b last:border-b-0">
                         <div className="flex items-start space-x-3">
                           <div
-                            className={`w-2 h-2 rounded-full mt-2 ${
-                              notification.type === 'success'
+                            className={`w-2 h-2 rounded-full mt-2 ${notification.type === 'success'
                                 ? 'bg-green-500'
                                 : notification.type === 'warning'
-                                ? 'bg-yellow-500'
-                                : 'bg-blue-500'
-                            }`}
+                                  ? 'bg-yellow-500'
+                                  : 'bg-blue-500'
+                              }`}
                           />
                           <div className="flex-1">
                             <p className="text-sm font-medium">{notification.title}</p>
@@ -283,33 +282,47 @@ const ModernLayout: React.FC<ModernLayoutProps> = ({
               {/* User Menu */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-  <Button
-    variant="ghost"
-    size="sm"
-    className="flex items-center space-x-2 hover-lift"
-  >
-    <div className="w-8 h-8 gradient-primary rounded-full flex items-center justify-center">
-      <span className="text-white font-medium">
-        {(() => {
-          if (!user) return 'GU'; // Guest User
-          const first = user.firstName || user.firstName?.split(' ')[0] || '';
-          const last = user.lastName || user.firstName?.split(' ')[1] || '';
-          return `${first[0] || ''}${last[0] || ''}`.toUpperCase();
-        })()}
-      </span>
-    </div>
-    <div className="text-left hidden md:block">
-      <p className="text-sm font-medium">
-        {user
-          ? user.firstName && user.lastName
-            ? `${user.firstName} ${user.lastName}`
-            : user.firstName || 'Unknown User'
-          : 'Guest User'}
-      </p>
-      <p className="text-xs text-gray-500">{getRoleDisplayName()}</p>
-    </div>
-  </Button>
-</DropdownMenuTrigger>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="flex items-center space-x-2 hover-lift"
+                  >
+                    <div className="w-8 h-8 gradient-primary rounded-full flex items-center justify-center">
+                      <span className="text-white font-medium">
+                        {(() => {
+                          if (!user) return 'GU';
+                          // Support both snake_case and camelCase for robustness
+                          const fName = (user as any).firstName || (user as any).first_name || '';
+                          const lName = (user as any).lastName || (user as any).last_name || '';
+
+                          if (fName && lName) {
+                            return `${fName[0]}${lName[0]}`.toUpperCase();
+                          }
+                          if (fName) {
+                            const parts = fName.trim().split(/\s+/);
+                            if (parts.length > 1) {
+                              return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+                            }
+                            return fName[0].toUpperCase();
+                          }
+                          return 'U';
+                        })()}
+                      </span>
+                    </div>
+                    <div className="text-left hidden md:block">
+                      <p className="text-sm font-medium">
+                        {(() => {
+                          if (!user) return 'Guest User';
+                          const fName = (user as any).firstName || (user as any).first_name;
+                          const lName = (user as any).lastName || (user as any).last_name;
+                          if (fName && lName) return `${fName} ${lName}`;
+                          return fName || lName || 'Unknown User';
+                        })()}
+                      </p>
+                      <p className="text-xs text-gray-500">{getRoleDisplayName()}</p>
+                    </div>
+                  </Button>
+                </DropdownMenuTrigger>
 
                 <DropdownMenuContent align="end" className="modal-content">
                   <DropdownMenuItem className="font-medium text-purple-700">
@@ -343,7 +356,7 @@ const ModernLayout: React.FC<ModernLayoutProps> = ({
             {openTabs.map((tabId) => {
               const tab = filteredTabs.find(t => t.id === tabId);
               if (!tab) return null;
-              
+
               return (
                 <div
                   key={tabId}
@@ -367,7 +380,7 @@ const ModernLayout: React.FC<ModernLayoutProps> = ({
                 </div>
               );
             })}
-            
+
             {/* New Tab Button */}
             <button
               onClick={handleNewTab}
@@ -382,14 +395,14 @@ const ModernLayout: React.FC<ModernLayoutProps> = ({
       {/* Main Content */}
       <main className="flex-1 p-6">
         <div className="animate-fade-in">
-          {showNewTabDashboard ? <NewTabDashboard /> : 
-           showModulesCategory ? <ModulesCategory /> : 
-           React.Children.map(children, child => {
-             if (React.isValidElement(child)) {
-               return React.cloneElement(child, { onNavigate: handleTabClick } as any);
-             }
-             return child;
-           })}
+          {showNewTabDashboard ? <NewTabDashboard /> :
+            showModulesCategory ? <ModulesCategory /> :
+              React.Children.map(children, child => {
+                if (React.isValidElement(child)) {
+                  return React.cloneElement(child, { onNavigate: handleTabClick } as any);
+                }
+                return child;
+              })}
         </div>
       </main>
 

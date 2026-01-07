@@ -48,7 +48,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const saved = localStorage.getItem('currentUser');
-    if (saved) setUser(JSON.parse(saved));
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Robustly handle both formats from localStorage
+      const userData: User = {
+        id: parsed.id,
+        email: parsed.email,
+        firstName: parsed.firstName || parsed.first_name,
+        lastName: parsed.lastName || parsed.last_name,
+        role: parsed.role,
+      };
+      setUser(userData);
+    }
   }, []);
 
   const axiosInstance = axios.create({
@@ -66,7 +77,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         password,
       });
 
-      const { tokens, user: userData } = res.data;
+      const { tokens, user: rawUser } = res.data;
+
+      const userData: User = {
+        id: rawUser.id,
+        email: rawUser.email,
+        firstName: rawUser.first_name,
+        lastName: rawUser.last_name,
+        role: rawUser.role,
+      };
 
       localStorage.setItem('accessToken', tokens.access);
       localStorage.setItem('refreshToken', tokens.refresh);
