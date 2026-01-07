@@ -1,4 +1,4 @@
-export type PatientStatus = 'Stable' | 'Critical';
+export type PatientStatus = 'Stable' | 'Critical' | 'Observation' | 'Recovering';
 
 /* =========================
    VITAL SIGNS

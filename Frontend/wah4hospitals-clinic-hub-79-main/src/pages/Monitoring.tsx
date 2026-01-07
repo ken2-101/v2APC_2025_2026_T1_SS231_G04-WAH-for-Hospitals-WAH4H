@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Search } from 'lucide-react';
 import {
   MonitoringAdmission,
   VitalSign,
@@ -9,6 +12,7 @@ import {
 } from '../types/monitoring';
 import { PatientMonitoringPage } from '@/components/monitoring/PatientMonitoringPage';
 import { MonitoringDashboard } from '@/components/monitoring/MonitoringDashboard';
+import { MonitoringFilters } from '@/components/monitoring/MonitoringFilters';
 
 // Detect backend URL dynamically
 const API_BASE =
@@ -27,6 +31,9 @@ const Monitoring: React.FC = () => {
   const [dietary, setDietary] = useState<DietaryOrder | null>(null);
   const [history, setHistory] = useState<HistoryEvent[]>([]);
 
+  const [searchTerm, setSearchTerm] = useState('');
+  const [activeFilters, setActiveFilters] = useState({ ward: '', status: '', doctor: '' });
+
   // Fetch all admissions
   useEffect(() => {
     const fetchAdmissions = async () => {
@@ -37,7 +44,7 @@ const Monitoring: React.FC = () => {
             id: adm.id,
             patientId: adm.patient,
             patientName: adm.patient_details
-              ? `${adm.patient_details.first_name} ${adm.patient_details.last_name}`
+              ? `${adm.patient_details.last_name}, ${adm.patient_details.first_name}`
               : 'Unknown Patient',
             room: adm.room || '—',
             doctorName: adm.attending_physician || 'Unknown Doctor',
@@ -53,10 +60,7 @@ const Monitoring: React.FC = () => {
             assignedNurse: adm.assigned_nurse,
             ward: adm.ward,
           }));
-          console.log('Mapped Admissions:', mapped);
           setAdmissions(mapped);
-        } else {
-          console.error('API did not return an array:', res.data);
         }
       } catch (err) {
         console.error('Error fetching admissions:', err);
@@ -64,6 +68,15 @@ const Monitoring: React.FC = () => {
     };
     fetchAdmissions();
   }, []);
+
+  // Filter handlers
+  const handleFilterChange = (key: string, value: string) => {
+    setActiveFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const clearFilters = () => {
+    setActiveFilters({ ward: '', status: '', doctor: '' });
+  };
 
   // Select an admission
   const handleSelectAdmission = async (adm: MonitoringAdmission) => {
@@ -86,6 +99,21 @@ const Monitoring: React.FC = () => {
       console.error('Error fetching admission details:', err);
     }
   };
+
+  // Filtered admissions
+  const filteredAdmissions = admissions.filter(admission => {
+    const matchesSearch =
+      admission.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      admission.id.toString().includes(searchTerm);
+
+    const matchesWard = !activeFilters.ward || admission.ward === activeFilters.ward;
+    const matchesStatus = !activeFilters.status || admission.status === activeFilters.status;
+    const matchesDoctor = !activeFilters.doctor || admission.attendingPhysician === activeFilters.doctor;
+
+    return matchesSearch && matchesWard && matchesStatus && matchesDoctor;
+  });
+
+  const hasActiveFilters = Object.values(activeFilters).some(Boolean);
 
   // Add new vital (backend-compatible)
   const handleAddVital = async (newVital: Omit<VitalSign, 'id'>) => {
@@ -175,11 +203,43 @@ const Monitoring: React.FC = () => {
   // Render dashboard
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Patient Monitoring</h1>
-        <p className="text-muted-foreground">Track vital signs, clinical notes, and dietary orders for admitted patients</p>
+        <h1 className="text-2xl font-bold text-gray-900">Patient Monitoring</h1>
+        <p className="text-gray-600">Track vital signs, clinical notes, and dietary orders for admitted patients</p>
       </div>
-      <MonitoringDashboard admissions={admissions} onSelectAdmission={handleSelectAdmission} />
+
+      {/* Monitoring Card */}
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <CardTitle className="mb-2 md:mb-0">Patients Under Monitoring</CardTitle>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
+              <div className="relative w-full sm:w-80">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  placeholder="Search patient name or ID..."
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  className="pl-10 w-full"
+                />
+              </div>
+              <MonitoringFilters
+                activeFilters={activeFilters}
+                handleFilterChange={handleFilterChange}
+                clearFilters={clearFilters}
+                hasActiveFilters={hasActiveFilters}
+              />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <MonitoringDashboard
+            admissions={filteredAdmissions}
+            onSelectAdmission={handleSelectAdmission}
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 };
