@@ -12,6 +12,7 @@ import PatientBillPrint from '@/components/billing/PatientBillPrint';
 import { BillingDashboard } from '@/components/billing/BillingDashboard';
 import { PaymentModal } from '@/components/billing/PaymentModal';
 import { Checkbox } from '@/components/ui/checkbox';
+import { DiscountCheckboxGroup, DiscountType } from '@/components/billing/DiscountCheckboxGroup';
 import billingService, { BillingRecord as APIBillingRecord, MedicineItem as APIMedicine, DiagnosticItem as APIDiagnostic } from '@/services/billingService';
 import { admissionService } from '@/services/admissionService';
 import axios from 'axios';
@@ -331,10 +332,13 @@ const Billing = () => {
   const [discount, setDiscount] = useState(0);
   const [philhealthCoverage, setPhilhealthCoverage] = useState(0);
 
-  // Discount Flags
-  const [isSenior, setIsSenior] = useState(false);
-  const [isPWD, setIsPWD] = useState(false);
-  const [isPhilHealthMember, setIsPhilHealthMember] = useState(false);
+  // Discount Flags - Using single state for exclusive selection
+  const [selectedDiscount, setSelectedDiscount] = useState<DiscountType>(null);
+
+  // Derived values for backward compatibility
+  const isSenior = selectedDiscount === 'senior';
+  const isPWD = selectedDiscount === 'pwd';
+  const isPhilHealthMember = selectedDiscount === 'philhealth';
 
   // --- Derived State (Calculations) ---
   const totalRoomCharge = numberOfDays * ratePerDay;
@@ -360,14 +364,14 @@ const Billing = () => {
     // Mock Policy: 20% discount on Vatable items (Room, Prof Fees, Meds, Diagnostics)
     const vatableAmount = totalRoomCharge + totalProfessionalFees + totalMedicineCharge + totalDiagnosticsCharge;
 
-    if (isSenior || isPWD) {
+    if (selectedDiscount === 'senior' || selectedDiscount === 'pwd') {
       newDiscount = vatableAmount * 0.20;
     }
 
     // Only update if it's different to avoid loops (though strict mode might run twice)
     // We also don't want to overwrite manual discount if user keyed it in, but here we assume auto-calc overrides
     setDiscount(newDiscount);
-  }, [isSenior, isPWD, totalRoomCharge, totalProfessionalFees, totalMedicineCharge, totalDiagnosticsCharge]);
+  }, [selectedDiscount, totalRoomCharge, totalProfessionalFees, totalMedicineCharge, totalDiagnosticsCharge]);
 
   // --- Handlers ---
 
@@ -433,7 +437,7 @@ const Billing = () => {
 
           // Auto-detect PhilHealth membership from patient records
           if (patientDetails?.philhealth_id && patientDetails.philhealth_id.trim() !== '') {
-            setIsPhilHealthMember(true);
+            setSelectedDiscount('philhealth');
             // Set default PhilHealth coverage (can be adjusted manually)
             setPhilhealthCoverage(15000); // Default coverage amount
           }
@@ -512,9 +516,7 @@ const Billing = () => {
     setMiscellaneousCharge(0);
     setDiscount(0);
     setPhilhealthCoverage(0);
-    setIsSenior(false);
-    setIsPWD(false);
-    setIsPhilHealthMember(false);
+    setSelectedDiscount(null);
 
     // Reset fetch indicators
     setPharmacyDataFetched(false);
@@ -1117,21 +1119,11 @@ const Billing = () => {
         <CardContent className="space-y-4">
           <Separator />
           <div>
-            <h3 className="font-semibold mb-2">Discounts & Coverage</h3>
-            <div className="flex flex-wrap gap-4 mb-4">
-              <div className="flex items-center space-x-2">
-                <Checkbox id="senior" checked={isSenior} onCheckedChange={(c) => !isFinalized && setIsSenior(c === true)} disabled={isFinalized} />
-                <Label htmlFor="senior">Senior Citizen</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox id="pwd" checked={isPWD} onCheckedChange={(c) => !isFinalized && setIsPWD(c === true)} disabled={isFinalized} />
-                <Label htmlFor="pwd">PWD</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox id="ph" checked={isPhilHealthMember} onCheckedChange={(c) => !isFinalized && setIsPhilHealthMember(c === true)} disabled={isFinalized} />
-                <Label htmlFor="ph">PhilHealth Member</Label>
-              </div>
-            </div>
+            <DiscountCheckboxGroup
+              selectedDiscount={selectedDiscount}
+              onDiscountChange={setSelectedDiscount}
+              disabled={isFinalized}
+            />
             <div className="grid grid-cols-2 gap-4">
               <div><Label>Discount Amount</Label><Input type="number" value={discount} onChange={e => setDiscount(Number(e.target.value))} disabled={isFinalized} /></div>
               <div><Label>PhilHealth Coverage</Label><Input type="number" value={philhealthCoverage} onChange={e => setPhilhealthCoverage(Number(e.target.value))} disabled={isFinalized} /></div>

@@ -62,6 +62,23 @@ class BillingRecordSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['created_at', 'updated_at']
     
+    def validate(self, data):
+        """Validate that only one discount flag is set at a time"""
+        is_senior = data.get('is_senior', False)
+        is_pwd = data.get('is_pwd', False)
+        is_philhealth_member = data.get('is_philhealth_member', False)
+        
+        discount_flags = [is_senior, is_pwd, is_philhealth_member]
+        active_discounts = sum(1 for flag in discount_flags if flag)
+        
+        if active_discounts > 1:
+            raise serializers.ValidationError({
+                'discount': 'Only one discount type can be selected at a time. '
+                           'Please choose either Senior Citizen, PWD, or PhilHealth Member.'
+            })
+        
+        return data
+    
     def create(self, validated_data):
         medicines_data = validated_data.pop('medicines', [])
         diagnostics_data = validated_data.pop('diagnostics', [])
