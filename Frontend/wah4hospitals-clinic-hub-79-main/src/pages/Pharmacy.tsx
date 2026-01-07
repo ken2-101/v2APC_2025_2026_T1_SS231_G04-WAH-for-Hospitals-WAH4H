@@ -5,7 +5,11 @@ import { DispenseModal } from '@/components/pharmacy/DispenseModal';
 import { toast } from 'sonner';
 import { InventoryItem, MedicationRequest } from '@/types/pharmacy';
 
-const API_BASE = 'https://sturdy-adventure-r4pv79wg54qxc5rwx-8000.app.github.dev/api/pharmacy';
+const API_BASE =
+  import.meta.env.BACKEND_PHARMACY_8000 ||
+    import.meta.env.LOCAL_8000
+    ? `${import.meta.env.LOCAL_8000}/api/pharmacy`
+    : import.meta.env.BACKEND_PHARMACY;
 
 const Pharmacy: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'restock' | 'dispense'>('restock');

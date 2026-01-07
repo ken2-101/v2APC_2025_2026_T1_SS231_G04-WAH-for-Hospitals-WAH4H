@@ -27,7 +27,11 @@ interface DietaryTabProps {
 }
 
 const API_BASE =
-  'https://sturdy-adventure-r4pv79wg54qxc5rwx-8000.app.github.dev/api/monitoring/dietary-orders/';
+  import.meta.env.BACKEND_MONITORING_8000
+    ? `${import.meta.env.BACKEND_MONITORING_8000}monitoring/dietary-orders/`
+    : import.meta.env.LOCAL_8000
+      ? `${import.meta.env.LOCAL_8000}/api/monitoring/dietary-orders/`
+      : `${import.meta.env.BACKEND_MONITORING}monitoring/dietary-orders/`;
 
 export const DietaryTab: React.FC<DietaryTabProps> = ({
   admissionId,
@@ -125,7 +129,7 @@ export const DietaryTab: React.FC<DietaryTabProps> = ({
       console.error('Dietary save failed:', err.response?.data);
       alert(
         'Failed to save dietary order:\n' +
-          JSON.stringify(err.response?.data, null, 2)
+        JSON.stringify(err.response?.data, null, 2)
       );
     } finally {
       setSaving(false);

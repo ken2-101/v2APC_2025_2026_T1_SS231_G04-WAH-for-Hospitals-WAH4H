@@ -21,8 +21,14 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
   const [quantity, setQuantity] = useState<number>(1);
   const [notes, setNotes] = useState<string>('');
 
-  const PHARMACY_API = 'https://sturdy-adventure-r4pv79wg54qxc5rwx-8000.app.github.dev/api/pharmacy/inventory/';
-  const REQUEST_API = 'https://sturdy-adventure-r4pv79wg54qxc5rwx-8000.app.github.dev/api/pharmacy/medication-requests/';
+  const API_BASE =
+    import.meta.env.BACKEND_PHARMACY_8000 ||
+      import.meta.env.LOCAL_8000
+      ? `${import.meta.env.LOCAL_8000}/api/pharmacy`
+      : import.meta.env.BACKEND_PHARMACY;
+
+  const PHARMACY_API = `${API_BASE}/inventory/`;
+  const REQUEST_API = `${API_BASE}/medication-requests/`;
 
   // Fetch inventory
   const fetchInventory = async () => {

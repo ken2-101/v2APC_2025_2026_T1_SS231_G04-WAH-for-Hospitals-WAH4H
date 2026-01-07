@@ -339,7 +339,7 @@ const ModernLayout: React.FC<ModernLayoutProps> = ({
 
         {/* Chrome-style Tab Navigation */}
         <div className="px-6 pb-0">
-          <div className="flex items-center space-x-0 overflow-x-auto scrollbar-hide">
+          <div className="flex items-center space-x-1 overflow-x-auto scrollbar-hide">
             {openTabs.map((tabId) => {
               const tab = filteredTabs.find(t => t.id === tabId);
               if (!tab) return null;

@@ -4,7 +4,9 @@ import type { Admission, NewAdmission } from "@/types/admission"; // <- import N
 
 // Create an Axios instance
 const api: AxiosInstance = axios.create({
-  baseURL: "https://sturdy-adventure-r4pv79wg54qxc5rwx-8000.app.github.dev/api/admissions/",
+  baseURL:
+    import.meta.env.BACKEND_ADMISSIONS_8000 ||
+    import.meta.env.BACKEND_ADMISSIONS,
   headers: {
     "Content-Type": "application/json",
   },
@@ -18,7 +20,7 @@ const handleError = (error: any) => {
 export const admissionService = {
   getAll: async (): Promise<Admission[]> => {
     try {
-      const { data } = await api.get<Admission[]>(""); 
+      const { data } = await api.get<Admission[]>("");
       return data;
     } catch (error) {
       handleError(error);

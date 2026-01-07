@@ -17,7 +17,11 @@ interface ClinicalNotesTabProps {
 }
 
 const API_BASE =
-    'https://sturdy-adventure-r4pv79wg54qxc5rwx-8000.app.github.dev/api/monitoring/notes/';
+    import.meta.env.BACKEND_MONITORING_8000
+        ? `${import.meta.env.BACKEND_MONITORING_8000}monitoring/notes/`
+        : import.meta.env.LOCAL_8000
+            ? `${import.meta.env.LOCAL_8000}/api/monitoring/notes/`
+            : `${import.meta.env.BACKEND_MONITORING}monitoring/notes/`;
 
 export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({
     notes,

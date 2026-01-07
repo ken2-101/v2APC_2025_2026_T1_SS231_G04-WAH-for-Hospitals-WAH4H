@@ -74,8 +74,12 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
 
     try {
       // Use numeric ID for PUT request, not patient_id string
+      const API_URL =
+        import.meta.env.BACKEND_PATIENTS_8000 ||
+        (import.meta.env.LOCAL_8000 ? `${import.meta.env.LOCAL_8000}/api/patients/` : import.meta.env.BACKEND_PATIENTS);
+
       await axios.put(
-        `https://sturdy-adventure-r4pv79wg54qxc5rwx-8000.app.github.dev/api/patients/${patient.id}/`,
+        `${API_URL}${patient.id}/`,
         formData
       );
       await fetchPatients();

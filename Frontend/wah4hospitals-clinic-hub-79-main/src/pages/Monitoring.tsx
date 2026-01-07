@@ -12,9 +12,10 @@ import { MonitoringDashboard } from '@/components/monitoring/MonitoringDashboard
 
 // Detect backend URL dynamically
 const API_BASE =
-  process.env.NODE_ENV === 'development'
-    ? 'https://sturdy-adventure-r4pv79wg54qxc5rwx-8000.app.github.dev/api'
-    : '/api';
+  import.meta.env.BACKEND_MONITORING_8000 ||
+    import.meta.env.LOCAL_8000
+    ? `${import.meta.env.LOCAL_8000}/api`
+    : import.meta.env.BACKEND_MONITORING;
 
 const Monitoring: React.FC = () => {
   const [currentView, setCurrentView] = useState<'dashboard' | 'patient'>('dashboard');
@@ -172,7 +173,15 @@ const Monitoring: React.FC = () => {
   }
 
   // Render dashboard
-  return <MonitoringDashboard admissions={admissions} onSelectAdmission={handleSelectAdmission} />;
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">Patient Monitoring</h1>
+        <p className="text-muted-foreground">Track vital signs, clinical notes, and dietary orders for admitted patients</p>
+      </div>
+      <MonitoringDashboard admissions={admissions} onSelectAdmission={handleSelectAdmission} />
+    </div>
+  );
 };
 
 export default Monitoring;

@@ -1,7 +1,10 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'https://sturdy-adventure-r4pv79wg54qxc5rwx-8000.app.github.dev',
+  baseURL:
+    import.meta.env.STURDY_ADVENTURE_BASE_8000 ||
+    import.meta.env.LOCAL_8000 ||
+    import.meta.env.STURDY_ADVENTURE_BASE,
   headers: {
     'Content-Type': 'application/json',
   },
