@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { X } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import type { PatientFormData } from '../../types/patient';
 import addressData from '../../data/addressData.json';
 
@@ -28,84 +28,77 @@ export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> =
   success,
   formError
 }) => {
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-xl font-bold text-gray-900">Register New Patient</h3>
-            <Button variant="ghost" size="sm" onClick={onClose} className="text-gray-500 hover:text-gray-700">
-              <X className="w-5 h-5" />
-            </Button>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-bold text-gray-900">Register New Patient</DialogTitle>
+        </DialogHeader>
+
+        {success && <div className="mb-4 p-3 bg-green-100 text-green-700 rounded-md">{success}</div>}
+        {formError && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">{formError}</div>}
+
+        <form onSubmit={handleRegisterPatient} className="space-y-6">
+          {/* Patient ID */}
+          <div>
+            <label htmlFor="patient_id" className="block text-sm font-medium text-gray-700 mb-1">Patient ID</label>
+            <Input
+              type="text"
+              id="patient_id"
+              name="patient_id"
+              value={formData.patient_id || 'PXXXX'}
+              disabled
+              className="bg-gray-100 cursor-not-allowed"
+            />
           </div>
 
-          {success && <div className="mb-4 p-3 bg-green-100 text-green-700 rounded-md">{success}</div>}
-          {formError && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">{formError}</div>}
-
-          <form onSubmit={handleRegisterPatient} className="space-y-6">
-            {/* Patient ID */}
-            <div>
-              <label htmlFor="patient_id" className="block text-sm font-medium text-gray-700 mb-1">Patient ID</label>
-              <Input
-                type="text"
-                id="patient_id"
-                name="patient_id"
-                value={formData.patient_id || 'PXXXX'}
-                disabled
-                className="bg-gray-100 cursor-not-allowed"
-              />
+          {/* Identity & Personal Info */}
+          <div>
+            <h4 className="text-lg font-semibold mb-3 border-b pb-2">Identity & Personal Information</h4>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <InputField label="Last Name *" name="last_name" value={formData.last_name} onChange={handleFormChange} required />
+              <InputField label="First Name *" name="first_name" value={formData.first_name} onChange={handleFormChange} required />
+              <InputField label="Middle Name" name="middle_name" value={formData.middle_name} onChange={handleFormChange} />
+              <InputField label="Suffix" name="suffix" value={formData.suffix} onChange={handleFormChange} placeholder="e.g., Jr, III" />
             </div>
 
-            {/* Identity & Personal Info */}
-            <div>
-              <h4 className="text-lg font-semibold mb-3 border-b pb-2">Identity & Personal Information</h4>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <InputField label="Last Name *" name="last_name" value={formData.last_name} onChange={handleFormChange} required />
-                <InputField label="First Name *" name="first_name" value={formData.first_name} onChange={handleFormChange} required />
-                <InputField label="Middle Name" name="middle_name" value={formData.middle_name} onChange={handleFormChange} />
-                <InputField label="Suffix" name="suffix" value={formData.suffix} onChange={handleFormChange} placeholder="e.g., Jr, III" />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
-                <SelectField label="Sex *" name="sex" value={formData.sex} onChange={handleFormChange} required options={[
-                  { value: '', label: 'Select' },
-                  { value: 'M', label: 'Male' },
-                  { value: 'F', label: 'Female' }
-                ]}/>
-                <InputField label="Date of Birth *" type="date" name="date_of_birth" value={formData.date_of_birth} onChange={handleFormChange} required />
-                <SelectField label="Civil Status *" name="civil_status" value={formData.civil_status} onChange={handleFormChange} required options={[
-                  { value: '', label: 'Select' },
-                  { value: 'Single', label: 'Single' },
-                  { value: 'Married', label: 'Married' },
-                  { value: 'Divorced', label: 'Divorced' },
-                  { value: 'Widowed', label: 'Widowed' },
-                  { value: 'Separated', label: 'Separated' }
-                ]}/>
-                <InputField label="Nationality *" name="nationality" value={formData.nationality} onChange={handleFormChange} required />
-              </div>
-
-              {/* Occupation */}
-              <div className="mt-4">
-                <InputField label="Occupation" name="occupation" value={formData.occupation} onChange={handleFormChange} placeholder="e.g., Teacher, Engineer" />
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+              <SelectField label="Sex *" name="sex" value={formData.sex} onChange={handleFormChange} required options={[
+                { value: '', label: 'Select' },
+                { value: 'M', label: 'Male' },
+                { value: 'F', label: 'Female' }
+              ]} />
+              <InputField label="Date of Birth *" type="date" name="date_of_birth" value={formData.date_of_birth} onChange={handleFormChange} required />
+              <SelectField label="Civil Status *" name="civil_status" value={formData.civil_status} onChange={handleFormChange} required options={[
+                { value: '', label: 'Select' },
+                { value: 'Single', label: 'Single' },
+                { value: 'Married', label: 'Married' },
+                { value: 'Divorced', label: 'Divorced' },
+                { value: 'Widowed', label: 'Widowed' },
+                { value: 'Separated', label: 'Separated' }
+              ]} />
+              <InputField label="Nationality *" name="nationality" value={formData.nationality} onChange={handleFormChange} required />
             </div>
 
-            {/* Address */}
-            <AddressFields formData={formData} handleFormChange={handleFormChange} />
-
-            {/* Buttons */}
-            <div className="flex justify-end gap-2 pt-4">
-              <Button type="button" variant="outline" onClick={onClose} disabled={formLoading}>Cancel</Button>
-              <Button type="submit" disabled={formLoading} className="bg-blue-600 hover:bg-blue-700">
-                {formLoading ? 'Creating Patient...' : 'Register Patient'}
-              </Button>
+            {/* Occupation */}
+            <div className="mt-4">
+              <InputField label="Occupation" name="occupation" value={formData.occupation} onChange={handleFormChange} placeholder="e.g., Teacher, Engineer" />
             </div>
-          </form>
-        </div>
-      </div>
-    </div>
+          </div>
+
+          {/* Address */}
+          <AddressFields formData={formData} handleFormChange={handleFormChange} />
+
+          {/* Buttons */}
+          <div className="flex justify-end gap-2 pt-4">
+            <Button type="button" variant="outline" onClick={onClose} disabled={formLoading}>Cancel</Button>
+            <Button type="submit" disabled={formLoading} className="bg-blue-600 hover:bg-blue-700">
+              {formLoading ? 'Creating Patient...' : 'Register Patient'}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 };
 
@@ -131,7 +124,7 @@ const SelectField: React.FC<any> = ({ label, options, ...props }) => (
 // --------------------------
 // Address Fields
 // --------------------------
-const AddressFields: React.FC<{formData: PatientFormData, handleFormChange: any}> = ({ formData, handleFormChange }) => (
+const AddressFields: React.FC<{ formData: PatientFormData, handleFormChange: any }> = ({ formData, handleFormChange }) => (
   <div>
     <h4 className="text-lg font-semibold mb-3 border-b pb-2">Address (PSGC)</h4>
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -141,7 +134,7 @@ const AddressFields: React.FC<{formData: PatientFormData, handleFormChange: any}
         value={formData.region}
         onChange={handleFormChange}
         required
-        options={[{ value: '', label: 'Select Region' }, ...addressData.regions.map((r:any) => ({ value: r.code, label: r.name }))]}
+        options={[{ value: '', label: 'Select Region' }, ...addressData.regions.map((r: any) => ({ value: r.code, label: r.name }))]}
       />
       <SelectField
         label="Province *"
@@ -150,7 +143,7 @@ const AddressFields: React.FC<{formData: PatientFormData, handleFormChange: any}
         onChange={handleFormChange}
         required
         disabled={!formData.region}
-        options={[{ value: '', label: 'Select Province' }, ...(formData.region ? addressData.provinces[formData.region]?.map((p:any) => ({ value: p.code, label: p.name })) || [] : [])]}
+        options={[{ value: '', label: 'Select Province' }, ...(formData.region ? addressData.provinces[formData.region]?.map((p: any) => ({ value: p.code, label: p.name })) || [] : [])]}
       />
       <SelectField
         label="City/Municipality *"
@@ -159,7 +152,7 @@ const AddressFields: React.FC<{formData: PatientFormData, handleFormChange: any}
         onChange={handleFormChange}
         required
         disabled={!formData.province}
-        options={[{ value: '', label: 'Select City/Municipality' }, ...(formData.province ? addressData.cities[formData.province]?.map((c:any) => ({ value: c.code, label: c.name })) || [] : [])]}
+        options={[{ value: '', label: 'Select City/Municipality' }, ...(formData.province ? addressData.cities[formData.province]?.map((c: any) => ({ value: c.code, label: c.name })) || [] : [])]}
       />
       <SelectField
         label="Barangay *"
@@ -168,7 +161,7 @@ const AddressFields: React.FC<{formData: PatientFormData, handleFormChange: any}
         onChange={handleFormChange}
         required
         disabled={!formData.city_municipality}
-        options={[{ value: '', label: 'Select Barangay' }, ...(formData.city_municipality ? addressData.barangays[formData.city_municipality] || [] : []).map((b:any) => ({ value: b, label: b }))]}
+        options={[{ value: '', label: 'Select Barangay' }, ...(formData.city_municipality ? addressData.barangays[formData.city_municipality] || [] : []).map((b: any) => ({ value: b, label: b }))]}
       />
     </div>
   </div>
