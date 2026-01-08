@@ -216,7 +216,8 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
   });
 
   const [currentRole, setCurrentRoleState] = useState<UserRole>(() => {
-    return (user?.role as UserRole) || (localStorage.getItem('userRole') as UserRole) || 'doctor';
+    const savedRole = localStorage.getItem('userRole') as UserRole | null;
+    return (savedRole || (user?.role as UserRole) || 'billing_clerk');
   });
 
   const [availableTabs, setAvailableTabs] = useState<string[]>([]);
@@ -228,23 +229,21 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
       const userRole = user.role as UserRole;
       setCurrentRoleState(userRole);
       localStorage.setItem('userRole', userRole);
-      
-      // Update role level
       setRoleLevel(roleHierarchy[userRole] || RoleLevel.SUPPORT);
+    } else {
+      // Reset to minimal access when no authenticated user
+      setCurrentRoleState('billing_clerk');
+      setRoleLevel(RoleLevel.SUPPORT);
+      setIsAdminMode(false);
+      localStorage.setItem('adminMode', JSON.stringify(false));
     }
   }, [user]);
 
   // Update available tabs based on role and admin mode
   useEffect(() => {
     if (isAdminMode && currentRole === 'admin') {
-      // Admin mode grants extended access
-      setAvailableTabs([
-        'dashboard', 'patients', 'admission', 'laboratory', 'philhealth', 'pharmacy',
-        'appointments', 'monitoring', 'discharge', 'inventory', 'compliance', 
-        'statistics', 'erp', 'billing', 'settings'
-      ]);
+      setAvailableTabs(roleAccessConfig.admin);
     } else {
-      // Normal mode - use role-based access
       setAvailableTabs(roleAccessConfig[currentRole] || []);
     }
   }, [isAdminMode, currentRole]);
@@ -287,13 +286,14 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
    * Set current role (security: prevents unauthorized role switching)
    */
   const setCurrentRole = (role: UserRole) => {
-    // Prevent role switching - role must match authenticated user
+    // Role is dictated by authentication; prevent manual override
     if (user?.role && role !== user.role) {
-      console.error('Security violation: Cannot change role manually. Role is determined by authentication.');
+      console.error('Security violation: Role is determined by authentication.');
       return;
     }
     setCurrentRoleState(role);
     localStorage.setItem('userRole', role);
+    setRoleLevel(roleHierarchy[role] || RoleLevel.SUPPORT);
   };
 
   return (

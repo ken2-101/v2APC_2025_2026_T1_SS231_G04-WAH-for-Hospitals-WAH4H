@@ -86,7 +86,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   axiosInstance.interceptors.response.use(
     (response) => response,
     async (error) => {
-      const originalRequest = error.config;
+      const originalRequest: any = error.config;
 
       // If 401 error and we haven't retried yet, attempt token refresh
       if (error.response?.status === 401 && !originalRequest._retry) {
@@ -132,35 +132,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const { tokens, user: rawUser } = res.data;
 
-      const userData: User = {
-        id: rawUser.id,
-        email: rawUser.email,
-        firstName: rawUser.first_name,
-        lastName: rawUser.last_name,
-        role: rawUser.role,
-      };
-
       // Store authentication tokens
       localStorage.setItem('accessToken', tokens.access);
       localStorage.setItem('refreshToken', tokens.refresh);
 
       // Map backend user data to frontend User interface
       const userObj: User = {
-        id: userData.id.toString(),
-        email: userData.email,
-        firstName: userData.first_name,
-        lastName: userData.last_name,
-        role: userData.role as UserRole,
+        id: String(rawUser.id),
+        email: rawUser.email,
+        firstName: rawUser.first_name,
+        lastName: rawUser.last_name,
+        role: rawUser.role as UserRole,
       };
 
       localStorage.setItem('currentUser', JSON.stringify(userObj));
-      localStorage.setItem('userRole', userData.role);
+      localStorage.setItem('userRole', rawUser.role);
 
       setUser(userObj);
 
       toast({
         title: 'Welcome back!',
-        description: `Logged in as ${userData.first_name} ${userData.last_name} (${userData.role})`,
+        description: `Logged in as ${userObj.firstName} ${userObj.lastName} (${userObj.role})`,
       });
 
       return true;
