@@ -189,7 +189,7 @@ export const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="unit_price">Unit Price ($)</Label>
+              <Label htmlFor="unit_price">Unit Price (₱)</Label>
               <Input
                 id="unit_price"
                 type="number"

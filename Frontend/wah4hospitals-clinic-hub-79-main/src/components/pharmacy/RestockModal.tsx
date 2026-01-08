@@ -178,7 +178,7 @@ export const RestockModal: React.FC<RestockModalProps> = ({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="unit_price">Unit Price ($)</Label>
+            <Label htmlFor="unit_price">Unit Price (₱)</Label>
             <Input
               id="unit_price"
               type="number"
