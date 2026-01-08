@@ -12,6 +12,8 @@ import PatientBillPrint from '@/components/billing/PatientBillPrint';
 import { BillingDashboard } from '@/components/billing/BillingDashboard';
 import { PaymentModal } from '@/components/billing/PaymentModal';
 import { Checkbox } from '@/components/ui/checkbox';
+import { DiscountCheckboxGroup, DiscountType } from '@/components/billing/DiscountCheckboxGroup';
+import { useToast } from '@/hooks/use-toast';
 import billingService, { BillingRecord as APIBillingRecord, MedicineItem as APIMedicine, DiagnosticItem as APIDiagnostic } from '@/services/billingService';
 import { admissionService } from '@/services/admissionService';
 import axios from 'axios';
@@ -77,6 +79,8 @@ interface BillingRecord {
 }
 
 const Billing = () => {
+  const { toast } = useToast();
+  
   // Patient & View State
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [currentView, setCurrentView] = useState<'list' | 'billing' | 'print'>('list');
@@ -331,10 +335,13 @@ const Billing = () => {
   const [discount, setDiscount] = useState(0);
   const [philhealthCoverage, setPhilhealthCoverage] = useState(0);
 
-  // Discount Flags
-  const [isSenior, setIsSenior] = useState(false);
-  const [isPWD, setIsPWD] = useState(false);
-  const [isPhilHealthMember, setIsPhilHealthMember] = useState(false);
+  // Discount Flags - Using single state for exclusive selection
+  const [selectedDiscount, setSelectedDiscount] = useState<DiscountType>(null);
+
+  // Derived values for backward compatibility
+  const isSenior = selectedDiscount === 'senior';
+  const isPWD = selectedDiscount === 'pwd';
+  const isPhilHealthMember = selectedDiscount === 'philhealth';
 
   // --- Derived State (Calculations) ---
   const totalRoomCharge = numberOfDays * ratePerDay;
@@ -360,14 +367,14 @@ const Billing = () => {
     // Mock Policy: 20% discount on Vatable items (Room, Prof Fees, Meds, Diagnostics)
     const vatableAmount = totalRoomCharge + totalProfessionalFees + totalMedicineCharge + totalDiagnosticsCharge;
 
-    if (isSenior || isPWD) {
+    if (selectedDiscount === 'senior' || selectedDiscount === 'pwd') {
       newDiscount = vatableAmount * 0.20;
     }
 
     // Only update if it's different to avoid loops (though strict mode might run twice)
     // We also don't want to overwrite manual discount if user keyed it in, but here we assume auto-calc overrides
     setDiscount(newDiscount);
-  }, [isSenior, isPWD, totalRoomCharge, totalProfessionalFees, totalMedicineCharge, totalDiagnosticsCharge]);
+  }, [selectedDiscount, totalRoomCharge, totalProfessionalFees, totalMedicineCharge, totalDiagnosticsCharge]);
 
   // --- Handlers ---
 
@@ -433,7 +440,7 @@ const Billing = () => {
 
           // Auto-detect PhilHealth membership from patient records
           if (patientDetails?.philhealth_id && patientDetails.philhealth_id.trim() !== '') {
-            setIsPhilHealthMember(true);
+            setSelectedDiscount('philhealth');
             // Set default PhilHealth coverage (can be adjusted manually)
             setPhilhealthCoverage(15000); // Default coverage amount
           }
@@ -512,9 +519,7 @@ const Billing = () => {
     setMiscellaneousCharge(0);
     setDiscount(0);
     setPhilhealthCoverage(0);
-    setIsSenior(false);
-    setIsPWD(false);
-    setIsPhilHealthMember(false);
+    setSelectedDiscount(null);
 
     // Reset fetch indicators
     setPharmacyDataFetched(false);
@@ -554,17 +559,29 @@ const Billing = () => {
 
     // Validation
     if (!patientName || !hospitalId || !admissionDate) {
-      alert('Please fill in all required patient information fields.');
+      toast({
+        variant: 'destructive',
+        title: 'Validation Error',
+        description: 'Please fill in all required patient information fields.',
+      });
       return;
     }
 
     if (!dischargeDate) {
-      alert('Discharge date is required. Please enter the patient discharge date.');
+      toast({
+        variant: 'destructive',
+        title: 'Validation Error',
+        description: 'Discharge date is required. Please enter the patient discharge date.',
+      });
       return;
     }
 
     if (!roomType) {
-      alert('Please select a room type.');
+      toast({
+        variant: 'destructive',
+        title: 'Validation Error',
+        description: 'Please select a room type.',
+      });
       return;
     }
 
@@ -589,17 +606,24 @@ const Billing = () => {
         const updated = await billingService.update(existingBilling.id, apiData);
         const localRecord = convertAPIToLocal(updated);
         setBillingRecords(prev => prev.map(b => b.id === existingBilling.id ? localRecord : b));
-        alert('✓ Billing record updated and finalized successfully.');
+        toast({
+          title: 'Success',
+          description: 'Billing record updated and finalized successfully.',
+        });
       } else {
         // Create new billing record
         const created = await billingService.create(apiData);
         const localRecord = convertAPIToLocal(created);
         setBillingRecords(prev => [...prev, localRecord]);
-        alert('✓ Billing record created and finalized successfully.');
+        toast({
+          title: 'Success',
+          description: 'Billing record created and finalized successfully.',
+        });
       }
 
-      // Refresh dashboard data
+      // Refresh dashboard data and redirect to dashboard
       await fetchBillingData();
+      setCurrentView('list');
     } catch (err: any) {
       console.error('Error saving billing record:', err);
 
@@ -620,7 +644,11 @@ const Billing = () => {
       }
 
       setError(errorMessage);
-      alert('❌ Error: ' + errorMessage);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: errorMessage,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -628,7 +656,11 @@ const Billing = () => {
 
   const handlePrintBill = () => {
     if (!isFinalized) {
-      alert('Please save the bill first before printing.');
+      toast({
+        variant: 'destructive',
+        title: 'Cannot Print',
+        description: 'Please save the bill first before printing.',
+      });
       return;
     }
     setCurrentView('print');
@@ -976,13 +1008,23 @@ const Billing = () => {
                         setPharmacyItemCount(items.length);
 
                         if (items.length > 0) {
-                          alert(`✓ Loaded ${items.length} medicine items from Pharmacy`);
+                          toast({
+                            title: 'Success',
+                            description: `Loaded ${items.length} medicine items from Pharmacy`,
+                          });
                         } else {
-                          alert('No dispensed medicines found in Pharmacy module');
+                          toast({
+                            title: 'Info',
+                            description: 'No dispensed medicines found in Pharmacy module',
+                          });
                         }
                       }
                     } catch (err) {
-                      alert('Failed to load pharmacy charges');
+                      toast({
+                        variant: 'destructive',
+                        title: 'Error',
+                        description: 'Failed to load pharmacy charges',
+                      });
                     } finally {
                       setLoadingCharges(false);
                     }
@@ -1058,13 +1100,23 @@ const Billing = () => {
                         setLaboratoryItemCount(items.length);
 
                         if (items.length > 0) {
-                          alert(`✓ Loaded ${items.length} lab tests from Laboratory`);
+                          toast({
+                            title: 'Success',
+                            description: `Loaded ${items.length} lab tests from Laboratory`,
+                          });
                         } else {
-                          alert('No completed lab tests found in Laboratory module');
+                          toast({
+                            title: 'Info',
+                            description: 'No completed lab tests found in Laboratory module',
+                          });
                         }
                       }
                     } catch (err) {
-                      alert('Failed to load laboratory charges');
+                      toast({
+                        variant: 'destructive',
+                        title: 'Error',
+                        description: 'Failed to load laboratory charges',
+                      });
                     } finally {
                       setLoadingCharges(false);
                     }
@@ -1117,21 +1169,11 @@ const Billing = () => {
         <CardContent className="space-y-4">
           <Separator />
           <div>
-            <h3 className="font-semibold mb-2">Discounts & Coverage</h3>
-            <div className="flex flex-wrap gap-4 mb-4">
-              <div className="flex items-center space-x-2">
-                <Checkbox id="senior" checked={isSenior} onCheckedChange={(c) => !isFinalized && setIsSenior(c === true)} disabled={isFinalized} />
-                <Label htmlFor="senior">Senior Citizen</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox id="pwd" checked={isPWD} onCheckedChange={(c) => !isFinalized && setIsPWD(c === true)} disabled={isFinalized} />
-                <Label htmlFor="pwd">PWD</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox id="ph" checked={isPhilHealthMember} onCheckedChange={(c) => !isFinalized && setIsPhilHealthMember(c === true)} disabled={isFinalized} />
-                <Label htmlFor="ph">PhilHealth Member</Label>
-              </div>
-            </div>
+            <DiscountCheckboxGroup
+              selectedDiscount={selectedDiscount}
+              onDiscountChange={setSelectedDiscount}
+              disabled={isFinalized}
+            />
             <div className="grid grid-cols-2 gap-4">
               <div><Label>Discount Amount</Label><Input type="number" value={discount} onChange={e => setDiscount(Number(e.target.value))} disabled={isFinalized} /></div>
               <div><Label>PhilHealth Coverage</Label><Input type="number" value={philhealthCoverage} onChange={e => setPhilhealthCoverage(Number(e.target.value))} disabled={isFinalized} /></div>
@@ -1181,7 +1223,11 @@ const Billing = () => {
         totalBalance={outOfPocketTotal}
         onPaymentSuccess={async (data) => {
           if (!existingBilling) {
-            alert('Please save the billing record first before adding payment.');
+            toast({
+              variant: 'destructive',
+              title: 'Error',
+              description: 'Please save the billing record first before adding payment.',
+            });
             return;
           }
 
@@ -1202,14 +1248,21 @@ const Billing = () => {
             const latestPayment = payments[payments.length - 1];
             const orNumber = latestPayment?.or_number || 'Unknown';
 
-            alert(`Payment Processed! OR Number: ${orNumber}`);
+            toast({
+              title: 'Payment Processed',
+              description: `OR Number: ${orNumber}`,
+            });
             // Refresh billing data to get updated balance
             await fetchBillingData();
-            setIsPaymentModalOpen(false);
+            // Don't close modal - let user view receipt and close manually
           } catch (err: any) {
             console.error('Error processing payment:', err);
             const errorMessage = err?.response?.data?.error || err?.response?.data?.detail || err?.message || 'Failed to process payment. Please try again.';
-            alert(`Payment Error: ${errorMessage}`);
+            toast({
+              variant: 'destructive',
+              title: 'Payment Error',
+              description: errorMessage,
+            });
           } finally {
             setIsLoading(false);
           }
