@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 from patients.models import Patient
 from admissions.models import Admission
 
@@ -68,6 +69,23 @@ class BillingRecord(models.Model):
     
     def __str__(self):
         return f"Billing Record {self.id} - {self.patient_name}"
+    
+    def clean(self):
+        """Validate that only one discount flag is set at a time"""
+        super().clean()
+        discount_flags = [self.is_senior, self.is_pwd, self.is_philhealth_member]
+        active_discounts = sum(1 for flag in discount_flags if flag)
+        
+        if active_discounts > 1:
+            raise ValidationError(
+                'Only one discount type can be selected at a time. '
+                'Please choose either Senior Citizen, PWD, or PhilHealth Member.'
+            )
+    
+    def save(self, *args, **kwargs):
+        """Override save to run validation"""
+        self.full_clean()
+        super().save(*args, **kwargs)
     
     @property
     def total_room_charge(self):
