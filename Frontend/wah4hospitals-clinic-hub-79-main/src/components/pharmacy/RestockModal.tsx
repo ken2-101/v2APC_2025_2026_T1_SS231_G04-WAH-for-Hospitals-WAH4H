@@ -14,11 +14,11 @@ interface RestockModalProps {
   onInventoryUpdate: (item: InventoryItem) => void; // Updated type: full InventoryItem
 }
 
-const API_BASE =
+const API_BASE = (
   import.meta.env.BACKEND_PHARMACY_8000 ||
-    import.meta.env.LOCAL_8000
-    ? `${import.meta.env.LOCAL_8000}/api/pharmacy`
-    : import.meta.env.BACKEND_PHARMACY;
+  import.meta.env.BACKEND_PHARMACY ||
+  'http://localhost:8000/api/pharmacy'
+).replace(/\/$/, ''); // Remove trailing slash if present
 
 export const RestockModal: React.FC<RestockModalProps> = ({
   isOpen,
@@ -30,8 +30,11 @@ export const RestockModal: React.FC<RestockModalProps> = ({
     brand_name: '',
     description: '',
     quantity: '',
+    minimum_stock_level: '10',
+    unit_price: '0',
     batch_number: '',
     expiry_date: '',
+    manufacturer: '',
   });
 
   const handleRestock = async () => {
@@ -60,8 +63,11 @@ export const RestockModal: React.FC<RestockModalProps> = ({
         brand_name: itemData.brand_name,
         description: itemData.description,
         quantity,
+        minimum_stock_level: Number(itemData.minimum_stock_level),
+        unit_price: Number(itemData.unit_price),
         batch_number: itemData.batch_number,
         expiry_date: itemData.expiry_date,
+        manufacturer: itemData.manufacturer,
       };
 
       const res = await axios.post<InventoryItem>(`${API_BASE}/inventory/`, payload);
@@ -75,8 +81,11 @@ export const RestockModal: React.FC<RestockModalProps> = ({
         brand_name: '',
         description: '',
         quantity: '',
+        minimum_stock_level: '10',
+        unit_price: '0',
         batch_number: '',
         expiry_date: '',
+        manufacturer: '',
       });
       onClose();
     } catch (err: any) {
@@ -119,6 +128,17 @@ export const RestockModal: React.FC<RestockModalProps> = ({
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="manufacturer">Manufacturer (Optional)</Label>
+            <Input
+              id="manufacturer"
+              value={itemData.manufacturer}
+              onChange={(e) =>
+                setItemData((prev) => ({ ...prev, manufacturer: e.target.value }))
+              }
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="description">Description (Optional)</Label>
             <Input
               id="description"
@@ -129,15 +149,44 @@ export const RestockModal: React.FC<RestockModalProps> = ({
             />
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="quantity">Quantity</Label>
+              <Input
+                id="quantity"
+                type="number"
+                min={1}
+                value={itemData.quantity}
+                onChange={(e) =>
+                  setItemData((prev) => ({ ...prev, quantity: e.target.value }))
+                }
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="minimum_stock_level">Min Stock Level</Label>
+              <Input
+                id="minimum_stock_level"
+                type="number"
+                min={0}
+                value={itemData.minimum_stock_level}
+                onChange={(e) =>
+                  setItemData((prev) => ({ ...prev, minimum_stock_level: e.target.value }))
+                }
+              />
+            </div>
+          </div>
+
           <div className="space-y-2">
-            <Label htmlFor="quantity">Quantity</Label>
+            <Label htmlFor="unit_price">Unit Price (₱)</Label>
             <Input
-              id="quantity"
+              id="unit_price"
               type="number"
-              min={1}
-              value={itemData.quantity}
+              min={0}
+              step="0.01"
+              value={itemData.unit_price}
               onChange={(e) =>
-                setItemData((prev) => ({ ...prev, quantity: e.target.value }))
+                setItemData((prev) => ({ ...prev, unit_price: e.target.value }))
               }
             />
           </div>
