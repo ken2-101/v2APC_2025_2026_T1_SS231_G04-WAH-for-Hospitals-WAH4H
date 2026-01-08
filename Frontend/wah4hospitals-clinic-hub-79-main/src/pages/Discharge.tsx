@@ -92,19 +92,6 @@ const Discharge = () => {
   });
 
   const [isAddRecordModalOpen, setIsAddRecordModalOpen] = useState(false);
-  const [newRecordForm, setNewRecordForm] = useState({
-    patient: '',
-    patientName: '',
-    room: '',
-    admissionDate: '',
-    condition: '',
-    physician: '',
-    department: '',
-    age: '',
-    estimatedDischarge: ''
-  });
-
-  const [isBillingImportModalOpen, setIsBillingImportModalOpen] = useState(false);
   const [billingPatients, setBillingPatients] = useState<any[]>([]);
   const [selectedBillingIds, setSelectedBillingIds] = useState<number[]>([]);
   const [isLoadingBilling, setIsLoadingBilling] = useState(false);
@@ -145,62 +132,16 @@ const Discharge = () => {
     setIsDischargeModalOpen(true);
   };
 
-  const handleAddNewRecord = () => {
-    if (!newRecordForm.patientName || !newRecordForm.room || !newRecordForm.admissionDate ||
-      !newRecordForm.condition || !newRecordForm.physician || !newRecordForm.department ||
-      !newRecordForm.age) {
-      alert('Please fill in all required fields');
-      return;
-    }
-
-    const newRecord: PendingPatient = {
-      id: Date.now(),
-      patientName: newRecordForm.patientName,
-      room: newRecordForm.room,
-      admissionDate: newRecordForm.admissionDate,
-      condition: newRecordForm.condition,
-      status: 'pending',
-      physician: newRecordForm.physician,
-      department: newRecordForm.department,
-      age: parseInt(newRecordForm.age),
-      estimatedDischarge: newRecordForm.estimatedDischarge || '',
-      requirements: {
-        finalDiagnosis: false,
-        physicianSignature: false,
-        medicationReconciliation: false,
-        dischargeSummary: false,
-        billingClearance: false,
-        nursingNotes: false,
-        followUpScheduled: false
-      }
-    };
-
-    setPendingDischarges(prev => [...prev, newRecord]);
-    setIsAddRecordModalOpen(false);
-    setNewRecordForm({
-      patient: '',
-      patientName: '',
-      room: '',
-      admissionDate: '',
-      condition: '',
-      physician: '',
-      department: '',
-      age: '',
-      estimatedDischarge: ''
-    });
-    alert(`Discharge record created successfully for ${newRecordForm.patientName}`);
-  };
-
   const handleLoadBillingPatients = async () => {
     setIsLoadingBilling(true);
     try {
       const response = await dischargeService.getFromBilling();
       setBillingPatients(response.patients || []);
       setSelectedBillingIds([]);
-      setIsBillingImportModalOpen(true);
+      setIsAddRecordModalOpen(true);
     } catch (error) {
       console.error('Error loading billing patients:', error);
-      alert('Failed to load patients from billing');
+      alert('Failed to load patients from billing records. Please try again.');
     } finally {
       setIsLoadingBilling(false);
     }
@@ -216,39 +157,33 @@ const Discharge = () => {
 
   const handleImportFromBilling = async () => {
     if (selectedBillingIds.length === 0) {
-      alert('Please select at least one patient to import');
+      alert('Please select at least one patient to add');
       return;
     }
 
+    setIsLoadingBilling(true);
     try {
       const response = await dischargeService.createFromBilling(selectedBillingIds);
-      alert(`Successfully imported ${response.created} patient(s) for discharge`);
-
-      // Reload the discharge records
-      // In a real app, you'd fetch from the API here
-      if (response.records && response.records.length > 0) {
-        const newRecords = response.records.map((record: any) => ({
-          id: record.id,
-          patientName: record.patientName,
-          room: record.room,
-          admissionDate: record.admissionDate,
-          condition: record.condition,
-          status: record.status,
-          physician: record.physician,
-          department: record.department,
-          age: record.age,
-          estimatedDischarge: record.estimatedDischarge || '',
-          requirements: record.requirements
-        }));
-        setPendingDischarges(prev => [...prev, ...newRecords]);
+      
+      if (response.errors && response.errors.length > 0) {
+        const errorMessages = response.errors.map((err: any) => err.error).join('\n');
+        alert(`Some records could not be added:\n${errorMessages}\n\nSuccessfully added: ${response.created} patient(s)`);
+      } else {
+        alert(`Successfully added ${response.created} patient(s) to discharge queue`);
       }
 
-      setIsBillingImportModalOpen(false);
+      // Reload pending discharges
+      const pendingData = await dischargeService.getPending();
+      setPendingDischarges(pendingData);
+
+      setIsAddRecordModalOpen(false);
       setBillingPatients([]);
       setSelectedBillingIds([]);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error importing from billing:', error);
-      alert('Failed to import patients from billing');
+      alert(error?.response?.data?.error || 'Failed to add patients from billing');
+    } finally {
+      setIsLoadingBilling(false);
     }
   };
 
@@ -340,18 +275,19 @@ const Discharge = () => {
           <Button
             onClick={handleLoadBillingPatients}
             disabled={isLoadingBilling}
-            variant="outline"
-            className="border-green-600 text-green-600 hover:bg-green-50"
-          >
-            <Download className="w-4 h-4 mr-2" />
-            {isLoadingBilling ? 'Loading...' : 'Import from Billing'}
-          </Button>
-          <Button
-            onClick={() => setIsAddRecordModalOpen(true)}
             className="bg-primary hover:bg-primary/90 flex-1 sm:flex-none"
           >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Record
+            {isLoadingBilling ? (
+              <>
+                <AlertTriangle className="w-4 h-4 mr-2 animate-spin" />
+                Loading...
+              </>
+            ) : (
+              <>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Record
+              </>
+            )}
           </Button>
           {canPrint() ? (
             <PrintButton
@@ -694,146 +630,30 @@ const Discharge = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Add New Discharge Record Modal */}
+      {/* Add New Discharge Record Modal - Import from Billing */}
       <Dialog open={isAddRecordModalOpen} onOpenChange={setIsAddRecordModalOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Add New Discharge Record</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="patientName">Patient Name *</Label>
-                <Input
-                  id="patientName"
-                  value={newRecordForm.patientName}
-                  onChange={(e) => setNewRecordForm({ ...newRecordForm, patientName: e.target.value })}
-                  placeholder="Enter patient name"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="room">Room *</Label>
-                <Input
-                  id="room"
-                  value={newRecordForm.room}
-                  onChange={(e) => setNewRecordForm({ ...newRecordForm, room: e.target.value })}
-                  placeholder="e.g., 101A"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="admissionDate">Admission Date *</Label>
-                <Input
-                  id="admissionDate"
-                  type="date"
-                  value={newRecordForm.admissionDate}
-                  onChange={(e) => setNewRecordForm({ ...newRecordForm, admissionDate: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="age">Age *</Label>
-                <Input
-                  id="age"
-                  type="number"
-                  value={newRecordForm.age}
-                  onChange={(e) => setNewRecordForm({ ...newRecordForm, age: e.target.value })}
-                  placeholder="Enter age"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="condition">Condition *</Label>
-                <Input
-                  id="condition"
-                  value={newRecordForm.condition}
-                  onChange={(e) => setNewRecordForm({ ...newRecordForm, condition: e.target.value })}
-                  placeholder="e.g., Pneumonia"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="physician">Physician *</Label>
-                <Input
-                  id="physician"
-                  value={newRecordForm.physician}
-                  onChange={(e) => setNewRecordForm({ ...newRecordForm, physician: e.target.value })}
-                  placeholder="e.g., Dr. Smith"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="department">Department *</Label>
-                <Input
-                  id="department"
-                  value={newRecordForm.department}
-                  onChange={(e) => setNewRecordForm({ ...newRecordForm, department: e.target.value })}
-                  placeholder="e.g., Cardiology"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="estimatedDischarge">Estimated Discharge Date</Label>
-                <Input
-                  id="estimatedDischarge"
-                  type="date"
-                  value={newRecordForm.estimatedDischarge}
-                  onChange={(e) => setNewRecordForm({ ...newRecordForm, estimatedDischarge: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <Alert>
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription className="text-sm">
-                New discharge records will be created with "Pending" status. All discharge requirements will need to be completed before the patient can be discharged.
-              </AlertDescription>
-            </Alert>
-
-            <div className="flex justify-end space-x-3 pt-4">
-              <Button variant="outline" onClick={() => {
-                setIsAddRecordModalOpen(false);
-                setNewRecordForm({
-                  patient: '',
-                  patientName: '',
-                  room: '',
-                  admissionDate: '',
-                  condition: '',
-                  physician: '',
-                  department: '',
-                  age: '',
-                  estimatedDischarge: ''
-                });
-              }}>
-                Cancel
-              </Button>
-              <Button onClick={handleAddNewRecord} className="bg-primary hover:bg-primary/90">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Record
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Import from Billing Modal */}
-      <Dialog open={isBillingImportModalOpen} onOpenChange={setIsBillingImportModalOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Import Patients from Billing</DialogTitle>
+            <DialogTitle>Add Discharge Record from Billing</DialogTitle>
+            <p className="text-sm text-muted-foreground mt-2">
+              Select patients from existing billing records to create discharge records
+            </p>
           </DialogHeader>
           <div className="space-y-6">
             <Alert>
-              <AlertTriangle className="h-4 w-4" />
+              <AlertTriangle className="h-4 w-4 text-blue-600" />
               <AlertDescription className="text-sm">
-                Select patients with billing records to create discharge records. Only patients without existing discharge records are shown.
+                Select patients below to add them to the discharge queue for processing
               </AlertDescription>
             </Alert>
 
             {billingPatients.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No eligible patients found in billing records.
+              <div className="text-center py-12">
+                <FileText className="w-16 h-16 mx-auto text-muted-foreground/50 mb-4" />
+                <p className="text-lg font-medium text-muted-foreground">No patients available</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  All billing records have been added to discharge queue
+                </p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -856,77 +676,88 @@ const Discharge = () => {
                   </Button>
                 </div>
 
-                {billingPatients.map((patient) => (
-                  <div
-                    key={patient.billing_id}
-                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 cursor-pointer"
-                    onClick={() => handleToggleBillingPatient(patient.billing_id)}
-                  >
-                    <div className="flex items-center gap-4 flex-1">
-                      <Checkbox
-                        checked={selectedBillingIds.includes(patient.billing_id)}
-                        onCheckedChange={() => handleToggleBillingPatient(patient.billing_id)}
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-semibold">{patient.patient_name}</h4>
-                          <Badge variant="outline" className="text-xs">
-                            {patient.hospital_id}
-                          </Badge>
-                        </div>
-                        <div className="grid grid-cols-3 gap-4 text-sm text-muted-foreground">
-                          <div>
-                            <span className="font-medium">Room:</span> {patient.room}
-                          </div>
-                          <div>
-                            <span className="font-medium">Admission:</span> {patient.admission_date}
-                          </div>
-                          <div>
-                            <span className="font-medium">Payment:</span>{' '}
-                            <Badge
-                              variant="outline"
-                              className={
-                                patient.payment_status === 'Paid'
-                                  ? 'bg-green-100 text-green-800 border-green-200'
-                                  : patient.payment_status === 'Partial'
-                                    ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
-                                    : 'bg-red-100 text-red-800 border-red-200'
-                              }
-                            >
-                              {patient.payment_status}
+                <div className="max-h-96 overflow-y-auto space-y-2">
+                  {billingPatients.map((patient) => (
+                    <div
+                      key={patient.billing_id}
+                      className={`flex items-start p-4 border-2 rounded-lg transition-all cursor-pointer ${
+                        selectedBillingIds.includes(patient.billing_id)
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                      }`}
+                      onClick={() => handleToggleBillingPatient(patient.billing_id)}
+                    >
+                      <div className="flex items-start gap-4 flex-1">
+                        <Checkbox
+                          checked={selectedBillingIds.includes(patient.billing_id)}
+                          onCheckedChange={() => handleToggleBillingPatient(patient.billing_id)}
+                          className="mt-1"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <h4 className="font-semibold text-base">{patient.patient_name}</h4>
+                            <Badge variant="outline" className="text-xs">
+                              ID: {patient.hospital_id}
                             </Badge>
                           </div>
-                        </div>
-                        {patient.running_balance && parseFloat(patient.running_balance) > 0 && (
-                          <div className="text-sm text-muted-foreground mt-1">
-                            <span className="font-medium">Balance:</span> ₱{parseFloat(patient.running_balance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Room:</span>
+                              <span className="ml-2 font-medium">{patient.room}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Age:</span>
+                              <span className="ml-2 font-medium">{patient.age} years</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Department:</span>
+                              <span className="ml-2 font-medium">{patient.department}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Admission:</span>
+                              <span className="ml-2 font-medium">{patient.admission_date}</span>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-muted-foreground">Physician:</span>
+                              <span className="ml-2 font-medium">{patient.attending_physician}</span>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-muted-foreground">Condition:</span>
+                              <span className="ml-2 font-medium">{patient.condition}</span>
+                            </div>
                           </div>
-                        )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
 
-            <div className="flex justify-end space-x-3 pt-4">
-              <Button
-                variant="outline"
+            <div className="flex justify-end space-x-3 pt-4 border-t">
+              <Button 
+                variant="outline" 
                 onClick={() => {
-                  setIsBillingImportModalOpen(false);
+                  setIsAddRecordModalOpen(false);
                   setBillingPatients([]);
                   setSelectedBillingIds([]);
                 }}
               >
                 Cancel
               </Button>
-              <Button
+              <Button 
                 onClick={handleImportFromBilling}
-                disabled={selectedBillingIds.length === 0}
+                disabled={selectedBillingIds.length === 0 || isLoadingBilling}
                 className="bg-primary hover:bg-primary/90"
               >
-                <Download className="w-4 h-4 mr-2" />
-                Import {selectedBillingIds.length} Patient(s)
+                {isLoadingBilling ? (
+                  <>Processing...</>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4 mr-2" />
+                    Add {selectedBillingIds.length} Record{selectedBillingIds.length !== 1 ? 's' : ''}
+                  </>
+                )}
               </Button>
             </div>
           </div>
