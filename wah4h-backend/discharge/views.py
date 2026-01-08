@@ -107,19 +107,16 @@ class DischargeRecordViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get', 'post'])
     def from_billing(self, request):
         """
-        GET: Get finalized billing records that are eligible for discharge.
+        GET: Get billing records that are eligible for discharge.
         POST: Create discharge records from selected billing records.
-        Only finalized billing records can create discharge records.
         """
         if request.method == 'GET':
-            # Get finalized billing records that don't have discharge records yet
-            finalized_billings = BillingRecord.objects.filter(
-                is_finalized=True
-            ).select_related('patient', 'admission')
+            # Get all billing records that don't have discharge records yet
+            all_billings = BillingRecord.objects.all().select_related('patient', 'admission')
             
             # Filter out those that already have discharge records
             existing_discharge_patient_ids = DischargeRecord.objects.values_list('patient_id', flat=True)
-            eligible_billings = finalized_billings.exclude(patient_id__in=existing_discharge_patient_ids)
+            eligible_billings = all_billings.exclude(patient_id__in=existing_discharge_patient_ids)
             
             # Use the serializer
             serializer = BillingPatientSerializer(eligible_billings, many=True)
@@ -143,15 +140,8 @@ class DischargeRecordViewSet(viewsets.ModelViewSet):
         
         for billing_id in billing_ids:
             try:
-                # Validate billing record exists and is finalized
+                # Get billing record
                 billing = get_object_or_404(BillingRecord, id=billing_id)
-                
-                if not billing.is_finalized:
-                    errors.append({
-                        'billing_id': billing_id,
-                        'error': f'Billing record {billing_id} is not finalized. Only finalized bills can proceed to discharge.'
-                    })
-                    continue
                 
                 # Check if discharge record already exists
                 if DischargeRecord.objects.filter(patient=billing.patient).exists():
@@ -174,7 +164,7 @@ class DischargeRecordViewSet(viewsets.ModelViewSet):
                     department=billing.admission.ward if billing.admission else 'N/A',
                     age=self._calculate_age(billing.patient.date_of_birth) if billing.patient.date_of_birth else 0,
                     estimated_discharge=billing.discharge_date,
-                    billing_clearance=True,  # Billing is cleared since it's finalized
+                    billing_clearance=True,
                     billing_status='cleared'
                 )
                 
@@ -217,8 +207,7 @@ class DischargeRecordViewSet(viewsets.ModelViewSet):
     
     def create(self, request, *args, **kwargs):
         """
-        Override create to validate that discharge records must come from billing.
-        Direct creation without billing validation is not allowed.
+        Override create to validate that discharge records should come from billing.
         """
         patient_id = request.data.get('patient')
         
@@ -228,17 +217,14 @@ class DischargeRecordViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Validate that patient has a finalized billing record
+        # Validate that patient has a billing record
         try:
             patient = Patient.objects.get(id=patient_id)
-            billing_record = BillingRecord.objects.filter(
-                patient=patient,
-                is_finalized=True
-            ).first()
+            billing_record = BillingRecord.objects.filter(patient=patient).first()
             
             if not billing_record:
                 return Response(
-                    {'error': 'Patient must have a finalized billing record before discharge eligibility. Please finalize billing first.'},
+                    {'error': 'Patient must have a billing record before discharge. Please create billing record first.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             

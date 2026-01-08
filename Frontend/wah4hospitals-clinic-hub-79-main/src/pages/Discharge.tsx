@@ -141,7 +141,7 @@ const Discharge = () => {
       setIsAddRecordModalOpen(true);
     } catch (error) {
       console.error('Error loading billing patients:', error);
-      alert('Failed to load patients from billing. Please ensure billing records are finalized.');
+      alert('Failed to load patients from billing records. Please try again.');
     } finally {
       setIsLoadingBilling(false);
     }
@@ -157,7 +157,7 @@ const Discharge = () => {
 
   const handleImportFromBilling = async () => {
     if (selectedBillingIds.length === 0) {
-      alert('Please select at least one patient to import');
+      alert('Please select at least one patient to add');
       return;
     }
 
@@ -167,9 +167,9 @@ const Discharge = () => {
       
       if (response.errors && response.errors.length > 0) {
         const errorMessages = response.errors.map((err: any) => err.error).join('\n');
-        alert(`Some imports failed:\n${errorMessages}\n\nSuccessfully imported: ${response.created} patient(s)`);
+        alert(`Some records could not be added:\n${errorMessages}\n\nSuccessfully added: ${response.created} patient(s)`);
       } else {
-        alert(`Successfully imported ${response.created} patient(s) for discharge processing`);
+        alert(`Successfully added ${response.created} patient(s) to discharge queue`);
       }
 
       // Reload pending discharges
@@ -181,7 +181,7 @@ const Discharge = () => {
       setSelectedBillingIds([]);
     } catch (error: any) {
       console.error('Error importing from billing:', error);
-      alert(error?.response?.data?.error || 'Failed to import patients from billing');
+      alert(error?.response?.data?.error || 'Failed to add patients from billing');
     } finally {
       setIsLoadingBilling(false);
     }
@@ -634,33 +634,32 @@ const Discharge = () => {
       <Dialog open={isAddRecordModalOpen} onOpenChange={setIsAddRecordModalOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Import Patients from Billing for Discharge</DialogTitle>
+            <DialogTitle>Add Discharge Record from Billing</DialogTitle>
             <p className="text-sm text-muted-foreground mt-2">
-              Only patients with finalized billing records are eligible for discharge processing
+              Select patients from existing billing records to create discharge records
             </p>
           </DialogHeader>
           <div className="space-y-6">
             <Alert>
               <AlertTriangle className="h-4 w-4 text-blue-600" />
               <AlertDescription className="text-sm">
-                <strong>Hospital Policy:</strong> Discharge records can only be created from finalized billing records. 
-                Select patients below to add them to the discharge queue.
+                Select patients below to add them to the discharge queue for processing
               </AlertDescription>
             </Alert>
 
             {billingPatients.length === 0 ? (
               <div className="text-center py-12">
                 <FileText className="w-16 h-16 mx-auto text-muted-foreground/50 mb-4" />
-                <p className="text-lg font-medium text-muted-foreground">No eligible patients found</p>
+                <p className="text-lg font-medium text-muted-foreground">No patients available</p>
                 <p className="text-sm text-muted-foreground mt-2">
-                  All patients with finalized billing have been added to discharge queue
+                  All billing records have been added to discharge queue
                 </p>
               </div>
             ) : (
               <div className="space-y-3">
                 <div className="flex items-center justify-between pb-2 border-b">
                   <span className="text-sm font-medium">
-                    {billingPatients.length} eligible patient(s) | {selectedBillingIds.length} selected
+                    {billingPatients.length} patient(s) available | {selectedBillingIds.length} selected
                   </span>
                   <Button
                     variant="outline"
@@ -681,17 +680,18 @@ const Discharge = () => {
                   {billingPatients.map((patient) => (
                     <div
                       key={patient.billing_id}
-                      className={`flex items-center justify-between p-4 border-2 rounded-lg transition-all cursor-pointer ${
+                      className={`flex items-start p-4 border-2 rounded-lg transition-all cursor-pointer ${
                         selectedBillingIds.includes(patient.billing_id)
                           ? 'border-primary bg-primary/5'
                           : 'border-border hover:border-primary/50 hover:bg-muted/50'
                       }`}
                       onClick={() => handleToggleBillingPatient(patient.billing_id)}
                     >
-                      <div className="flex items-center gap-4 flex-1">
+                      <div className="flex items-start gap-4 flex-1">
                         <Checkbox
                           checked={selectedBillingIds.includes(patient.billing_id)}
                           onCheckedChange={() => handleToggleBillingPatient(patient.billing_id)}
+                          className="mt-1"
                         />
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
@@ -699,43 +699,33 @@ const Discharge = () => {
                             <Badge variant="outline" className="text-xs">
                               ID: {patient.hospital_id}
                             </Badge>
-                            {patient.is_finalized && (
-                              <Badge className="text-xs bg-green-100 text-green-800 border-green-200">
-                                <CheckCircle className="w-3 h-3 mr-1" />
-                                Billing Finalized
-                              </Badge>
-                            )}
                           </div>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                          <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
                             <div>
                               <span className="text-muted-foreground">Room:</span>
-                              <span className="ml-1 font-medium">{patient.room}</span>
+                              <span className="ml-2 font-medium">{patient.room}</span>
                             </div>
                             <div>
                               <span className="text-muted-foreground">Age:</span>
-                              <span className="ml-1 font-medium">{patient.age} yrs</span>
+                              <span className="ml-2 font-medium">{patient.age} years</span>
                             </div>
                             <div>
                               <span className="text-muted-foreground">Department:</span>
-                              <span className="ml-1 font-medium">{patient.department}</span>
+                              <span className="ml-2 font-medium">{patient.department}</span>
                             </div>
                             <div>
+                              <span className="text-muted-foreground">Admission:</span>
+                              <span className="ml-2 font-medium">{patient.admission_date}</span>
+                            </div>
+                            <div className="col-span-2">
                               <span className="text-muted-foreground">Physician:</span>
-                              <span className="ml-1 font-medium">{patient.attending_physician}</span>
+                              <span className="ml-2 font-medium">{patient.attending_physician}</span>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-muted-foreground">Condition:</span>
+                              <span className="ml-2 font-medium">{patient.condition}</span>
                             </div>
                           </div>
-                          <div className="mt-2 text-sm">
-                            <span className="text-muted-foreground">Condition:</span>
-                            <span className="ml-1 font-medium">{patient.condition}</span>
-                          </div>
-                          {patient.total_amount && (
-                            <div className="mt-2 text-sm">
-                              <span className="text-muted-foreground">Total Bill:</span>
-                              <span className="ml-1 font-semibold text-green-600">
-                                ₱{parseFloat(patient.total_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </span>
-                            </div>
-                          )}
                         </div>
                       </div>
                     </div>
@@ -765,7 +755,7 @@ const Discharge = () => {
                 ) : (
                   <>
                     <Download className="w-4 h-4 mr-2" />
-                    Import {selectedBillingIds.length} Patient{selectedBillingIds.length !== 1 ? 's' : ''}
+                    Add {selectedBillingIds.length} Record{selectedBillingIds.length !== 1 ? 's' : ''}
                   </>
                 )}
               </Button>
