@@ -5,11 +5,11 @@ import { DispenseModal } from '@/components/pharmacy/DispenseModal';
 import { toast } from 'sonner';
 import { InventoryItem, MedicationRequest } from '@/types/pharmacy';
 
-const API_BASE =
+const API_BASE = (
   import.meta.env.BACKEND_PHARMACY_8000 ||
-    import.meta.env.LOCAL_8000
-    ? `${import.meta.env.LOCAL_8000}/api/pharmacy`
-    : import.meta.env.BACKEND_PHARMACY;
+  import.meta.env.BACKEND_PHARMACY ||
+  'http://localhost:8000/api/pharmacy'
+).replace(/\/$/, ''); // Remove trailing slash if present
 
 const Pharmacy: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'restock' | 'dispense'>('restock');
@@ -56,15 +56,8 @@ const Pharmacy: React.FC = () => {
   }, []);
 
   const handleInventoryUpdate = (item: InventoryItem) => {
-    (async () => {
-      try {
-        const res = await axios.post<InventoryItem>(`${API_BASE}/inventory/`, item);
-        setInventory((prev) => [...prev, res.data]);
-        toast.success('Stock added successfully');
-      } catch (err: any) {
-        toast.error(err.response?.data?.error || 'Failed to add stock');
-      }
-    })();
+    // RestockModal already created the item, just add it to the local state
+    setInventory((prev) => [...prev, item]);
   };
 
   const openDispenseModal = (request: MedicationRequest) => {

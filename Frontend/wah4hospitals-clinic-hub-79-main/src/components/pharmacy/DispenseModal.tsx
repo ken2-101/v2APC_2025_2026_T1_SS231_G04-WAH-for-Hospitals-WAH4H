@@ -15,11 +15,11 @@ interface DispenseModalProps {
   onDispenseSuccess: () => void;
 }
 
-const API_BASE =
+const API_BASE = (
   import.meta.env.BACKEND_PHARMACY_8000 ||
-    import.meta.env.LOCAL_8000
-    ? `${import.meta.env.LOCAL_8000}/api/pharmacy`
-    : import.meta.env.BACKEND_PHARMACY;
+  import.meta.env.BACKEND_PHARMACY ||
+  'http://localhost:8000/api/pharmacy'
+).replace(/\/$/, ''); // Remove trailing slash if present
 
 export const DispenseModal: React.FC<DispenseModalProps> = ({
   isOpen,
