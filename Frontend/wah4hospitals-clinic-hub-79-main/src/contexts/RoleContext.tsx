@@ -1,22 +1,38 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 
+/**
+ * User Roles - Strictly aligned with Django backend ROLE_CHOICES
+ * Source: wah4h-backend/accounts/models.py
+ */
 export type UserRole =
-  | 'doctor'
-  | 'nurse'
-  | 'pharmacist'
-  | 'lab-technician'
-  | 'administrator'
-  | 'radiologist'
-  | 'billing_clerk';
+  | 'admin'           // System Administrator - Full system access
+  | 'doctor'          // Doctor - Clinical care and medical decisions
+  | 'nurse'           // Nurse - Patient care and monitoring
+  | 'lab_technician'  // Lab Technician - Laboratory tests and results
+  | 'pharmacist'      // Pharmacist - Medication dispensing and management
+  | 'billing_clerk';  // Billing Clerk - Financial and billing operations
 
-export interface RoleContextType 
-{
+/**
+ * Role hierarchy levels for permission management
+ */
+export enum RoleLevel {
+  ADMIN = 4,        // Full system access
+  CLINICAL = 3,     // Clinical staff (doctors, nurses)
+  TECHNICAL = 2,    // Technical staff (lab, pharmacy)
+  SUPPORT = 1,      // Support staff (billing)
+}
+
+export interface RoleContextType {
   isAdminMode: boolean;
   currentRole: UserRole;
   availableTabs: string[];
+  roleLevel: RoleLevel;
   setAdminMode: (enabled: boolean) => void;
   setCurrentRole: (role: UserRole) => void;
+  hasAccess: (module: string) => boolean;
+  canModify: (resourceType: string) => boolean;
+  isAdmin: () => boolean;
 }
 
 const RoleContext = createContext<RoleContextType | undefined>(undefined);
@@ -27,18 +43,164 @@ export const useRole = () => {
   return context;
 };
 
-// Role-based access configuration
+/**
+ * Role hierarchy mapping for permission levels
+ */
+const roleHierarchy: Record<UserRole, RoleLevel> = {
+  admin: RoleLevel.ADMIN,
+  doctor: RoleLevel.CLINICAL,
+  nurse: RoleLevel.CLINICAL,
+  lab_technician: RoleLevel.TECHNICAL,
+  pharmacist: RoleLevel.TECHNICAL,
+  billing_clerk: RoleLevel.SUPPORT,
+};
+
+/**
+ * Role-based Module Access Configuration
+ * Based on real-world hospital departmental responsibilities and workflows
+ * 
+ * Dashboard: Overview and analytics
+ * Patients: Patient records and information
+ * Admission: Patient admission and registration
+ * Laboratory: Lab tests and results
+ * Monitoring: Vital signs and patient monitoring
+ * Discharge: Patient discharge process
+ * Pharmacy: Medication management and dispensing
+ * Inventory: Stock and supplies management
+ * Appointments: Scheduling and appointment management
+ * Billing: Financial transactions and billing
+ * Philhealth: Insurance and PhilHealth claims
+ * Compliance: Regulatory compliance and reporting
+ * ERP: Enterprise resource planning
+ * Statistics: Analytics and reporting
+ * Settings: User preferences and system configuration
+ */
 const roleAccessConfig: Record<UserRole, string[]> = {
-  doctor: ['dashboard', 'patients', 'admission', 'laboratory', 'monitoring', 'discharge', 'philhealth', 'settings'],
-  nurse: ['dashboard', 'patients', 'admission', 'laboratory', 'monitoring', 'inventory', 'appointments', 'settings'],
-  pharmacist: ['dashboard', 'pharmacy', 'inventory', 'compliance', 'settings'],
-  'lab-technician': ['dashboard', 'laboratory', 'monitoring', 'compliance', 'settings'],
-  administrator: [
-    'dashboard', 'patients', 'admission', 'laboratory', 'philhealth', 'pharmacy',
-    'appointments', 'monitoring', 'discharge', 'inventory', 'compliance', 'billing', 'settings'
+  // ========== ADMIN: Full system access ==========
+  admin: [
+    'dashboard',
+    'patients',
+    'admission',
+    'laboratory',
+    'monitoring',
+    'discharge',
+    'pharmacy',
+    'inventory',
+    'appointments',
+    'billing',
+    'philhealth',
+    'compliance',
+    'erp',
+    'statistics',
+    'settings',
   ],
-  radiologist: ['dashboard', 'monitoring', 'patients', 'settings'],
-  'billing_clerk': ['dashboard', 'philhealth', 'erp', 'billing', 'settings'],
+
+  // ========== DOCTOR: Clinical care and medical decisions ==========
+  // Doctors need access to patient care, diagnostics, treatment, and discharge
+  doctor: [
+    'dashboard',      // View patient statistics and alerts
+    'patients',       // Access patient medical records
+    'admission',      // Admit patients and create care plans
+    'laboratory',     // Order and review lab tests
+    'monitoring',     // Monitor patient vital signs and progress
+    'discharge',      // Discharge patients and create discharge summaries
+    'appointments',   // View and manage patient appointments
+    'philhealth',     // View insurance coverage for treatment decisions
+    'settings',       // Personal settings
+  ],
+
+  // ========== NURSE: Patient care coordination and monitoring ==========
+  // Nurses handle direct patient care, medication administration, and monitoring
+  nurse: [
+    'dashboard',      // View patient assignments and alerts
+    'patients',       // Access patient records for care delivery
+    'admission',      // Assist with patient intake and documentation
+    'monitoring',     // Record vital signs and patient observations
+    'laboratory',     // View lab results for patient care
+    'pharmacy',       // View medication orders for administration
+    'inventory',      // Manage medical supplies and equipment
+    'appointments',   // Coordinate patient scheduling
+    'settings',       // Personal settings
+  ],
+
+  // ========== LAB TECHNICIAN: Laboratory operations ==========
+  // Lab technicians perform tests, manage specimens, and report results
+  lab_technician: [
+    'dashboard',      // View pending lab orders
+    'laboratory',     // Process lab tests and enter results
+    'monitoring',     // View patient status for test prioritization
+    'patients',       // Limited access to verify patient information
+    'compliance',     // Quality control and regulatory compliance
+    'settings',       // Personal settings
+  ],
+
+  // ========== PHARMACIST: Medication management ==========
+  // Pharmacists dispense medications, check interactions, and manage inventory
+  pharmacist: [
+    'dashboard',      // View medication orders and alerts
+    'pharmacy',       // Dispense medications and verify prescriptions
+    'inventory',      // Manage pharmaceutical inventory
+    'patients',       // Access patient allergies and medication history
+    'compliance',     // Drug regulatory compliance
+    'settings',       // Personal settings
+  ],
+
+  // ========== BILLING CLERK: Financial operations ==========
+  // Billing clerks handle invoicing, payments, and insurance claims
+  billing_clerk: [
+    'dashboard',      // View billing summaries and pending claims
+    'billing',        // Create and manage invoices
+    'philhealth',     // Process insurance claims
+    'erp',            // Financial reporting and integration
+    'patients',       // Access patient information for billing
+    'settings',       // Personal settings
+  ],
+};
+
+/**
+ * Resource modification permissions by role
+ * Defines what types of data each role can create, edit, or delete
+ */
+const modificationPermissions: Record<UserRole, string[]> = {
+  admin: ['all'],  // Admins can modify everything
+  
+  doctor: [
+    'patient-records',
+    'diagnoses',
+    'treatments',
+    'prescriptions',
+    'lab-orders',
+    'discharge-summary',
+    'medical-notes',
+  ],
+  
+  nurse: [
+    'vital-signs',
+    'nursing-notes',
+    'medication-administration',
+    'patient-care-logs',
+    'inventory-usage',
+  ],
+  
+  lab_technician: [
+    'lab-results',
+    'specimen-tracking',
+    'test-reports',
+  ],
+  
+  pharmacist: [
+    'medication-dispensing',
+    'pharmacy-inventory',
+    'prescription-verification',
+    'drug-interactions',
+  ],
+  
+  billing_clerk: [
+    'invoices',
+    'payments',
+    'insurance-claims',
+    'billing-records',
+  ],
 };
 
 interface RoleProviderProps {
@@ -58,29 +220,62 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
   });
 
   const [availableTabs, setAvailableTabs] = useState<string[]>([]);
+  const [roleLevel, setRoleLevel] = useState<RoleLevel>(RoleLevel.SUPPORT);
 
-  // Update role when user changes
+  // Sync role with authenticated user
   useEffect(() => {
     if (user?.role) {
-      setCurrentRoleState(user.role);
-      localStorage.setItem('userRole', user.role);
+      const userRole = user.role as UserRole;
+      setCurrentRoleState(userRole);
+      localStorage.setItem('userRole', userRole);
+      
+      // Update role level
+      setRoleLevel(roleHierarchy[userRole] || RoleLevel.SUPPORT);
     }
   }, [user]);
 
-  // Update available tabs whenever role or admin mode changes
+  // Update available tabs based on role and admin mode
   useEffect(() => {
-    if (isAdminMode && currentRole === 'administrator') {
+    if (isAdminMode && currentRole === 'admin') {
+      // Admin mode grants extended access
       setAvailableTabs([
         'dashboard', 'patients', 'admission', 'laboratory', 'philhealth', 'pharmacy',
-        'appointments', 'monitoring', 'discharge', 'inventory', 'compliance', 'statistics', 'erp', 'billing', 'settings'
+        'appointments', 'monitoring', 'discharge', 'inventory', 'compliance', 
+        'statistics', 'erp', 'billing', 'settings'
       ]);
     } else {
+      // Normal mode - use role-based access
       setAvailableTabs(roleAccessConfig[currentRole] || []);
     }
   }, [isAdminMode, currentRole]);
 
+  /**
+   * Check if current role has access to a specific module
+   */
+  const hasAccess = (module: string): boolean => {
+    return availableTabs.includes(module);
+  };
+
+  /**
+   * Check if current role can modify a specific resource type
+   */
+  const canModify = (resourceType: string): boolean => {
+    const permissions = modificationPermissions[currentRole] || [];
+    return permissions.includes('all') || permissions.includes(resourceType);
+  };
+
+  /**
+   * Check if current user is an administrator
+   */
+  const isAdmin = (): boolean => {
+    return currentRole === 'admin';
+  };
+
+  /**
+   * Enable/disable admin mode (restricted to admin role only)
+   */
   const setAdminMode = (enabled: boolean) => {
-    if (enabled && currentRole !== 'administrator') {
+    if (enabled && currentRole !== 'admin') {
       console.warn('Only administrators can enable admin mode');
       return;
     }
@@ -88,9 +283,13 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
     localStorage.setItem('adminMode', JSON.stringify(enabled));
   };
 
+  /**
+   * Set current role (security: prevents unauthorized role switching)
+   */
   const setCurrentRole = (role: UserRole) => {
+    // Prevent role switching - role must match authenticated user
     if (user?.role && role !== user.role) {
-      console.warn('Cannot change role - role is determined by user account');
+      console.error('Security violation: Cannot change role manually. Role is determined by authentication.');
       return;
     }
     setCurrentRoleState(role);
@@ -103,8 +302,12 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
         isAdminMode,
         currentRole,
         availableTabs,
+        roleLevel,
         setAdminMode,
-        setCurrentRole
+        setCurrentRole,
+        hasAccess,
+        canModify,
+        isAdmin,
       }}
     >
       {children}
