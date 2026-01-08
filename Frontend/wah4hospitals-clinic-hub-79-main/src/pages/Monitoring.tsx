@@ -9,6 +9,7 @@ import {
 } from '../types/monitoring';
 import { PatientMonitoringPage } from '@/components/monitoring/PatientMonitoringPage';
 import { MonitoringDashboard } from '@/components/monitoring/MonitoringDashboard';
+import { Activity, Users, AlertTriangle, Heart } from 'lucide-react';
 
 // Detect backend URL dynamically
 const API_BASE =
@@ -174,11 +175,53 @@ const Monitoring: React.FC = () => {
 
   // Render dashboard
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Patient Monitoring</h1>
-        <p className="text-muted-foreground">Track vital signs, clinical notes, and dietary orders for admitted patients</p>
+    <div className="space-y-6 pb-8">
+      {/* Enhanced Header */}
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg shadow-lg p-8 text-white">
+        <div className="flex items-center gap-4 mb-3">
+          <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 border border-white/30">
+            <Activity className="w-8 h-8" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold">Patient Monitoring</h1>
+            <p className="text-blue-100 text-sm mt-1">Real-time patient care and vital signs tracking</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-blue-100 text-xs font-medium uppercase tracking-wide">Active Patients</p>
+                <p className="text-3xl font-bold mt-1">{admissions.length}</p>
+              </div>
+              <Users className="w-8 h-8 text-white/60" />
+            </div>
+          </div>
+          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-blue-100 text-xs font-medium uppercase tracking-wide">Critical Status</p>
+                <p className="text-3xl font-bold mt-1">
+                  {admissions.filter(a => a.status === 'Critical').length}
+                </p>
+              </div>
+              <AlertTriangle className="w-8 h-8 text-red-300" />
+            </div>
+          </div>
+          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-blue-100 text-xs font-medium uppercase tracking-wide">Stable Status</p>
+                <p className="text-3xl font-bold mt-1">
+                  {admissions.filter(a => a.status === 'Stable').length}
+                </p>
+              </div>
+              <Heart className="w-8 h-8 text-green-300" />
+            </div>
+          </div>
+        </div>
       </div>
+      
       <MonitoringDashboard admissions={admissions} onSelectAdmission={handleSelectAdmission} />
     </div>
   );
