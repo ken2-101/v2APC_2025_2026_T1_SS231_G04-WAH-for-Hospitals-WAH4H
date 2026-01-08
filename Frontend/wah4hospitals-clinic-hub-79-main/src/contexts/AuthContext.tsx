@@ -130,7 +130,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         password,
       });
 
-      const { tokens, user: userData } = res.data;
+      const { tokens, user: rawUser } = res.data;
+
+      const userData: User = {
+        id: rawUser.id,
+        email: rawUser.email,
+        firstName: rawUser.first_name,
+        lastName: rawUser.last_name,
+        role: rawUser.role,
+      };
 
       // Store authentication tokens
       localStorage.setItem('accessToken', tokens.access);
