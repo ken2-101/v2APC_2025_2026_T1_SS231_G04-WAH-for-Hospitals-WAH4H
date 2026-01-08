@@ -14,6 +14,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2, Eye, EyeOff, UserPlus } from 'lucide-react';
 import { UserRole } from '@/contexts/RoleContext';
+import { ROLE_OPTIONS } from '@/lib/roleUtils';
 
 const Register = () => {
   const [firstName, setFirstName] = useState('');
@@ -28,19 +29,6 @@ const Register = () => {
 
   const navigate = useNavigate();
   const { register, isLoading } = useAuth();
-
-  /**
-   * 🔥 BACKEND-ALIGNED ROLE VALUES
-   * These MUST match Django ROLE_CHOICES exactly
-   */
-  const roleOptions: { value: UserRole; label: string }[] = [
-    { value: 'doctor', label: 'Doctor' },
-    { value: 'nurse', label: 'Nurse' },
-    { value: 'pharmacist', label: 'Pharmacist' },
-    { value: 'lab-technician', label: 'Lab Technician' },
-    { value: 'billing_clerk', label: 'Billing Staff' },
-    { value: 'administrator', label: 'Administrator' },
-  ];
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -147,9 +135,12 @@ const Register = () => {
                   <SelectValue placeholder="Select your role" />
                 </SelectTrigger>
                 <SelectContent>
-                  {roleOptions.map((r) => (
+                  {ROLE_OPTIONS.map((r) => (
                     <SelectItem key={r.value} value={r.value}>
-                      {r.label}
+                      <div className="flex flex-col">
+                        <span className="font-medium">{r.label}</span>
+                        <span className="text-xs text-muted-foreground">{r.description}</span>
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
