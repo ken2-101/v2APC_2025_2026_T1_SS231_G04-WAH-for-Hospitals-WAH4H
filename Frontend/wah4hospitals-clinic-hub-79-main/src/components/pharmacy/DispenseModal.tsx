@@ -15,11 +15,11 @@ interface DispenseModalProps {
   onDispenseSuccess: () => void;
 }
 
-const API_BASE =
+const API_BASE = (
   import.meta.env.BACKEND_PHARMACY_8000 ||
-    import.meta.env.LOCAL_8000
-    ? `${import.meta.env.LOCAL_8000}/api/pharmacy`
-    : import.meta.env.BACKEND_PHARMACY;
+  import.meta.env.BACKEND_PHARMACY ||
+  'http://localhost:8000/api/pharmacy'
+).replace(/\/$/, ''); // Remove trailing slash if present
 
 export const DispenseModal: React.FC<DispenseModalProps> = ({
   isOpen,
@@ -65,12 +65,19 @@ export const DispenseModal: React.FC<DispenseModalProps> = ({
     }
 
     try {
-      // POST to the proper dispense endpoint
-      await axios.post(`${API_BASE}/medication-requests/${medicationRequest.id}/dispense/`, {
-        quantity,
-      });
+      // Step 1: Approve the medication request first
+      await axios.post(
+        `${API_BASE}/medication-requests/${medicationRequest.id}/update-status/`,
+        { status: 'approved' }
+      );
 
-      toast.success('Medication dispensed and inventory updated');
+      // Step 2: Dispense the medication (backend requires status="approved")
+      await axios.post(
+        `${API_BASE}/medication-requests/${medicationRequest.id}/dispense/`,
+        { quantity }
+      );
+
+      toast.success('Medication approved and dispensed successfully');
       onDispenseSuccess(); // refresh parent state
       onClose();
     } catch (err: any) {
@@ -85,7 +92,7 @@ export const DispenseModal: React.FC<DispenseModalProps> = ({
         <DialogHeader>
           <DialogTitle>Dispense Medication</DialogTitle>
           <p className="text-sm text-gray-500">
-            Dispensing will update the request status to approved and reduce the inventory quantity.
+            Approving and dispensing will update the request status to 'dispensed' and reduce the inventory quantity.
           </p>
         </DialogHeader>
 
