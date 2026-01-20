@@ -3,7 +3,7 @@ from django.conf import settings
 
 
 # ============================================================================
-# BASE MODELS & MIXINS
+# BASE MODELS
 # ============================================================================
 
 class BaseModel(models.Model):
@@ -19,7 +19,7 @@ class BaseModel(models.Model):
 
 
 # ============================================================================
-# CHOICE CONSTANTS - Single Source of Truth
+# CHOICE CONSTANTS (FHIR & PHCore ValueSets)
 # ============================================================================
 
 class ClinicalStatusChoices(models.TextChoices):
@@ -68,19 +68,6 @@ class CriticalityChoices(models.TextChoices):
 
 
 # ============================================================================
-# ABSTRACT MIXINS
-# ============================================================================
-
-# Note: ClinicalStatusMixin removed - not needed as models define their own fields
-
-
-# Note: RecorderAsserterMixin removed - not needed as models define their own fields
-
-
-# Note: SeverityMixin removed - models use SeverityChoices.choices instead
-
-
-# ============================================================================
 # PATIENT REGISTRATION MODULE
 # ============================================================================
 
@@ -121,34 +108,10 @@ class Patient(BaseModel):
     patient_id = models.AutoField(primary_key=True, db_column='PAT_patient_id')
     
     # Identifiers - FHIR identifier element
-    identifier_philhealth = models.CharField(
-        max_length=20, 
-        unique=True, 
-        null=True, 
-        blank=True, 
-        db_column='PAT_identifier_philhealth'
-    )
-    identifier_pdd = models.CharField(
-        max_length=20, 
-        unique=True, 
-        null=True, 
-        blank=True, 
-        db_column='PAT_identifier_pdd'
-    )
-    identifier_philsys = models.CharField(
-        max_length=20, 
-        unique=True, 
-        null=True, 
-        blank=True, 
-        db_column='PAT_identifier_philsys'
-    )
-    identifier_national_id = models.CharField(
-        max_length=50, 
-        unique=True, 
-        null=True, 
-        blank=True, 
-        db_column='PAT_identifier_national_id'
-    )
+    identifier_philhealth = models.CharField(max_length=20, unique=True, null=True, blank=True, db_column='PAT_identifier_philhealth')
+    identifier_pdd = models.CharField(max_length=20, unique=True, null=True, blank=True, db_column='PAT_identifier_pdd')
+    identifier_philsys = models.CharField(max_length=20, unique=True, null=True, blank=True, db_column='PAT_identifier_philsys')
+    identifier_national_id = models.CharField(max_length=50, unique=True, null=True, blank=True, db_column='PAT_identifier_national_id')
     
     # Name - FHIR HumanName element
     first_name = models.CharField(max_length=50, db_column='PAT_first_name')
@@ -159,20 +122,8 @@ class Patient(BaseModel):
     # Demographics
     birthdate = models.DateField(db_column='PAT_birthdate')
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES, db_column='PAT_gender')
-    sex = models.CharField(
-        max_length=10, 
-        choices=SEX_CHOICES, 
-        null=True, 
-        blank=True, 
-        db_column='PAT_sex'
-    )
-    civil_status = models.CharField(
-        max_length=10, 
-        choices=CIVIL_STATUS_CHOICES, 
-        null=True, 
-        blank=True, 
-        db_column='PAT_civil_status'
-    )
+    sex = models.CharField(max_length=10, choices=SEX_CHOICES, null=True, blank=True, db_column='PAT_sex')
+    civil_status = models.CharField(max_length=10, choices=CIVIL_STATUS_CHOICES, null=True, blank=True, db_column='PAT_civil_status')
     
     # Contact - FHIR ContactPoint element
     contact_number = models.CharField(max_length=15, null=True, blank=True, db_column='PAT_contact_number')
@@ -188,65 +139,21 @@ class Patient(BaseModel):
     country = models.CharField(max_length=50, null=True, blank=True, db_column='PAT_country')
     
     # PHCore Extensions - Philippine-specific fields
-    extension_occupation = models.CharField(
-        max_length=100, 
-        null=True, 
-        blank=True, 
-        db_column='PAT_extension_occupation'
-    )
-    extension_ethnicity = models.CharField(
-        max_length=50, 
-        null=True, 
-        blank=True, 
-        db_column='PAT_extension_ethnicity'
-    )
-    extension_indigenous_group = models.CharField(
-        max_length=50, 
-        null=True, 
-        blank=True, 
-        db_column='PAT_extension_indigenous_group'
-    )
-    extension_religion = models.CharField(
-        max_length=50, 
-        null=True, 
-        blank=True, 
-        db_column='PAT_extension_religion'
-    )
-    extension_educational_attainment = models.CharField(
-        max_length=50, 
-        null=True, 
-        blank=True, 
-        db_column='PAT_extension_educational_attainment'
-    )
-    extension_citizenship = models.CharField(
-        max_length=50, 
-        null=True, 
-        blank=True, 
-        db_column='PAT_extension_citizenship'
-    )
-    extension_disability = models.TextField(
-        null=True, 
-        blank=True, 
-        db_column='PAT_extension_disability'
-    )
+    extension_occupation = models.CharField(max_length=100, null=True, blank=True, db_column='PAT_extension_occupation')
+    extension_ethnicity = models.CharField(max_length=50, null=True, blank=True, db_column='PAT_extension_ethnicity')
+    extension_indigenous_group = models.CharField(max_length=50, null=True, blank=True, db_column='PAT_extension_indigenous_group')
+    extension_religion = models.CharField(max_length=50, null=True, blank=True, db_column='PAT_extension_religion')
+    extension_educational_attainment = models.CharField(max_length=50, null=True, blank=True, db_column='PAT_extension_educational_attainment')
+    extension_citizenship = models.CharField(max_length=50, null=True, blank=True, db_column='PAT_extension_citizenship')
+    extension_disability = models.TextField(null=True, blank=True, db_column='PAT_extension_disability')
     
     # Deceased indicator - FHIR Patient.deceased[x]
     deceased = models.BooleanField(default=False, db_column='PAT_deceased')
     deceased_datetime = models.DateTimeField(null=True, blank=True, db_column='PAT_deceased_datetime')
     
     # Administrative
-    status = models.CharField(
-        max_length=10, 
-        choices=STATUS_CHOICES, 
-        default='active', 
-        db_column='PAT_status'
-    )
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT,
-        db_column='PAT_created_by',
-        related_name='created_patients'
-    )
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='active', db_column='PAT_status')
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, db_column='PAT_created_by', related_name='created_patients')
 
     class Meta:
         db_table = 'PATIENT'
@@ -287,23 +194,33 @@ class AllergyIntolerance(BaseModel):
 
     allergy_id = models.AutoField(primary_key=True, db_column='ALG_allergy_id')
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, db_column='ALG_patient_id', related_name='allergies')
+    
+    # Clinical & Verification Status
     clinical_status = models.CharField(max_length=20, choices=ClinicalStatusChoices.choices, null=True, blank=True, db_column='ALG_clinical_status')
     verification_status = models.CharField(max_length=20, choices=VerificationStatusChoices.choices, null=True, blank=True, db_column='ALG_verification_status')
+    
+    # Allergy Details
     type = models.CharField(max_length=15, choices=TYPE_CHOICES, null=True, blank=True, db_column='ALG_type')
     category = models.CharField(max_length=15, choices=CATEGORY_CHOICES, db_column='ALG_category')
     criticality = models.CharField(max_length=20, choices=CriticalityChoices.choices, db_column='ALG_criticality')
     code = models.CharField(max_length=100, db_column='ALG_code')
     code_system = models.CharField(max_length=100, null=True, blank=True, db_column='ALG_code_system')
     code_display = models.CharField(max_length=200, null=True, blank=True, db_column='ALG_code_display')
+    
+    # Timing
     onset_datetime = models.DateTimeField(null=True, blank=True, db_column='ALG_onset_datetime')
     recorded_date = models.DateTimeField(db_column='ALG_recorded_date')
-    recorder = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, db_column='ALG_recorder_id', related_name='recorded_allergies')
-    asserter = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, db_column='ALG_asserter_id', related_name='asserted_allergies')
     last_occurrence = models.DateTimeField(null=True, blank=True, db_column='ALG_last_occurrence')
+    
+    # Reaction Info
     reaction_severity = models.CharField(max_length=10, choices=SeverityChoices.choices, null=True, blank=True, db_column='ALG_reaction_severity')
     reaction_manifestation = models.CharField(max_length=100, null=True, blank=True, db_column='ALG_reaction_manifestation')
     reaction_description = models.TextField(null=True, blank=True, db_column='ALG_reaction_description')
     note = models.TextField(null=True, blank=True, db_column='ALG_note')
+
+    # Practitioners
+    recorder = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, db_column='ALG_recorder_id', related_name='recorded_allergies')
+    asserter = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, db_column='ALG_asserter_id', related_name='asserted_allergies')
 
     class Meta:
         db_table = 'ALLERGY_INTOLERANCE'
@@ -326,20 +243,30 @@ class Condition(BaseModel):
     condition_id = models.AutoField(primary_key=True, db_column='COND_condition_id')
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, db_column='COND_patient_id', related_name='conditions')
     encounter = models.ForeignKey('admissions.Admission', on_delete=models.SET_NULL, null=True, blank=True, db_column='COND_encounter_id', related_name='conditions')
+    
+    # Status
     clinical_status = models.CharField(max_length=15, choices=ClinicalStatusChoices.choices, null=True, blank=True, db_column='COND_clinical_status')
     verification_status = models.CharField(max_length=20, choices=VerificationStatusChoices.choices, null=True, blank=True, db_column='COND_verification_status')
+    
+    # Diagnosis Details
     category = models.CharField(max_length=25, choices=CATEGORY_CHOICES, null=True, blank=True, db_column='COND_category')
     severity = models.CharField(max_length=10, choices=SeverityChoices.choices, null=True, blank=True, db_column='COND_severity')
     code_icd10 = models.CharField(max_length=20, null=True, blank=True, db_column='COND_code_icd10')
     code_icd11 = models.CharField(max_length=20, null=True, blank=True, db_column='COND_code_icd11')
     diagnosis_text = models.TextField(db_column='COND_diagnosis_text')
     body_site = models.CharField(max_length=100, null=True, blank=True, db_column='COND_body_site')
+    
+    # Timing
     onset_date = models.DateField(null=True, blank=True, db_column='COND_onset_date')
     abatement_date = models.DateField(null=True, blank=True, db_column='COND_abatement_date')
     recorded_date = models.DateTimeField(db_column='COND_recorded_date')
+    
+    # Additional Info
+    note = models.TextField(null=True, blank=True, db_column='COND_note')
+    
+    # Practitioners
     recorder = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, db_column='COND_recorder_id', related_name='recorded_conditions')
     asserter = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, db_column='COND_asserter_id', related_name='asserted_conditions')
-    note = models.TextField(null=True, blank=True, db_column='COND_note')
 
     class Meta:
         db_table = 'CONDITION'
