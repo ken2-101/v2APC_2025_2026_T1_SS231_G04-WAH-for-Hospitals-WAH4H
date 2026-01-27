@@ -1,9 +1,9 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import DischargeRecordViewSet
+from .views import DischargeViewSet
 
 router = DefaultRouter()
-router.register(r'discharge-records', DischargeRecordViewSet, basename='discharge-record')
+router.register(r'discharges', DischargeViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),

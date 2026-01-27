@@ -27,13 +27,14 @@ INSTALLED_APPS = [
 
     # Apps
     "patients",
-    "admissions",
+    "admission",
     "monitoring",
     "discharge",
     "accounts",
     "pharmacy",
     "laboratory", # added here
     "billing", # added billing
+    "core", # added core
 
     # Third-party
     "rest_framework",

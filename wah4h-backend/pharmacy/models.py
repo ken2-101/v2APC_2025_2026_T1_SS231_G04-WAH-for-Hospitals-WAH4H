@@ -1,167 +1,115 @@
 from django.db import models
-from django.core.exceptions import ValidationError
-from django.utils import timezone
-from datetime import timedelta
-from admissions.models import Admission
+from core.models import TimeStampedModel, FHIRResourceModel
 
-
-class InventoryItem(models.Model):
-    """
-    Represents a pharmaceutical product in the hospital inventory.
-    Follows best practices for medication tracking and regulatory compliance.
-    """
-    generic_name = models.CharField(max_length=100, db_index=True)
-    brand_name = models.CharField(max_length=100, blank=True)
-    description = models.TextField(blank=True)
-    quantity = models.PositiveIntegerField(default=0)
-    minimum_stock_level = models.PositiveIntegerField(
-        default=10,
-        help_text="Alert when stock falls below this level"
-    )
-    unit_price = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        default=0.00,
-        help_text="Price per unit for billing"
-    )
-    expiry_date = models.DateField()
-    batch_number = models.CharField(max_length=50, db_index=True)
-    manufacturer = models.CharField(max_length=200, blank=True)
-    is_active = models.BooleanField(
-        default=True,
-        help_text="Inactive items are not available for dispensing"
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
+class Medication(TimeStampedModel):
+    medication_id = models.AutoField(primary_key=True)
+    code_code = models.CharField(max_length=100, unique=True, null=True, blank=True)
+    code_display = models.CharField(max_length=100, null=True, blank=True)
+    code_system = models.CharField(max_length=100, null=True, blank=True)
+    code_version = models.CharField(max_length=100, null=True, blank=True)
+    status = models.CharField(max_length=100)
+    implicit_rules = models.CharField(max_length=255, null=True, blank=True)
     class Meta:
-        ordering = ['-created_at']
-        indexes = [
-            models.Index(fields=['generic_name', 'batch_number']),
-            models.Index(fields=['expiry_date']),
-        ]
+        db_table = 'medication'
 
-    def __str__(self):
-        return f"{self.generic_name} ({self.brand_name or 'Generic'}) - Batch: {self.batch_number}"
-
-    def clean(self):
-        """Validate the inventory item before saving."""
-        if self.expiry_date and self.expiry_date < timezone.now().date():
-            raise ValidationError({
-                'expiry_date': 'Expiry date cannot be in the past'
-            })
-        
-        if self.quantity < 0:
-            raise ValidationError({
-                'quantity': 'Quantity cannot be negative'
-            })
-        
-        if self.unit_price < 0:
-            raise ValidationError({
-                'unit_price': 'Unit price cannot be negative'
-            })
-
-    @property
-    def is_expired(self):
-        """Check if the item has expired."""
-        return self.expiry_date < timezone.now().date()
-
-    @property
-    def is_expiring_soon(self):
-        """Check if item expires within 30 days."""
-        return self.expiry_date <= timezone.now().date() + timedelta(days=30)
-
-    @property
-    def is_low_stock(self):
-        """Check if item is below minimum stock level."""
-        return self.quantity <= self.minimum_stock_level
-
-    @property
-    def is_out_of_stock(self):
-        """Check if item is out of stock."""
-        return self.quantity == 0
-
-class MedicationRequest(models.Model):
-    """
-    Represents a request for medication from a healthcare provider.
-    Tracks the approval and dispensing workflow.
-    """
-    STATUS_CHOICES = [
-        ("pending", "Pending"),
-        ("approved", "Approved"),
-        ("denied", "Denied"),
-        ("dispensed", "Dispensed"),
-    ]
-
-    admission = models.ForeignKey(
-        Admission,
-        on_delete=models.CASCADE,
-        related_name="medication_requests"
-    )
-
-    inventory_item = models.ForeignKey(
-        InventoryItem,
-        on_delete=models.CASCADE,
-        related_name="medication_requests"
-    )
-
-    quantity = models.PositiveIntegerField()
-    status = models.CharField(
-        max_length=10,
-        choices=STATUS_CHOICES,
-        default="pending",
-        db_index=True
-    )
-    notes = models.TextField(blank=True)
-    requested_by = models.CharField(
-        max_length=100,
-        blank=True,
-        help_text="Healthcare provider who requested the medication"
-    )
-    approved_by = models.CharField(
-        max_length=100,
-        blank=True,
-        help_text="Pharmacist who approved/denied the request"
-    )
-    requested_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
+class MedicationRequest(FHIRResourceModel):
+    medication_request_id = models.AutoField(primary_key=True)
+    subject = models.ForeignKey('patients.Patient', on_delete=models.PROTECT, db_column='subject_id')
+    encounter = models.ForeignKey('admission.Encounter', on_delete=models.PROTECT, db_column='encounter_id')
+    requester = models.ForeignKey('accounts.Practitioner', on_delete=models.PROTECT, db_column='requester_id', null=True, blank=True, related_name='medication_requests_requested')
+    performer = models.ForeignKey('accounts.Practitioner', on_delete=models.PROTECT, db_column='performer_id', null=True, blank=True, related_name='medication_requests_performed')
+    recorder = models.ForeignKey('accounts.Practitioner', on_delete=models.PROTECT, db_column='recorder_id', null=True, blank=True, related_name='medication_requests_recorded')
+    based_on_id = models.IntegerField(null=True, blank=True)
+    insurance_id = models.IntegerField(null=True, blank=True)
+    reported_reference_id = models.IntegerField(null=True, blank=True)
+    reason_reference_id = models.IntegerField(null=True, blank=True)
+    medication_reference = models.CharField(max_length=255, null=True, blank=True)
+    medication_code = models.CharField(max_length=100, null=True, blank=True)
+    medication_display = models.CharField(max_length=100, null=True, blank=True)
+    medication_system = models.CharField(max_length=100, null=True, blank=True)
+    intent = models.CharField(max_length=255, null=True, blank=True)
+    category = models.CharField(max_length=255, null=True, blank=True)
+    priority = models.CharField(max_length=255, null=True, blank=True)
+    do_not_perform = models.BooleanField(null=True, blank=True)
+    reported_boolean = models.BooleanField(null=True, blank=True)
+    authored_on = models.DateTimeField(null=True, blank=True)
+    status_reason = models.CharField(max_length=100, null=True, blank=True)
+    reason_code = models.CharField(max_length=100, null=True, blank=True)
+    note = models.TextField(null=True, blank=True)
+    dosage_text = models.TextField(null=True, blank=True)
+    dosage_site = models.CharField(max_length=255, null=True, blank=True)
+    dosage_route = models.CharField(max_length=255, null=True, blank=True)
+    dosage_method = models.CharField(max_length=255, null=True, blank=True)
+    dosage_dose_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    dosage_dose_unit = models.CharField(max_length=255, null=True, blank=True)
+    dosage_rate_quantity_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    dosage_rate_quantity_unit = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    dosage_rate_ratio_numerator = models.CharField(max_length=255, null=True, blank=True)
+    dosage_rate_ratio_denominator = models.CharField(max_length=255, null=True, blank=True)
+    dispense_quantity = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    dispense_initial_fill_quantity = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    dispense_initial_fill_duration = models.CharField(max_length=255, null=True, blank=True)
+    dispense_interval = models.CharField(max_length=255, null=True, blank=True)
+    dispense_validity_period_start = models.CharField(max_length=255, null=True, blank=True)
+    dispense_validity_period_end = models.CharField(max_length=255, null=True, blank=True)
+    dispense_repeats_allowed = models.CharField(max_length=255, null=True, blank=True)
+    group_identifier = models.CharField(max_length=100, null=True, blank=True)
+    course_of_therapy_type = models.CharField(max_length=100, null=True, blank=True)
+    instantiates_canonical = models.CharField(max_length=255, null=True, blank=True)
+    instantiates_uri = models.CharField(max_length=255, null=True, blank=True)
+    performer_type = models.CharField(max_length=100, null=True, blank=True)
     class Meta:
-        ordering = ['-requested_at']
-        indexes = [
-            models.Index(fields=['status', '-requested_at']),
-        ]
+        db_table = 'medication_request'
 
-    def __str__(self):
-        return f"Request #{self.id} - {self.inventory_item.generic_name} x{self.quantity}"
-
-    def clean(self):
-        """Validate the medication request."""
-        if self.quantity <= 0:
-            raise ValidationError({
-                'quantity': 'Quantity must be greater than zero'
-            })
-
-
-class DispenseLog(models.Model):
-    """
-    Audit log for dispensed medications.
-    Maintains a permanent record for regulatory compliance.
-    """
-    medication_request = models.OneToOneField(
-        MedicationRequest,
-        on_delete=models.CASCADE
-    )
-    dispensed_by = models.CharField(
-        max_length=100,
-        blank=True,
-        help_text="Pharmacist who dispensed the medication"
-    )
-    dispensed_at = models.DateTimeField(auto_now_add=True)
-    notes = models.TextField(blank=True)
-
+class Inventory(TimeStampedModel):
+    inventory_id = models.AutoField(primary_key=True)
+    item_code = models.CharField(max_length=100, null=True, blank=True)
+    item_name = models.CharField(max_length=255, null=True, blank=True)
+    category = models.CharField(max_length=255, null=True, blank=True)
+    batch_number = models.CharField(max_length=255, null=True, blank=True)
+    current_stock = models.CharField(max_length=255, null=True, blank=True)
+    reorder_level = models.CharField(max_length=255, null=True, blank=True)
+    unit_of_measure = models.CharField(max_length=255, null=True, blank=True)
+    unit_cost = models.CharField(max_length=255, null=True, blank=True)
+    status = models.CharField(max_length=100)
+    expiry_date = models.DateField(null=True, blank=True)
+    last_restocked_datetime = models.DateTimeField(null=True, blank=True)
+    created_by = models.CharField(max_length=255, null=True, blank=True)
     class Meta:
-        ordering = ['-dispensed_at']
+        db_table = 'inventory'
 
-    def __str__(self):
-        return f"Dispensed {self.medication_request.inventory_item.generic_name} on {self.dispensed_at}"
+class MedicationAdministration(FHIRResourceModel):
+    medication_administration_id = models.AutoField(primary_key=True)
+    subject = models.ForeignKey('patients.Patient', on_delete=models.PROTECT, db_column='subject_id')
+    context_id = models.IntegerField(null=True, blank=True)
+    performer_actor = models.ForeignKey('accounts.Practitioner', on_delete=models.PROTECT, db_column='performer_actor_id', null=True, blank=True)
+    request = models.ForeignKey('pharmacy.MedicationRequest', on_delete=models.PROTECT, db_column='request_id', null=True, blank=True)
+    part_of_id = models.IntegerField(null=True, blank=True)
+    device_id = models.IntegerField(null=True, blank=True)
+    event_history_id = models.IntegerField(null=True, blank=True)
+    reason_reference_id = models.IntegerField(null=True, blank=True)
+    medication_reference = models.CharField(max_length=255, null=True, blank=True)
+    medication_code = models.CharField(max_length=100, null=True, blank=True)
+    medication_display = models.CharField(max_length=100, null=True, blank=True)
+    medication_system = models.CharField(max_length=100, null=True, blank=True)
+    instantiates_uri = models.CharField(max_length=255, null=True, blank=True)
+    status_reason = models.CharField(max_length=100, null=True, blank=True)
+    category = models.CharField(max_length=255, null=True, blank=True)
+    effective_datetime = models.DateTimeField(null=True, blank=True)
+    effective_period_start = models.DateField(null=True, blank=True)
+    effective_period_end = models.DateField(null=True, blank=True)
+    performer_function = models.CharField(max_length=255, null=True, blank=True)
+    reason_code = models.CharField(max_length=100, null=True, blank=True)
+    note = models.TextField(null=True, blank=True)
+    dosage_text = models.TextField(null=True, blank=True)
+    dosage_site = models.CharField(max_length=255, null=True, blank=True)
+    dosage_route = models.CharField(max_length=255, null=True, blank=True)
+    dosage_method = models.CharField(max_length=255, null=True, blank=True)
+    dosage_dose_value = models.DecimalField(max_digits=10, decimal_places=0, null=True, blank=True)
+    dosage_dose_unit = models.CharField(max_length=255, null=True, blank=True)
+    dosage_rate_quantity_value = models.DecimalField(max_digits=10, decimal_places=0, null=True, blank=True)
+    dosage_rate_quantity_unit = models.DecimalField(max_digits=10, decimal_places=0, null=True, blank=True)
+    dosage_rate_ratio_numerator = models.CharField(max_length=255, null=True, blank=True)
+    dosage_rate_ratio_denominator = models.CharField(max_length=255, null=True, blank=True)
+    class Meta:
+        db_table = 'medication_administration'

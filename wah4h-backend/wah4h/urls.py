@@ -11,7 +11,7 @@ urlpatterns = [
     path('api/', include('patients.urls')),
 
     # Admissions module
-    path('api/admissions/', include('admissions.urls')),
+    path('api/admission/', include('admission.urls')),
 
     # Monitoring module
     path('api/monitoring/', include('monitoring.urls')),  # <- added

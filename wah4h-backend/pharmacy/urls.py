@@ -1,30 +1,18 @@
-from django.urls import path
-from . import views
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import (
+    InventoryViewSet, 
+    MedicationViewSet, 
+    MedicationRequestViewSet, 
+    MedicationAdministrationViewSet
+)
+
+router = DefaultRouter()
+router.register(r'inventory', InventoryViewSet)
+router.register(r'medications', MedicationViewSet)
+router.register(r'medication-requests', MedicationRequestViewSet)
+router.register(r'medication-administrations', MedicationAdministrationViewSet)
 
 urlpatterns = [
-    # Inventory Management
-    path("inventory/", views.inventory_list, name="inventory-list"),
-    path("inventory/<int:item_id>/", views.inventory_detail, name="inventory-detail"),
-    path(
-        "inventory/<int:item_id>/restock/",
-        views.restock_inventory,
-        name="restock-inventory"
-    ),
-    
-    # Medication Requests
-    path(
-        "medication-requests/",
-        views.medication_requests,
-        name="medication-requests"
-    ),
-    path(
-        "medication-requests/<int:request_id>/update-status/",
-        views.update_request_status,
-        name="update-request-status"
-    ),
-    path(
-        "medication-requests/<int:request_id>/dispense/",
-        views.dispense_medication,
-        name="dispense-medication"
-    ),
+    path('', include(router.urls)),
 ]

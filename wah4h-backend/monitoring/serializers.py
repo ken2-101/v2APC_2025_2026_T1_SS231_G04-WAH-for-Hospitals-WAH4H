@@ -1,22 +1,17 @@
 from rest_framework import serializers
-from .models import VitalSign, ClinicalNote, DietaryOrder, HistoryEvent
+from .models import Observation, ChargeItem, NutritionOrder
 
-class VitalSignSerializer(serializers.ModelSerializer):
+class ObservationSerializer(serializers.ModelSerializer):
     class Meta:
-        model = VitalSign
-        fields = "__all__"
+        model = Observation
+        fields = '__all__'
 
-class ClinicalNoteSerializer(serializers.ModelSerializer):
+class ChargeItemSerializer(serializers.ModelSerializer):
     class Meta:
-        model = ClinicalNote
-        fields = "__all__"
+        model = ChargeItem
+        fields = '__all__'
 
-class DietaryOrderSerializer(serializers.ModelSerializer):
+class NutritionOrderSerializer(serializers.ModelSerializer):
     class Meta:
-        model = DietaryOrder
-        fields = "__all__"
-
-class HistoryEventSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = HistoryEvent
-        fields = "__all__"
+        model = NutritionOrder
+        fields = '__all__'
