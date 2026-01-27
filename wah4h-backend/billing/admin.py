@@ -1,5 +1,8 @@
 from django.contrib import admin
-from .models import Account, Claim, Invoice, PaymentReconciliation, PaymentNotice
+from .models import (
+    Account, Claim, Invoice, PaymentReconciliation, PaymentNotice,
+    Coverage, ClaimResponse, ClaimItem, InvoiceLineItem, PaymentReconciliationDetail
+)
 
 @admin.register(Account)
 class AccountAdmin(admin.ModelAdmin):
@@ -25,3 +28,30 @@ class PaymentReconciliationAdmin(admin.ModelAdmin):
 @admin.register(PaymentNotice)
 class PaymentNoticeAdmin(admin.ModelAdmin):
     list_display = ('payment_notice_id', 'payment_status', 'amount_value', 'payment_date', 'status')
+
+@admin.register(Coverage)
+class CoverageAdmin(admin.ModelAdmin):
+    list_display = ('coverage_id', 'beneficiary', 'payor', 'relationship', 'status')
+    search_fields = ('beneficiary__last_name', 'class_value')
+    list_filter = ('status', 'relationship')
+
+@admin.register(ClaimResponse)
+class ClaimResponseAdmin(admin.ModelAdmin):
+    list_display = ('claim_response_id', 'claim', 'patient', 'outcome', 'payment_amount', 'status')
+    search_fields = ('claim__claim_id', 'patient__last_name')
+    list_filter = ('status', 'outcome')
+
+@admin.register(ClaimItem)
+class ClaimItemAdmin(admin.ModelAdmin):
+    list_display = ('claim_item_id', 'claim', 'sequence', 'product_or_service', 'quantity', 'net')
+    search_fields = ('claim__claim_id', 'product_or_service')
+
+@admin.register(InvoiceLineItem)
+class InvoiceLineItemAdmin(admin.ModelAdmin):
+    list_display = ('line_item_id', 'invoice', 'sequence', 'price_component_type', 'price_component_amount')
+    search_fields = ('invoice__invoice_id', 'price_component_code')
+
+@admin.register(PaymentReconciliationDetail)
+class PaymentReconciliationDetailAdmin(admin.ModelAdmin):
+    list_display = ('detail_id', 'payment_reconciliation', 'type', 'amount', 'date')
+    search_fields = ('payment_reconciliation__payment_reconciliation_id', 'identifier')

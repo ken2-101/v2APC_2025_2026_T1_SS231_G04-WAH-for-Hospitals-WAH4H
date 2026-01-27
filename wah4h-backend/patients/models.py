@@ -1,9 +1,8 @@
 from django.db import models
 from core.models import TimeStampedModel, FHIRResourceModel
 
-class Patient(TimeStampedModel):
+class Patient(FHIRResourceModel):
     patient_id = models.AutoField(primary_key=True)
-    identifier = models.CharField(max_length=100, unique=True, null=True, blank=True)
     # FIX: Added 'active' (was missing or named 'status' previously)
     active = models.BooleanField(null=True, blank=True)
     name_use = models.CharField(max_length=50, null=True, blank=True)
@@ -33,10 +32,10 @@ class Patient(TimeStampedModel):
     contact_telecom = models.CharField(max_length=100, null=True, blank=True)
     contact_address = models.CharField(max_length=255, null=True, blank=True)
     contact_gender = models.CharField(max_length=50, null=True, blank=True)
-    contact_organization_id = models.IntegerField(null=True, blank=True)
-    general_practitioner_id = models.IntegerField(null=True, blank=True)
-    managing_organization_id = models.IntegerField(null=True, blank=True)
-    link_other_patient_id = models.IntegerField(null=True, blank=True)
+    contact_organization = models.ForeignKey('accounts.Organization', on_delete=models.PROTECT, db_column='contact_organization_id', null=True, blank=True, related_name='patient_contacts')
+    general_practitioner = models.ForeignKey('accounts.Practitioner', on_delete=models.PROTECT, db_column='general_practitioner_id', null=True, blank=True)
+    managing_organization = models.ForeignKey('accounts.Organization', on_delete=models.PROTECT, db_column='managing_organization_id', null=True, blank=True, related_name='managed_patients')
+    link_other_patient = models.ForeignKey('patients.Patient', on_delete=models.PROTECT, db_column='link_other_patient_id', null=True, blank=True)
     link_type = models.CharField(max_length=50, null=True, blank=True)
     
     class Meta:
@@ -47,7 +46,6 @@ class Patient(TimeStampedModel):
 
 class Condition(FHIRResourceModel):
     condition_id = models.AutoField(primary_key=True)
-    identifier = models.CharField(max_length=100, unique=True, null=True, blank=True)
     clinical_status = models.CharField(max_length=100, null=True, blank=True)
     verification_status = models.CharField(max_length=100, null=True, blank=True)
     category = models.CharField(max_length=255, null=True, blank=True)
@@ -73,10 +71,8 @@ class Condition(FHIRResourceModel):
     recorder = models.ForeignKey('accounts.Practitioner', on_delete=models.PROTECT, db_column='recorder_id', null=True, blank=True)
     asserter = models.ForeignKey('accounts.Practitioner', on_delete=models.PROTECT, db_column='asserter_id', null=True, blank=True, related_name='asserted_conditions')
     stage_summary = models.CharField(max_length=255, null=True, blank=True)
-    stage_assessment_id = models.IntegerField(null=True, blank=True)
     stage_type = models.CharField(max_length=100, null=True, blank=True)
     evidence_code = models.CharField(max_length=100, null=True, blank=True)
-    evidence_detail_id = models.IntegerField(null=True, blank=True)
     note = models.TextField(null=True, blank=True)
 
     class Meta:

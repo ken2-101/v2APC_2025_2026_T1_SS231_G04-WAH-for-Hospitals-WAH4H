@@ -2,7 +2,7 @@
 from django.db import models
 from core.models import TimeStampedModel, FHIRResourceModel
 
-class Organization(TimeStampedModel):
+class Organization(FHIRResourceModel):
     organization_id = models.AutoField(primary_key=True)
     active = models.BooleanField(null=True, blank=True)
     nhfr_code = models.CharField(max_length=100, unique=True, null=True, blank=True)
@@ -10,7 +10,7 @@ class Organization(TimeStampedModel):
     name = models.CharField(max_length=255, null=True, blank=True)
     alias = models.CharField(max_length=255, null=True, blank=True)
     telecom = models.CharField(max_length=50, null=True, blank=True)
-    endpoint_id = models.IntegerField(null=True, blank=True)
+    endpoint = models.ForeignKey('accounts.Endpoint', on_delete=models.PROTECT, db_column='endpoint_id', null=True, blank=True, related_name='organizations')
     part_of_organization = models.ForeignKey(
         'accounts.Organization',
         on_delete=models.PROTECT,
@@ -69,7 +69,7 @@ class Location(FHIRResourceModel):
         blank=True,
         db_column='part_of_location_id'
     )
-    endpoint_id = models.IntegerField(null=True, blank=True)
+    endpoint = models.ForeignKey('accounts.Endpoint', on_delete=models.PROTECT, db_column='endpoint_id', null=True, blank=True, related_name='locations')
     address_line = models.CharField(max_length=255, null=True, blank=True)
     address_city = models.CharField(max_length=255, null=True, blank=True)
     address_district = models.CharField(max_length=255, null=True, blank=True)
@@ -89,9 +89,8 @@ class Location(FHIRResourceModel):
         return self.name or f"Location {self.location_id}"
 
 
-class Practitioner(TimeStampedModel):
+class Practitioner(FHIRResourceModel):
     practitioner_id = models.AutoField(primary_key=True)
-    identifier = models.CharField(max_length=100, unique=True)
     active = models.BooleanField(null=True, blank=True)
     first_name = models.CharField(max_length=255)
     middle_name = models.CharField(max_length=255, null=True, blank=True)
@@ -110,7 +109,7 @@ class Practitioner(TimeStampedModel):
     address_postal_code = models.CharField(max_length=100, null=True, blank=True)
     qualification_code = models.CharField(max_length=100, null=True, blank=True)
     qualification_identifier = models.CharField(max_length=100, null=True, blank=True)
-    qualification_issuer_id = models.IntegerField(null=True, blank=True)
+    qualification_issuer = models.ForeignKey('accounts.Organization', on_delete=models.PROTECT, db_column='qualification_issuer_id', null=True, blank=True, related_name='qualified_practitioners')
     qualification_period_start = models.DateField(null=True, blank=True)
     qualification_period_end = models.DateField(null=True, blank=True)
 
@@ -121,9 +120,8 @@ class Practitioner(TimeStampedModel):
         return f"{self.first_name} {self.last_name}"
 
 
-class PractitionerRole(TimeStampedModel):
+class PractitionerRole(FHIRResourceModel):
     practitioner_role_id = models.AutoField(primary_key=True)
-    identifier = models.CharField(max_length=100, unique=True)
     active = models.BooleanField(null=True, blank=True)
     practitioner = models.ForeignKey(
         'accounts.Practitioner',
@@ -155,8 +153,8 @@ class PractitionerRole(TimeStampedModel):
     not_available_description = models.TextField(null=True, blank=True)
     not_available_period_start = models.DateField(null=True, blank=True)
     not_available_period_end = models.DateField(null=True, blank=True)
-    endpoint_id = models.IntegerField(null=True, blank=True)
-    healthcare_service_id = models.IntegerField(null=True, blank=True)
+    endpoint = models.ForeignKey('accounts.Endpoint', on_delete=models.PROTECT, db_column='endpoint_id', null=True, blank=True, related_name='practitioner_roles')
+    healthcare_service = models.ForeignKey('accounts.HealthcareService', on_delete=models.PROTECT, db_column='healthcare_service_id', null=True, blank=True, related_name='practitioner_roles')
 
     class Meta:
         db_table = 'practitioner_role'
@@ -202,3 +200,34 @@ class User(TimeStampedModel):
 
     def __str__(self):
         return self.username
+
+# Supporting Models
+
+class Endpoint(FHIRResourceModel):
+    endpoint_id = models.AutoField(primary_key=True)
+    connection_type = models.CharField(max_length=100, null=True, blank=True)
+    name = models.CharField(max_length=255, null=True, blank=True)
+    managing_organization = models.ForeignKey('accounts.Organization', on_delete=models.PROTECT, db_column='managing_organization_id', null=True, blank=True, related_name='managed_endpoints')
+    contact_telecom = models.CharField(max_length=100, null=True, blank=True)
+    period_start = models.DateField(null=True, blank=True)
+    period_end = models.DateField(null=True, blank=True)
+    payload_type = models.CharField(max_length=100, null=True, blank=True)
+    payload_mime_type = models.CharField(max_length=100, null=True, blank=True)
+    address = models.URLField(max_length=255, null=True, blank=True)
+    class Meta:
+        db_table = 'endpoint'
+
+class HealthcareService(FHIRResourceModel):
+    healthcare_service_id = models.AutoField(primary_key=True)
+    active = models.BooleanField(null=True, blank=True)
+    provided_by = models.ForeignKey('accounts.Organization', on_delete=models.PROTECT, db_column='provided_by_id', null=True, blank=True, related_name='healthcare_services')
+    category = models.CharField(max_length=100, null=True, blank=True)
+    type = models.CharField(max_length=100, null=True, blank=True)
+    specialty = models.CharField(max_length=100, null=True, blank=True)
+    location = models.ForeignKey('accounts.Location', on_delete=models.PROTECT, db_column='location_id', null=True, blank=True, related_name='healthcare_services')
+    name = models.CharField(max_length=255, null=True, blank=True)
+    comment = models.TextField(null=True, blank=True)
+    telecom = models.CharField(max_length=100, null=True, blank=True)
+    availability_exceptions = models.CharField(max_length=255, null=True, blank=True)
+    class Meta:
+        db_table = 'healthcare_service'

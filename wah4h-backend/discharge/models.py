@@ -1,5 +1,17 @@
 from django.db import models
-from core.models import TimeStampedModel
+from core.models import TimeStampedModel, FHIRResourceModel
+
+# ==================== STUB MODELS (Mirror Models for FK Targets) ====================
+
+class Media(FHIRResourceModel):
+    """Stub model: Media - for diagnostic report media references"""
+    media_id = models.AutoField(primary_key=True)
+    content_type = models.CharField(max_length=100, null=True, blank=True)
+    url = models.URLField(max_length=500, null=True, blank=True)
+    class Meta:
+        db_table = 'media'
+
+# ==================== CORE MODELS ====================
 
 class Discharge(TimeStampedModel):
     discharge_id = models.AutoField(primary_key=True)

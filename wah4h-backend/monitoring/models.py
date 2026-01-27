@@ -1,17 +1,16 @@
 from django.db import models
 from core.models import FHIRResourceModel, TimeStampedModel
 
-class Observation(TimeStampedModel):
+class Observation(FHIRResourceModel):
     observation_id = models.AutoField(primary_key=True)
-    status = models.CharField(max_length=100)
     subject = models.ForeignKey('patients.Patient', on_delete=models.PROTECT, db_column='subject_id')
     encounter = models.ForeignKey('admission.Encounter', on_delete=models.PROTECT, db_column='encounter_id')
     performer = models.ForeignKey('accounts.Practitioner', on_delete=models.PROTECT, db_column='performer_id', null=True, blank=True)
-    specimen_id = models.IntegerField(null=True, blank=True)
-    device_id = models.IntegerField(null=True, blank=True)
-    derived_from_id = models.IntegerField(null=True, blank=True)
-    focus_id = models.IntegerField(null=True, blank=True)
-    has_member_id = models.IntegerField(null=True, blank=True)
+    specimen = models.ForeignKey('laboratory.Specimen', on_delete=models.PROTECT, db_column='specimen_id', null=True, blank=True, related_name='observations')
+    device = models.ForeignKey('admission.Device', on_delete=models.PROTECT, db_column='device_id', null=True, blank=True, related_name='observations')
+    derived_from = models.ForeignKey('self', on_delete=models.PROTECT, db_column='derived_from_id', null=True, blank=True, related_name='derived_observations')
+    focus = models.ForeignKey('patients.Patient', on_delete=models.PROTECT, db_column='focus_id', null=True, blank=True, related_name='focused_observations')
+    has_member = models.ForeignKey('self', on_delete=models.PROTECT, db_column='has_member_id', null=True, blank=True, related_name='member_of')
     code = models.CharField(max_length=100)
     category = models.CharField(max_length=255, null=True, blank=True)
     body_site = models.CharField(max_length=255, null=True, blank=True)
@@ -76,8 +75,8 @@ class ChargeItem(FHIRResourceModel):
     chargeitem_id = models.AutoField(primary_key=True)
     subject = models.ForeignKey('patients.Patient', on_delete=models.PROTECT, db_column='subject_id')
     account = models.ForeignKey('billing.Account', on_delete=models.PROTECT, db_column='account_id', null=True, blank=True)
-    context_id = models.IntegerField(null=True, blank=True)
-    partof_id = models.IntegerField(null=True, blank=True)
+    context = models.ForeignKey('admission.Encounter', on_delete=models.PROTECT, db_column='context_id', null=True, blank=True, related_name='charge_items')
+    partof = models.ForeignKey('billing.Account', on_delete=models.PROTECT, db_column='partof_id', null=True, blank=True, related_name='charge_item_parts')
     performing_organization = models.ForeignKey(
         'accounts.Organization', 
         on_delete=models.PROTECT, 
@@ -95,8 +94,8 @@ class ChargeItem(FHIRResourceModel):
         related_name='charge_items_requested'
     )
     performer_actor = models.ForeignKey('accounts.Practitioner', on_delete=models.PROTECT, db_column='performer_actor_id', null=True, blank=True)
-    enterer_id = models.IntegerField(null=True, blank=True)
-    cost_center_id = models.IntegerField(null=True, blank=True)
+    enterer = models.ForeignKey('accounts.Practitioner', on_delete=models.PROTECT, db_column='enterer_id', null=True, blank=True, related_name='entered_charge_items')
+    cost_center = models.ForeignKey('accounts.Organization', on_delete=models.PROTECT, db_column='cost_center_id', null=True, blank=True, related_name='cost_center_charge_items')
     code = models.CharField(max_length=100)
     definition_uri = models.CharField(max_length=255, null=True, blank=True)
     definition_canonical = models.CharField(max_length=255, null=True, blank=True)
@@ -109,7 +108,7 @@ class ChargeItem(FHIRResourceModel):
     bodysite_system = models.CharField(max_length=100, null=True, blank=True)
     factor_override = models.CharField(max_length=255, null=True, blank=True)
     price_override_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    price_override_currency = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    price_override_currency = models.CharField(max_length=10, null=True, blank=True)
     override_reason = models.CharField(max_length=255, null=True, blank=True)
     reason_code = models.CharField(max_length=100, null=True, blank=True)
     reason_system = models.CharField(max_length=100, null=True, blank=True)
@@ -117,7 +116,7 @@ class ChargeItem(FHIRResourceModel):
     product_reference = models.CharField(max_length=255, null=True, blank=True)
     product_codeableconcept = models.CharField(max_length=100, null=True, blank=True)
     quantity_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    quantity_unit = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    quantity_unit = models.CharField(max_length=50, null=True, blank=True)
     supporting_information = models.CharField(max_length=255, null=True, blank=True)
     note = models.TextField(null=True, blank=True)
     class Meta:
@@ -129,8 +128,8 @@ class ChargeItemDefinition(FHIRResourceModel):
     version = models.CharField(max_length=255, null=True, blank=True)
     title = models.CharField(max_length=255, null=True, blank=True)
     derivedFromUri = models.CharField(max_length=255, null=True, blank=True)
-    partOf_id = models.IntegerField(null=True, blank=True)
-    replaces_id = models.IntegerField(null=True, blank=True)
+    partOf = models.ForeignKey('self', on_delete=models.PROTECT, db_column='partOf_id', null=True, blank=True, related_name='parts')
+    replaces = models.ForeignKey('self', on_delete=models.PROTECT, db_column='replaces_id', null=True, blank=True, related_name='replaced_by')
     experimental = models.CharField(max_length=255, null=True, blank=True)
     date = models.CharField(max_length=255, null=True, blank=True)
     publisher = models.CharField(max_length=255, null=True, blank=True)
@@ -151,11 +150,11 @@ class ChargeItemDefinition(FHIRResourceModel):
     applicability_description = models.TextField(null=True, blank=True)
     applicability_language = models.CharField(max_length=255, null=True, blank=True)
     applicability_expression = models.CharField(max_length=255, null=True, blank=True)
-    propertyGroup_priceComponent_type = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    propertyGroup_priceComponent_code = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    propertyGroup_priceComponent_type = models.CharField(max_length=100, null=True, blank=True)
+    propertyGroup_priceComponent_code = models.CharField(max_length=100, null=True, blank=True)
     propertyGroup_priceComponent_factor = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     propertyGroup_priceComponent_amount_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    propertyGroup_priceComponent_amount_currency = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    propertyGroup_priceComponent_amount_currency = models.CharField(max_length=10, null=True, blank=True)
     propertyGroup_applicability_description = models.TextField(null=True, blank=True)
     propertyGroup_applicability_language = models.CharField(max_length=255, null=True, blank=True)
     propertyGroup_applicability_expression = models.CharField(max_length=255, null=True, blank=True)
@@ -168,8 +167,6 @@ class NutritionOrder(FHIRResourceModel):
     patient = models.ForeignKey('patients.Patient', on_delete=models.PROTECT, db_column='patient_id')
     encounter = models.ForeignKey('admission.Encounter', on_delete=models.PROTECT, db_column='encounter_id', null=True, blank=True)
     orderer = models.ForeignKey('accounts.Practitioner', on_delete=models.PROTECT, db_column='orderer_id', null=True, blank=True)
-    identifier = models.CharField(max_length=100, unique=True, null=True, blank=True)
-    status = models.CharField(max_length=100)
     datetime = models.DateTimeField(auto_now_add=True)
     
     # Diet Details

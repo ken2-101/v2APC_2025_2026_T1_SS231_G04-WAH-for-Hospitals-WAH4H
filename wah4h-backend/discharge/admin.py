@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Discharge
+from .models import Discharge, Media
 
 @admin.register(Discharge)
 class DischargeAdmin(admin.ModelAdmin):
@@ -8,3 +8,9 @@ class DischargeAdmin(admin.ModelAdmin):
     list_display = ('discharge_id', 'encounter', 'patient', 'discharge_datetime', 'workflow_status')
     search_fields = ('discharge_id', 'patient__last_name', 'workflow_status')
     list_filter = ('workflow_status', 'discharge_datetime')
+
+@admin.register(Media)
+class MediaAdmin(admin.ModelAdmin):
+    list_display = ('media_id', 'content_type', 'status')
+    search_fields = ('identifier', 'content_type')
+    list_filter = ('status', 'content_type')
