@@ -182,10 +182,18 @@ class LoginSerializer(serializers.Serializer):
         email = attrs.get("email")
         password = attrs.get("password")
 
-        # IMPORTANT: Django authenticate() expects 'username' parameter
-        # even when using email as the login identifier
+        # IMPORTANT: Our database stores usernames, not emails as login identifiers.
+        # Users log in with email, but we must authenticate with username.
+        # Step 1: Look up the user by email
+        try:
+            user_obj = User.objects.get(email=email)
+            username = user_obj.username
+        except User.DoesNotExist:
+            raise serializers.ValidationError("Invalid credentials")
+        
+        # Step 2: Authenticate using the username
         user = authenticate(
-            username=email,
+            username=username,
             password=password
         )
 

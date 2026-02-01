@@ -1,12 +1,13 @@
 # accounts/models.py
 from django.db import models
+from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, UserManager
 from core.models import TimeStampedModel, FHIRResourceModel
 
 class Organization(FHIRResourceModel):
     organization_id = models.AutoField(primary_key=True)
     active = models.BooleanField(null=True, blank=True)
     nhfr_code = models.CharField(max_length=100, unique=True, null=True, blank=True)
-    type_code = models.CharField(max_length=100, unique=True, null=True, blank=True)
+    type_code = models.CharField(max_length=100, null=True, blank=True)
     name = models.CharField(max_length=255, null=True, blank=True)
     alias = models.CharField(max_length=255, null=True, blank=True)
     telecom = models.CharField(max_length=50, null=True, blank=True)
@@ -164,7 +165,20 @@ class PractitionerRole(FHIRResourceModel):
         db_table = 'practitioner_role'
 
 
-class User(TimeStampedModel):
+class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
+    """
+    Custom User model with OneToOne link to Practitioner.
+    
+    Architecture:
+    - Inherits from AbstractBaseUser for Django authentication (check_password, set_password, etc.)
+    - Inherits from PermissionsMixin for Django permission system
+    - practitioner is the primary key (enforces 1:1 relationship)
+    - Uses standard UserManager for authentication
+    
+    Context: Philippine LGU Hospital System
+    - Prevents credential sharing (one practitioner = one user)
+    - Supports offline TOTP authentication
+    """
     practitioner = models.OneToOneField(
         'accounts.Practitioner',
         on_delete=models.PROTECT,
@@ -173,31 +187,28 @@ class User(TimeStampedModel):
     )
     username = models.CharField(max_length=255, unique=True)
     email = models.EmailField(max_length=255, unique=True, null=True, blank=True)
-    password_hash = models.CharField(max_length=255)
+    password = models.CharField(max_length=255, db_column='password_hash')  # Django expects 'password' field
     first_name = models.CharField(max_length=255)
     last_name = models.CharField(max_length=255)
     role = models.CharField(max_length=255, null=True, blank=True)
     status = models.CharField(max_length=100)
-    last_login = models.CharField(max_length=255, null=True, blank=True)
     # Kept as Integer to match Excel, though Practitioner is PK
     id = models.IntegerField(null=True, blank=True)
+    
+    # Required by AbstractBaseUser and Django Admin
+    is_staff = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
+    is_superuser = models.BooleanField(default=False)
+
+    # Attach standard UserManager for Django authentication
+    objects = UserManager()
 
     # ---------------------------------------------------------
     # DJANGO AUTH CONFIGURATION
     # ---------------------------------------------------------
     USERNAME_FIELD = 'username'
     # Fields required when running 'createsuperuser'
-    REQUIRED_FIELDS = ['first_name', 'last_name', 'email']
-
-    @property
-    def is_anonymous(self):
-        """Always return False. Used for permission checks."""
-        return False
-
-    @property
-    def is_authenticated(self):
-        """Always return True. Used for permission checks."""
-        return True
+    REQUIRED_FIELDS = ['email']
 
     class Meta:
         db_table = 'user'

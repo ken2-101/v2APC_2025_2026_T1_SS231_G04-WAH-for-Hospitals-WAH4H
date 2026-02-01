@@ -197,17 +197,23 @@ class PractitionerService:
         # The qualification_identifier is the PRC License Number in the Philippines.
         # This MUST be unique across all active practitioners as it represents
         # legal authority to practice medicine.
+        #
+        # CRITICAL: We check for ANY existing practitioner (active=True) with this license.
+        # This prevents license reuse and ensures professional credential integrity.
         if qualification_identifier:
-            license_conflict = Practitioner.objects.filter(
-                qualification_identifier=qualification_identifier,
-                active=True
-            ).exists()
+            existing_with_license = Practitioner.objects.filter(
+                qualification_identifier=qualification_identifier
+            ).filter(
+                Q(active=True) | Q(active__isnull=True)  # Include NULL as "active" for safety
+            )
             
-            if license_conflict:
+            if existing_with_license.exists():
+                existing = existing_with_license.first()
                 raise ValidationError(
-                    f"PRC License '{qualification_identifier}' is already registered to another "
-                    "active practitioner. Each license must be unique. If this practitioner "
-                    "is transferring, please deactivate the previous record first."
+                    f"PRC License '{qualification_identifier}' is already registered to "
+                    f"{existing.first_name} {existing.last_name} (ID: {existing.practitioner_id}). "
+                    "Each PRC license must be unique. If this is a transfer, please deactivate "
+                    "the previous practitioner record first."
                 )
         
         # -------------------------------------------------------------------------
@@ -267,16 +273,18 @@ class PractitionerService:
         if email and User.objects.filter(email=email).exists():
             raise ValidationError(f"Email '{email}' is already registered.")
         
-        # Hash password securely
+        # Hash password securely using Django's built-in method
         raw_password = user_data.pop('password', None)
-        if raw_password:
-            user_data['password_hash'] = make_password(raw_password)
+        if not raw_password:
+            raise ValidationError("Password is required for user account creation.")
         
         # Create User with OneToOne link to Practitioner
+        # Note: We use create() instead of create_user() because practitioner is the PK
         user = User.objects.create(
             practitioner=practitioner,
             first_name=user_data.get('first_name', practitioner.first_name),
             last_name=user_data.get('last_name', practitioner.last_name),
+            password=make_password(raw_password),  # Django expects 'password' field
             **user_data
         )
         
