@@ -4,6 +4,7 @@ Django settings for wah4h project.
 
 from pathlib import Path
 from datetime import timedelta
+import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -74,10 +75,13 @@ WSGI_APPLICATION = "wah4h.wsgi.application"
 
 # Database
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
+    'default': dj_database_url.config(
+        # HYBRID TRICK:
+        # We use the default 'postgres' user from Step 1.
+        # We hardcode it here so you don't need a .env file for local testing.
+        default='postgres://postgres:password@localhost:5432/wah4h_db',
+        conn_max_age=600
+    )
 }
 
 # Password validation
