@@ -33,7 +33,7 @@ class Organization(FHIRResourceModel):
     contact_address_city = models.CharField(max_length=50, null=True, blank=True)
     contact_address_state = models.CharField(max_length=50, null=True, blank=True)
     contact_address_country = models.CharField(max_length=50, null=True, blank=True)
-    contact_address_postal_code = models.CharField(max_length=100, unique=True, null=True, blank=True)
+    contact_postal_code = models.CharField(max_length=100, unique=True, null=True, blank=True)
 
     class Meta:
         db_table = 'organization'
@@ -44,6 +44,8 @@ class Organization(FHIRResourceModel):
 
 class Location(FHIRResourceModel):
     location_id = models.AutoField(primary_key=True)
+    identifier = models.CharField(max_length=100, unique=True, null=True, blank=True)
+    status = models.CharField(max_length=100)
     physical_type_code = models.CharField(max_length=100, unique=True, null=True, blank=True)
     type_code = models.CharField(max_length=100, unique=True, null=True, blank=True)
     operational_status = models.CharField(max_length=100, null=True, blank=True)
@@ -91,6 +93,7 @@ class Location(FHIRResourceModel):
 
 class Practitioner(FHIRResourceModel):
     practitioner_id = models.AutoField(primary_key=True)
+    identifier = models.CharField(max_length=100, unique=True)
     active = models.BooleanField(null=True, blank=True)
     first_name = models.CharField(max_length=255)
     middle_name = models.CharField(max_length=255, null=True, blank=True)
@@ -122,6 +125,7 @@ class Practitioner(FHIRResourceModel):
 
 class PractitionerRole(FHIRResourceModel):
     practitioner_role_id = models.AutoField(primary_key=True)
+    identifier = models.CharField(max_length=100, unique=True)
     active = models.BooleanField(null=True, blank=True)
     practitioner = models.ForeignKey(
         'accounts.Practitioner',
