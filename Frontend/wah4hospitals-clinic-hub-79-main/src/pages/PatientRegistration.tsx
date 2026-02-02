@@ -103,8 +103,42 @@ export const PatientRegistration: React.FC = () => {
   const handleRegisterPatient = async (e: FormEvent) => {
     e.preventDefault();
     setFormLoading(true); setFormError(''); setFormSuccess('');
+    
+    // Map Frontend Form Data to Backend FHIR Model
+    const payload = {
+      // Required by FHIRResourceModel
+      identifier: formData.philhealth_id || formData.national_id || `TMP-${Date.now()}`,
+      status: formData.status,
+
+      // Patient Model Fields
+      first_name: formData.first_name,
+      last_name: formData.last_name,
+      middle_name: formData.middle_name,
+      name_suffix: formData.suffix,          // mapped from suffix
+      gender: formData.sex,                  // mapped from sex
+      birth_date: formData.date_of_birth,    // mapped from date_of_birth
+      marital_status: formData.civil_status, // mapped from civil_status
+      
+      // Address mapping
+      address_line: formData.house_no_street,
+      address_city: formData.city_municipality,
+      address_state: formData.province,
+      address_district: formData.barangay,
+      address_country: 'Philippines',       // default
+      
+      // Telecom
+      telecom: formData.mobile_number,
+      
+      // Additional fields that might be stored in specific fields or JSON
+      // If backend has specific columns for these, add them here:
+      // nationality: formData.nationality,
+      // occupation: formData.occupation,
+      
+      active: formData.status === 'Active',
+    };
+
     try {
-      const res = await axios.post(API_URL, formData);
+      const res = await axios.post(API_URL, payload);
       const registeredPatient: Patient = res.data;
       setFormSuccess(`Patient registered successfully! ID: ${registeredPatient.patient_id}`);
       setShowRegistrationModal(false);
