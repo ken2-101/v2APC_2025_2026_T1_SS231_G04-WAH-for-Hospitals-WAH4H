@@ -164,6 +164,7 @@ class PractitionerRole(FHIRResourceModel):
 # ==========================================
 from django.contrib.auth.models import BaseUserManager
 from django.contrib.auth.hashers import make_password, check_password as django_check_password
+import uuid
 
 class UserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -180,15 +181,35 @@ class UserManager(BaseUserManager):
             first_name = extra_fields.get('first_name', '')
             last_name = extra_fields.get('last_name', '')
             
+            # Generate unique identifier for the practitioner
+            practitioner_identifier = f"P-{uuid.uuid4().hex[:8].upper()}"
+            
             # Simple Practitioner creation
             practitioner = Practitioner.objects.create(
+                identifier=practitioner_identifier, # Added unique identifier
                 first_name=first_name,
                 last_name=last_name,
-                active=True
+                active=True,
+                status='active' # Ensure status is set for FHIRResourceModel
             )
+            print(f"DEBUG: Created Practitioner object: {practitioner}")
+            print(f"DEBUG: Practitioner PK: {practitioner.pk}")
+
+            # Ensure Practitioner is fresh and has an ID
+            if not practitioner.pk:
+                practitioner.refresh_from_db()
+                print(f"DEBUG: Refreshed Practitioner PK: {practitioner.pk}")
+            
             extra_fields['practitioner'] = practitioner
 
         user = self.model(email=email, **extra_fields)
+        
+        # Explicitly ensure the FK is set if it's missing on the instance
+        if not user.practitioner_id and extra_fields.get('practitioner') and extra_fields['practitioner'].pk:
+             user.practitioner_id = extra_fields['practitioner'].pk
+             print(f"DEBUG: Manually set user.practitioner_id to {user.practitioner_id}")
+             
+        print(f"DEBUG: Initialized User. Practitioner FK: {user.practitioner_id}")
         
         # Set default status
         if not user.status:

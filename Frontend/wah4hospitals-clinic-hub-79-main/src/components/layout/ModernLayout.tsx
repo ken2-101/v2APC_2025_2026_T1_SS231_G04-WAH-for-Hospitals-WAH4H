@@ -202,7 +202,7 @@ const ModernLayout: React.FC<ModernLayoutProps> = ({
               </div>
               <div>
                 <h1 className="text-xl font-bold text-gradient">WAH4H</h1>
-                <div className="flex items-center space-x-2 hidden sm:flex">
+                <div className="flex items-center space-x-2 hidden lg:flex">
                   <p className="text-sm text-gray-500">Healthcare Information System</p>
                   <Badge variant="secondary" className="bg-purple-100 text-purple-800 border-purple-200 text-xs">
                     <Crown className="w-3 h-3 mr-1" />

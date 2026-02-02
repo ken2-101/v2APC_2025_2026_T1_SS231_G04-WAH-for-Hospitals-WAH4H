@@ -40,7 +40,7 @@ class RegisterAPIView(generics.CreateAPIView):
                 "message": "User registered successfully",
                 "tokens": tokens,
                 "user": {
-                    "id": user.id,
+                    "id": user.pk,
                     "first_name": user.first_name,
                     "last_name": user.last_name,
                     "email": user.email,
@@ -71,7 +71,7 @@ class LoginAPIView(generics.GenericAPIView):
                 "message": "Login successful",
                 "tokens": tokens,
                 "user": {
-                    "id": user.id,
+                    "id": user.pk,
                     "first_name": user.first_name,
                     "last_name": user.last_name,
                     "email": user.email,

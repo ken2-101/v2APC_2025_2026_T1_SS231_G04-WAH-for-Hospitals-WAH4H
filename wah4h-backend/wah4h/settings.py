@@ -134,5 +134,7 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
     "AUTH_HEADER_TYPES": ("Bearer",),
+    "USER_ID_FIELD": "practitioner_id", # Use the actual PK field
+    "USER_ID_CLAIM": "user_id",
 }
         
