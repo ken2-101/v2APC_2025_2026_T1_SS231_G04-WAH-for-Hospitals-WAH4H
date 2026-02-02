@@ -159,6 +159,54 @@ class PractitionerRole(FHIRResourceModel):
     class Meta:
         db_table = 'practitioner_role'
 
+# ==========================================
+# Custom User Manager for Django Auth
+# ==========================================
+from django.contrib.auth.models import BaseUserManager
+from django.contrib.auth.hashers import make_password, check_password as django_check_password
+
+class UserManager(BaseUserManager):
+    def create_user(self, email, password=None, **extra_fields):
+        if not email:
+            raise ValueError("The Email field must be set")
+        email = self.normalize_email(email)
+        
+        # Ensure username is present
+        if 'username' not in extra_fields or not extra_fields['username']:
+            extra_fields['username'] = email
+
+        # Handle linked Practitioner creation if not provided
+        if 'practitioner' not in extra_fields:
+            first_name = extra_fields.get('first_name', '')
+            last_name = extra_fields.get('last_name', '')
+            
+            # Simple Practitioner creation
+            practitioner = Practitioner.objects.create(
+                first_name=first_name,
+                last_name=last_name,
+                active=True
+            )
+            extra_fields['practitioner'] = practitioner
+
+        user = self.model(email=email, **extra_fields)
+        
+        # Set default status
+        if not user.status:
+            user.status = 'active'
+            
+        if password:
+            user.set_password(password)
+        else:
+            user.set_unusable_password()
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, password=None, **extra_fields):
+        extra_fields.setdefault('role', 'admin')
+        return self.create_user(email, password, **extra_fields)
+
+    def get_by_natural_key(self, username):
+        return self.get(**{self.model.USERNAME_FIELD: username})
 
 class User(TimeStampedModel):
     practitioner = models.OneToOneField(
@@ -181,6 +229,8 @@ class User(TimeStampedModel):
     # ---------------------------------------------------------
     # DJANGO AUTH CONFIGURATION
     # ---------------------------------------------------------
+    objects = UserManager()
+    
     USERNAME_FIELD = 'username'
     # Fields required when running 'createsuperuser'
     REQUIRED_FIELDS = ['first_name', 'last_name', 'email']
@@ -194,6 +244,36 @@ class User(TimeStampedModel):
     def is_authenticated(self):
         """Always return True. Used for permission checks."""
         return True
+        
+    @property
+    def is_active(self):
+        return True # Or check self.status == 'active'
+
+    @property
+    def is_staff(self):
+        return self.role == 'admin' or self.role == 'Admin'
+
+    @property
+    def is_superuser(self):
+        return self.role == 'admin' or self.role == 'Admin'
+        
+    def has_perm(self, perm, obj=None):
+        return self.is_superuser
+
+    def has_module_perms(self, app_label):
+        return self.is_superuser
+
+    def set_password(self, raw_password):
+        self.password_hash = make_password(raw_password)
+        
+    def check_password(self, raw_password):
+        return django_check_password(raw_password, self.password_hash)
+        
+    def set_unusable_password(self):
+        self.password_hash = "!"
+        
+    def has_usable_password(self):
+         return self.password_hash != "!"
 
     class Meta:
         db_table = 'user'
