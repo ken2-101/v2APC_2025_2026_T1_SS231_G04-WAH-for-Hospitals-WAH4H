@@ -1,7 +1,16 @@
 import React from 'react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { X } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Filter, X } from 'lucide-react';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuCheckboxItem,
+    DropdownMenuTrigger,
+    DropdownMenuSeparator,
+    DropdownMenuLabel,
+    DropdownMenuItem,
+} from '@/components/ui/dropdown-menu';
 
 interface MonitoringFiltersProps {
     activeFilters: {
@@ -9,69 +18,74 @@ interface MonitoringFiltersProps {
         status: string;
         doctor: string;
     };
-    handleFilterChange: (key: string, value: string) => void;
+    options: {
+        wards: string[];
+        statuses: string[];
+        doctors: string[];
+    };
+    handleFilterChange: (key: 'ward' | 'status' | 'doctor', value: string) => void;
     clearFilters: () => void;
     hasActiveFilters: boolean;
 }
 
 export const MonitoringFilters: React.FC<MonitoringFiltersProps> = ({
     activeFilters,
+    options,
     handleFilterChange,
     clearFilters,
     hasActiveFilters,
 }) => {
+    const renderCheckboxItems = (
+        key: 'ward' | 'status' | 'doctor',
+        items: string[]
+    ) => {
+        return items.map((item) => (
+            <DropdownMenuCheckboxItem
+                key={item}
+                checked={activeFilters[key] === item}
+                onCheckedChange={() => handleFilterChange(key, activeFilters[key] === item ? '' : item)}
+            >
+                {item}
+            </DropdownMenuCheckboxItem>
+        ));
+    };
+
     return (
-        <div className="flex flex-wrap gap-2 items-center">
-            <Select
-                value={activeFilters.ward}
-                onValueChange={(value) => handleFilterChange('ward', value)}
-            >
-                <SelectTrigger className="w-[140px]">
-                    <SelectValue placeholder="Ward" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="General Ward">General Ward</SelectItem>
-                    <SelectItem value="ICU">ICU</SelectItem>
-                    <SelectItem value="Pediatrics">Pediatrics</SelectItem>
-                    <SelectItem value="Surgery">Surgery</SelectItem>
-                </SelectContent>
-            </Select>
-
-            <Select
-                value={activeFilters.status}
-                onValueChange={(value) => handleFilterChange('status', value)}
-            >
-                <SelectTrigger className="w-[140px]">
-                    <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="Stable">Stable</SelectItem>
-                    <SelectItem value="Critical">Critical</SelectItem>
-                    <SelectItem value="Observation">Observation</SelectItem>
-                    <SelectItem value="Recovering">Recovering</SelectItem>
-                </SelectContent>
-            </Select>
-
-            <Select
-                value={activeFilters.doctor}
-                onValueChange={(value) => handleFilterChange('doctor', value)}
-            >
-                <SelectTrigger className="w-[160px]">
-                    <SelectValue placeholder="Assigned Doctor" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="Dr. Smith">Dr. Smith</SelectItem>
-                    <SelectItem value="Dr. Johnson">Dr. Johnson</SelectItem>
-                    <SelectItem value="Dr. Williams">Dr. Williams</SelectItem>
-                </SelectContent>
-            </Select>
-
-            {hasActiveFilters && (
-                <Button variant="ghost" size="sm" onClick={clearFilters} className="h-10 px-2 text-gray-500">
-                    <X className="w-4 h-4 mr-1" />
-                    Clear
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="w-full sm:w-auto">
+                    <Filter className="w-4 h-4 mr-2" />
+                    Filter
+                    {hasActiveFilters && (
+                        <Badge className="ml-2 bg-blue-100 text-blue-800 text-xs">
+                            !
+                        </Badge>
+                    )}
                 </Button>
-            )}
-        </div>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Filter by Status</DropdownMenuLabel>
+                {renderCheckboxItems('status', options.statuses)}
+                <DropdownMenuSeparator />
+
+                <DropdownMenuLabel>Filter by Ward</DropdownMenuLabel>
+                {renderCheckboxItems('ward', options.wards)}
+                <DropdownMenuSeparator />
+
+                <DropdownMenuLabel>Filter by Doctor</DropdownMenuLabel>
+                {renderCheckboxItems('doctor', options.doctors)}
+
+                {hasActiveFilters && (
+                    <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={clearFilters} className="text-red-600">
+                            <X className="w-4 h-4 mr-2" />
+                            Clear All Filters
+                        </DropdownMenuItem>
+                    </>
+                )}
+            </DropdownMenuContent>
+        </DropdownMenu>
     );
 };

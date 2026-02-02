@@ -2,3 +2,5 @@
 venv/
 backend/venv/
 *.cfg
+
+*.pyc

@@ -12,6 +12,7 @@ import {
 } from '../types/monitoring';
 import { PatientMonitoringPage } from '@/components/monitoring/PatientMonitoringPage';
 import { MonitoringDashboard } from '@/components/monitoring/MonitoringDashboard';
+import { MonitoringFilters } from '@/components/monitoring/MonitoringFilters';
 import { Activity, Users, AlertTriangle, Heart } from 'lucide-react';
 
 // Detect backend URL dynamically
@@ -248,8 +249,35 @@ const Monitoring: React.FC = () => {
           </div>
         </div>
       </div>
-      
-      <MonitoringDashboard admissions={admissions} onSelectAdmission={handleSelectAdmission} />
+
+      {/* Search and Filters */}
+      <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+        <div className="relative w-full md:max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input
+            placeholder="Search by patient name, ID..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+
+        <div className="flex gap-2 w-full md:w-auto">
+          <MonitoringFilters
+            activeFilters={activeFilters as any}
+            handleFilterChange={handleFilterChange as any}
+            clearFilters={clearFilters}
+            hasActiveFilters={hasActiveFilters}
+            options={{
+              wards: Array.from(new Set(admissions.map(a => a.ward).filter(Boolean))),
+              statuses: ['Stable', 'Critical', 'Observation', 'Recovering'],
+              doctors: Array.from(new Set(admissions.map(a => a.attendingPhysician).filter(Boolean))),
+            }}
+          />
+        </div>
+      </div>
+
+      <MonitoringDashboard admissions={filteredAdmissions} onSelectAdmission={handleSelectAdmission} />
     </div>
   );
 };
