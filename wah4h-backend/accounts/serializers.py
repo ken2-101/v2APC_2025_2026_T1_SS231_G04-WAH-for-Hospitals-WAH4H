@@ -171,12 +171,15 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 class LoginSerializer(serializers.Serializer):
     """
-    Serializer for user authentication.
+    Serializer for user authentication with Email 2FA.
     
-    Supports both email and username login.
+    Two-step authentication:
+    1. email + password → Triggers OTP generation
+    2. email + password + otp → Validates OTP and returns JWT tokens
     """
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
+    otp = serializers.CharField(max_length=6, required=False, allow_blank=True)
 
     def validate(self, attrs):
         email = attrs.get("email")

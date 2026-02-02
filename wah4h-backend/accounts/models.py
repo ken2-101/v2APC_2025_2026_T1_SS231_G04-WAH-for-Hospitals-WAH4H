@@ -195,6 +195,10 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
     # Kept as Integer to match Excel, though Practitioner is PK
     id = models.IntegerField(null=True, blank=True)
     
+    # Email-based 2FA fields
+    otp_code = models.CharField(max_length=6, null=True, blank=True)
+    otp_created_at = models.DateTimeField(null=True, blank=True)
+    
     # Required by AbstractBaseUser and Django Admin
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)

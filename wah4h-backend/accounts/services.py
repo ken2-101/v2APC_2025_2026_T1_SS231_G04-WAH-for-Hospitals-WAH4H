@@ -401,113 +401,86 @@ class AuthService:
     """
     Manages authentication and security features.
     
-    Context: LGU hospitals often have poor cellular connectivity,
-    making SMS-based 2FA unreliable. We use TOTP (Time-based One-Time Password)
-    which works offline via authenticator apps like Google Authenticator.
+    Context: Email-based Two-Factor Authentication for simplicity.
+    The OTP is generated upon successful password verification and
+    emailed to the user. The code expires after 5 minutes.
     """
     
     @staticmethod
-    def setup_totp_device(user: User, device_name: str = "default") -> str:
+    def generate_login_otp(user: User) -> None:
         """
-        Provision a TOTP device for two-factor authentication.
+        Generate a 6-digit OTP and email it to the user.
         
-        This method creates a TOTP device and returns a provisioning URI
-        that can be encoded as a QR code for scanning by authenticator apps.
-        
-        Implementation Note: This is a scaffold/stub for TOTP integration.
-        In production, install django-otp:
-            pip install django-otp qrcode
-        
-        Then use:
-            from django_otp.plugins.otp_totp.models import TOTPDevice
-            
         Args:
-            user: User instance to provision device for
-            device_name: Name of the device (default: "default")
+            user: User instance with valid email address
             
-        Returns:
-            str: Provisioning URI for QR code generation
-                Format: otpauth://totp/WAH4H:username?secret=XXX&issuer=WAH4H
-        
-        Example:
-            >>> uri = AuthService.setup_totp_device(user)
-            >>> # Generate QR code from uri for user to scan
-            >>> import qrcode
-            >>> qr = qrcode.make(uri)
-            >>> qr.save('totp_qr.png')
+        Side Effects:
+            - Updates user.otp_code with a random 6-digit string
+            - Updates user.otp_created_at with current timestamp
+            - Sends email with OTP to user.email
         """
-        # Scaffold implementation - Replace with actual django-otp integration
-        # 
-        # PRODUCTION IMPLEMENTATION:
-        # ----------------------------
-        # from django_otp.plugins.otp_totp.models import TOTPDevice
-        # import pyotp
-        # 
-        # # Check if device already exists
-        # device = TOTPDevice.objects.filter(
-        #     user=user,
-        #     name=device_name
-        # ).first()
-        # 
-        # if not device:
-        #     device = TOTPDevice.objects.create(
-        #         user=user,
-        #         name=device_name,
-        #         confirmed=False
-        #     )
-        # 
-        # # Generate provisioning URI
-        # totp = pyotp.TOTP(device.key)
-        # provisioning_uri = totp.provisioning_uri(
-        #     name=user.email or user.username,
-        #     issuer_name="WAH4H Hospital System"
-        # )
-        # 
-        # return provisioning_uri
+        from django.core.mail import send_mail
+        from django.utils import timezone
+        import random
         
-        # Placeholder return for development
-        import secrets
-        secret = secrets.token_hex(20)
-        username = user.email or user.username
-        provisioning_uri = (
-            f"otpauth://totp/WAH4H:{username}"
-            f"?secret={secret}"
-            f"&issuer=WAH4H"
+        # Generate random 6-digit OTP
+        otp_code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+        
+        # Save OTP to database
+        user.otp_code = otp_code
+        user.otp_created_at = timezone.now()
+        user.save(update_fields=['otp_code', 'otp_created_at'])
+        
+        # Send email
+        send_mail(
+            subject='WAH4H Login Verification Code',
+            message=f'Your verification code is: {otp_code}\n\nThis code will expire in 5 minutes.',
+            from_email='noreply@wah4h.com',
+            recipient_list=[user.email],
+            fail_silently=False,
         )
-        
-        return provisioning_uri
     
     @staticmethod
-    def verify_totp_token(user: User, token: str, device_name: str = "default") -> bool:
+    def verify_login_otp(user: User, code: str) -> bool:
         """
-        Verify a TOTP token for a user's device.
+        Verify an OTP code for login.
         
         Args:
             user: User instance
-            token: 6-digit TOTP token
-            device_name: Name of the device to verify against
+            code: 6-digit OTP code provided by user
             
         Returns:
-            bool: True if token is valid
-        
-        Implementation Note: Scaffold method for django-otp integration.
+            bool: True if code is valid and not expired, False otherwise
+            
+        Side Effects:
+            If valid, clears user.otp_code and user.otp_created_at
         """
-        # PRODUCTION IMPLEMENTATION:
-        # ----------------------------
-        # from django_otp.plugins.otp_totp.models import TOTPDevice
-        # 
-        # try:
-        #     device = TOTPDevice.objects.get(
-        #         user=user,
-        #         name=device_name,
-        #         confirmed=True
-        #     )
-        #     return device.verify_token(token)
-        # except TOTPDevice.DoesNotExist:
-        #     return False
+        from django.utils import timezone
+        from datetime import timedelta
         
-        # Placeholder for development
-        return False
+        # Check if OTP exists
+        if not user.otp_code or not user.otp_created_at:
+            return False
+        
+        # Check if OTP matches
+        if user.otp_code != code:
+            return False
+        
+        # Check if OTP is expired (5 minutes)
+        expiry_time = user.otp_created_at + timedelta(minutes=5)
+        if timezone.now() > expiry_time:
+            # Clear expired OTP
+            user.otp_code = None
+            user.otp_created_at = None
+            user.save(update_fields=['otp_code', 'otp_created_at'])
+            return False
+        
+        # OTP is valid - clear it to prevent reuse
+        user.otp_code = None
+        user.otp_created_at = None
+        user.save(update_fields=['otp_code', 'otp_created_at'])
+        
+        return True
 
 
 # =============================================================================

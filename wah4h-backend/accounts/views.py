@@ -203,7 +203,11 @@ class RegisterAPIView(generics.CreateAPIView):
 
 class LoginAPIView(generics.GenericAPIView):
     """
-    User authentication endpoint.
+    User authentication endpoint with Email-based Two-Factor Authentication.
+    
+    Two-step process:
+    1. POST with email + password → Generates and sends OTP via email
+    2. POST with email + password + otp → Validates OTP and returns JWT tokens
     
     Returns JWT tokens and user information including practitioner_id
     which is required for most subsequent API calls.
@@ -212,10 +216,41 @@ class LoginAPIView(generics.GenericAPIView):
     permission_classes = [AllowAny]
 
     def post(self, request, *args, **kwargs):
+        from .services import AuthService
+        
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         user = serializer.validated_data["user"]
+        otp_code = request.data.get('otp', '').strip()
+        
+        # State 1: Request OTP (Password only - no OTP provided)
+        if not otp_code:
+            # Generate and send OTP via email
+            AuthService.generate_login_otp(user)
+            
+            return Response(
+                {
+                    "success": True,
+                    "message": "OTP sent to email",
+                    "step": "otp_verification"
+                },
+                status=status.HTTP_200_OK,
+            )
+        
+        # State 2: Verify OTP (Password + OTP provided)
+        is_valid = AuthService.verify_login_otp(user, otp_code)
+        
+        if not is_valid:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Invalid or expired OTP code"
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        # OTP verified successfully - generate JWT tokens
         tokens = get_tokens_for_user(user)
 
         # Build user response with practitioner_id

@@ -23,7 +23,10 @@ from rest_framework import status
 from datetime import date
 
 from .models import Organization, Practitioner, Location
-from .services import OrganizationService, PractitionerService
+from .services import OrganizationService, PractitionerService, AuthService
+from django.utils import timezone
+from datetime import timedelta
+from unittest.mock import patch
 
 User = get_user_model()
 
@@ -317,6 +320,136 @@ class PractitionerServiceTestCase(TestCase):
 
 
 # =============================================================================
+# Unit Tests: Auth Service (Email 2FA)
+# =============================================================================
+
+class AuthServiceTestCase(TestCase):
+    """
+    Test AuthService Email-based Two-Factor Authentication.
+    
+    Focus:
+    1. OTP generation and email sending
+    2. OTP verification with expiry (5 minutes)
+    3. OTP clearing after use
+    """
+    
+    def setUp(self):
+        """Create test user for OTP testing."""
+        practitioner_data = {
+            'identifier': 'PRAC-OTP-001',
+            'first_name': 'Test',
+            'last_name': 'User',
+            'birth_date': date(1990, 1, 1),
+            'active': True,
+            'status': 'active'
+        }
+        
+        user_data = {
+            'username': 'testuser',
+            'email': 'test@hospital.ph',
+            'password': 'TestPass123',
+            'role': 'doctor'
+        }
+        
+        self.practitioner = PractitionerService.register_practitioner(
+            practitioner_data,
+            user_data
+        )
+        self.user = User.objects.get(username='testuser')
+    
+    @patch('django.core.mail.send_mail')
+    def test_generate_login_otp(self, mock_send_mail):
+        """
+        Verify OTP generation creates 6-digit code and sends email.
+        """
+        # Call the service
+        AuthService.generate_login_otp(self.user)
+        
+        # Verify OTP was saved to user
+        self.user.refresh_from_db()
+        self.assertIsNotNone(self.user.otp_code)
+        self.assertEqual(len(self.user.otp_code), 6)
+        self.assertTrue(self.user.otp_code.isdigit())
+        self.assertIsNotNone(self.user.otp_created_at)
+        
+        # Verify email was sent
+        mock_send_mail.assert_called_once()
+        call_kwargs = mock_send_mail.call_args[1]
+        self.assertEqual(call_kwargs['recipient_list'], [self.user.email])
+        self.assertIn(self.user.otp_code, call_kwargs['message'])
+    
+    def test_verify_login_otp_valid(self):
+        """
+        Verify OTP verification succeeds with valid code.
+        """
+        # Generate OTP
+        self.user.otp_code = '123456'
+        self.user.otp_created_at = timezone.now()
+        self.user.save()
+        
+        # Verify OTP
+        is_valid = AuthService.verify_login_otp(self.user, '123456')
+        
+        self.assertTrue(is_valid)
+        
+        # Verify OTP was cleared after use
+        self.user.refresh_from_db()
+        self.assertIsNone(self.user.otp_code)
+        self.assertIsNone(self.user.otp_created_at)
+    
+    def test_verify_login_otp_invalid_code(self):
+        """
+        Verify OTP verification fails with wrong code.
+        """
+        # Generate OTP
+        self.user.otp_code = '123456'
+        self.user.otp_created_at = timezone.now()
+        self.user.save()
+        
+        # Verify with wrong code
+        is_valid = AuthService.verify_login_otp(self.user, '999999')
+        
+        self.assertFalse(is_valid)
+        
+        # Verify OTP was NOT cleared (for retry)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.otp_code, '123456')
+    
+    def test_verify_login_otp_expired(self):
+        """
+        Verify OTP verification fails with expired code (>5 minutes).
+        """
+        # Generate expired OTP (6 minutes ago)
+        self.user.otp_code = '123456'
+        self.user.otp_created_at = timezone.now() - timedelta(minutes=6)
+        self.user.save()
+        
+        # Verify with correct code but expired
+        is_valid = AuthService.verify_login_otp(self.user, '123456')
+        
+        self.assertFalse(is_valid)
+        
+        # Verify expired OTP was cleared
+        self.user.refresh_from_db()
+        self.assertIsNone(self.user.otp_code)
+        self.assertIsNone(self.user.otp_created_at)
+    
+    def test_verify_login_otp_no_otp_set(self):
+        """
+        Verify OTP verification fails when no OTP was generated.
+        """
+        # Ensure no OTP is set
+        self.user.otp_code = None
+        self.user.otp_created_at = None
+        self.user.save()
+        
+        # Try to verify
+        is_valid = AuthService.verify_login_otp(self.user, '123456')
+        
+        self.assertFalse(is_valid)
+
+
+# =============================================================================
 # Integration Tests: Practitioner Registration API
 # =============================================================================
 
@@ -580,9 +713,11 @@ class PractitionerRegistrationAPITestCase(APITestCase):
 
 class LoginAPITestCase(APITestCase):
     """
-    Test /api/accounts/login/ endpoint.
+    Test /api/accounts/login/ endpoint with Email-based Two-Factor Authentication.
     
-    Focus: Verify login returns practitioner_id (critical for frontend operations).
+    Focus: 
+    1. Two-step authentication flow (password → OTP → tokens)
+    2. Verify login returns practitioner_id (critical for frontend operations)
     """
     
     def setUp(self):
@@ -613,9 +748,15 @@ class LoginAPITestCase(APITestCase):
         
         self.user = User.objects.get(username='testdoctor')
     
-    def test_login_success(self):
+    @patch('django.core.mail.send_mail')
+    def test_login_step1_otp_generation(self, mock_send_mail):
         """
-        Verify successful login returns tokens and user info.
+        Test Step 1: Login with email + password triggers OTP generation.
+        
+        Expected:
+        - HTTP 200 OK
+        - Response contains step: "otp_verification"
+        - OTP is generated and sent via email
         """
         payload = {
             'email': 'test.doctor@hospital.ph',
@@ -626,42 +767,137 @@ class LoginAPITestCase(APITestCase):
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data['success'])
+        self.assertEqual(response.data['step'], 'otp_verification')
+        self.assertIn('OTP sent to email', response.data['message'])
         
-        # Assert tokens are present
-        self.assertIn('tokens', response.data)
-        self.assertIn('access', response.data['tokens'])
-        self.assertIn('refresh', response.data['tokens'])
+        # Verify no tokens returned yet
+        self.assertNotIn('tokens', response.data)
         
-        # Assert user data is present
-        self.assertIn('user', response.data)
-        user_data = response.data['user']
-        self.assertEqual(user_data['email'], 'test.doctor@hospital.ph')
-        self.assertEqual(user_data['username'], 'testdoctor')
+        # Verify OTP was generated
+        self.user.refresh_from_db()
+        self.assertIsNotNone(self.user.otp_code)
+        self.assertEqual(len(self.user.otp_code), 6)
+        
+        # Verify email was sent
+        mock_send_mail.assert_called_once()
     
-    def test_login_returns_practitioner_id(self):
+    @patch('django.core.mail.send_mail')
+    def test_login_step2_otp_verification_success(self, mock_send_mail):
         """
-        CRITICAL TEST: Verify login response includes practitioner_id.
+        Test Step 2: Login with email + password + valid OTP returns tokens.
+        
+        CRITICAL TEST: Verify complete 2FA flow and practitioner_id in response.
         
         Context: Frontend needs practitioner_id for most API operations.
         This is the "identity bridge" between User (auth) and Practitioner (FHIR).
         """
-        payload = {
+        # Step 1: Generate OTP
+        payload_step1 = {
             'email': 'test.doctor@hospital.ph',
             'password': 'TestPass123'
         }
         
-        response = self.client.post(self.url, payload, format='json')
+        response_step1 = self.client.post(self.url, payload_step1, format='json')
+        self.assertEqual(response_step1.status_code, status.HTTP_200_OK)
+        self.assertEqual(response_step1.data['step'], 'otp_verification')
         
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # Get the generated OTP from database
+        self.user.refresh_from_db()
+        otp_code = self.user.otp_code
         
-        # Assert practitioner_id is in user data
-        user_data = response.data['user']
+        # Step 2: Verify OTP and get tokens
+        payload_step2 = {
+            'email': 'test.doctor@hospital.ph',
+            'password': 'TestPass123',
+            'otp': otp_code
+        }
+        
+        response_step2 = self.client.post(self.url, payload_step2, format='json')
+        
+        self.assertEqual(response_step2.status_code, status.HTTP_200_OK)
+        self.assertTrue(response_step2.data['success'])
+        
+        # Assert tokens are present
+        self.assertIn('tokens', response_step2.data)
+        self.assertIn('access', response_step2.data['tokens'])
+        self.assertIn('refresh', response_step2.data['tokens'])
+        
+        # Assert user data with practitioner_id
+        self.assertIn('user', response_step2.data)
+        user_data = response_step2.data['user']
+        self.assertEqual(user_data['email'], 'test.doctor@hospital.ph')
+        self.assertEqual(user_data['username'], 'testdoctor')
         self.assertIn('practitioner_id', user_data)
         self.assertEqual(user_data['practitioner_id'], self.practitioner.practitioner_id)
+        
+        # Verify OTP was cleared after use
+        self.user.refresh_from_db()
+        self.assertIsNone(self.user.otp_code)
+        self.assertIsNone(self.user.otp_created_at)
+    
+    @patch('django.core.mail.send_mail')
+    def test_login_step2_otp_verification_invalid(self, mock_send_mail):
+        """
+        Test Step 2: Login with invalid OTP returns HTTP 400.
+        """
+        # Step 1: Generate OTP
+        payload_step1 = {
+            'email': 'test.doctor@hospital.ph',
+            'password': 'TestPass123'
+        }
+        
+        response_step1 = self.client.post(self.url, payload_step1, format='json')
+        self.assertEqual(response_step1.status_code, status.HTTP_200_OK)
+        
+        # Step 2: Try with wrong OTP
+        payload_step2 = {
+            'email': 'test.doctor@hospital.ph',
+            'password': 'TestPass123',
+            'otp': '999999'  # Wrong OTP
+        }
+        
+        response_step2 = self.client.post(self.url, payload_step2, format='json')
+        
+        self.assertEqual(response_step2.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(response_step2.data['success'])
+        self.assertIn('Invalid or expired OTP', response_step2.data['message'])
+    
+    @patch('django.core.mail.send_mail')
+    def test_login_step2_otp_verification_expired(self, mock_send_mail):
+        """
+        Test Step 2: Login with expired OTP returns HTTP 400.
+        """
+        # Step 1: Generate OTP
+        payload_step1 = {
+            'email': 'test.doctor@hospital.ph',
+            'password': 'TestPass123'
+        }
+        
+        response_step1 = self.client.post(self.url, payload_step1, format='json')
+        self.assertEqual(response_step1.status_code, status.HTTP_200_OK)
+        
+        # Manually expire the OTP
+        self.user.refresh_from_db()
+        otp_code = self.user.otp_code
+        self.user.otp_created_at = timezone.now() - timedelta(minutes=6)
+        self.user.save()
+        
+        # Step 2: Try with expired OTP
+        payload_step2 = {
+            'email': 'test.doctor@hospital.ph',
+            'password': 'TestPass123',
+            'otp': otp_code  # Correct code but expired
+        }
+        
+        response_step2 = self.client.post(self.url, payload_step2, format='json')
+        
+        self.assertEqual(response_step2.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(response_step2.data['success'])
+        self.assertIn('Invalid or expired OTP', response_step2.data['message'])
     
     def test_login_invalid_credentials(self):
         """
-        Verify login fails with invalid credentials.
+        Verify login fails with invalid password (Step 1).
         """
         payload = {
             'email': 'test.doctor@hospital.ph',
