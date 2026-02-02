@@ -1,79 +1,413 @@
 from django.db import models
 from core.models import TimeStampedModel, FHIRResourceModel
 
-class Patient(FHIRResourceModel):
-    patient_id = models.AutoField(primary_key=True)
-    # FIX: Added 'active' (was missing or named 'status' previously)
-    active = models.BooleanField(null=True, blank=True)
-    name_use = models.CharField(max_length=50, null=True, blank=True)
-    last_name = models.CharField(max_length=255, null=True, blank=True)
+
+class Patient(TimeStampedModel):
+    """
+    PHCORE Standard Patient Model
+    Aligned with Philippine LGU requirements and Data Dictionary
+    """
+    id = models.BigAutoField(primary_key=True)
+    patient_id = models.CharField(max_length=255, unique=True, null=True, blank=True)
+    
+    # Name fields
     first_name = models.CharField(max_length=255, null=True, blank=True)
+    last_name = models.CharField(max_length=255, null=True, blank=True)
     middle_name = models.CharField(max_length=255, null=True, blank=True)
-    name_suffix = models.CharField(max_length=50, null=True, blank=True)
-    gender = models.CharField(max_length=50, null=True, blank=True)
-    # FIX: Added 'birth_date' (was likely missing)
-    birth_date = models.DateField(null=True, blank=True)
-    deceased_boolean = models.BooleanField(null=True, blank=True)
-    deceased_datetime = models.DateTimeField(null=True, blank=True)
-    address_use = models.CharField(max_length=50, null=True, blank=True)
+    suffix_name = models.CharField(max_length=255, null=True, blank=True)
+    
+    # Demographics
+    gender = models.CharField(max_length=100, null=True, blank=True)
+    birthdate = models.DateField(null=True, blank=True)
+    civil_status = models.CharField(max_length=255, null=True, blank=True)
+    nationality = models.CharField(max_length=255, null=True, blank=True)
+    religion = models.CharField(max_length=255, null=True, blank=True)
+    
+    # Health identifiers
+    philhealth_id = models.CharField(max_length=255, null=True, blank=True)
+    blood_type = models.CharField(max_length=100, null=True, blank=True)
+    pwd_type = models.CharField(max_length=100, null=True, blank=True)
+    
+    # Occupation and Education
+    occupation = models.CharField(max_length=255, null=True, blank=True)
+    education = models.CharField(max_length=255, null=True, blank=True)
+    
+    # Contact information
+    mobile_number = models.CharField(max_length=255, null=True, blank=True)
+    
+    # Address fields
     address_line = models.CharField(max_length=255, null=True, blank=True)
     address_city = models.CharField(max_length=255, null=True, blank=True)
     address_district = models.CharField(max_length=255, null=True, blank=True)
     address_state = models.CharField(max_length=255, null=True, blank=True)
-    address_postal_code = models.CharField(max_length=50, null=True, blank=True)
-    address_country = models.CharField(max_length=50, null=True, blank=True)
-    telecom = models.CharField(max_length=100, null=True, blank=True)
-    marital_status = models.CharField(max_length=100, null=True, blank=True)
-    multiple_birth_boolean = models.BooleanField(null=True, blank=True)
-    multiple_birth_integer = models.IntegerField(null=True, blank=True)
-    photo_url = models.URLField(max_length=255, null=True, blank=True)
-    contact_relationship = models.CharField(max_length=100, null=True, blank=True)
-    contact_name = models.CharField(max_length=255, null=True, blank=True)
-    contact_telecom = models.CharField(max_length=100, null=True, blank=True)
-    contact_address = models.CharField(max_length=255, null=True, blank=True)
-    contact_gender = models.CharField(max_length=50, null=True, blank=True)
-    contact_organization = models.ForeignKey('accounts.Organization', on_delete=models.PROTECT, db_column='contact_organization_id', null=True, blank=True, related_name='patient_contacts')
-    general_practitioner = models.ForeignKey('accounts.Practitioner', on_delete=models.PROTECT, db_column='general_practitioner_id', null=True, blank=True)
-    managing_organization = models.ForeignKey('accounts.Organization', on_delete=models.PROTECT, db_column='managing_organization_id', null=True, blank=True, related_name='managed_patients')
-    link_other_patient = models.ForeignKey('patients.Patient', on_delete=models.PROTECT, db_column='link_other_patient_id', null=True, blank=True)
-    link_type = models.CharField(max_length=50, null=True, blank=True)
+    address_postal_code = models.CharField(max_length=100, null=True, blank=True)
+    address_country = models.CharField(max_length=255, null=True, blank=True)
+    
+    # Emergency contact
+    contact_first_name = models.CharField(max_length=50, null=True, blank=True)
+    contact_last_name = models.CharField(max_length=50, null=True, blank=True)
+    contact_mobile_number = models.CharField(max_length=50, null=True, blank=True)
+    contact_relationship = models.CharField(max_length=50, null=True, blank=True)
+    
+    # Indigenous and PWD flags
+    indigenous_flag = models.BooleanField(null=True, blank=True)
+    indigenous_group = models.CharField(max_length=255, null=True, blank=True)
+    
+    # Consent and media
+    consent_flag = models.BooleanField(null=True, blank=True)
+    image_url = models.URLField(max_length=255, null=True, blank=True)
     
     class Meta:
         db_table = 'patient'
+        indexes = [
+            models.Index(fields=['patient_id']),
+            models.Index(fields=['last_name', 'first_name']),
+            models.Index(fields=['philhealth_id']),
+        ]
 
     def __str__(self):
-        return f"{self.first_name} {self.last_name}"
+        return f"{self.patient_id or self.id}: {self.first_name} {self.last_name}"
+
 
 class Condition(FHIRResourceModel):
+    """
+    FHIR Standard Condition Model
+    """
     condition_id = models.AutoField(primary_key=True)
+    identifier = models.CharField(max_length=100, unique=True, null=False, blank=False)
+    
+    # Status fields
     clinical_status = models.CharField(max_length=100, null=True, blank=True)
     verification_status = models.CharField(max_length=100, null=True, blank=True)
+    
+    # Classification
     category = models.CharField(max_length=255, null=True, blank=True)
-    severity = models.CharField(max_length=100, null=True, blank=True)
-    code_code = models.CharField(max_length=100, null=True, blank=True)
-    # FIX: Added 'code_display' (Admin was looking for this)
-    code_display = models.CharField(max_length=255, null=True, blank=True)
-    subject = models.ForeignKey('patients.Patient', on_delete=models.PROTECT, db_column='subject_id')
-    encounter = models.ForeignKey('admission.Encounter', on_delete=models.PROTECT, db_column='encounter_id', null=True, blank=True)
+    severity = models.CharField(max_length=255, null=True, blank=True)
+    code = models.CharField(max_length=100, null=False, blank=False)
+    
+    # Relationships
+    subject_id = models.ForeignKey(
+        'patients.Patient',
+        on_delete=models.PROTECT,
+        db_column='subject_id',
+        null=False,
+        blank=False,
+        related_name='conditions'
+    )
+    encounter_id = models.ForeignKey(
+        'admission.Encounter',
+        on_delete=models.PROTECT,
+        db_column='encounter_id',
+        null=False,
+        blank=False,
+        related_name='conditions'
+    )
+    
+    # Body site
+    body_site = models.CharField(max_length=255, null=True, blank=True)
+    
+    # Onset timing
     onset_datetime = models.DateTimeField(null=True, blank=True)
-    onset_age = models.CharField(max_length=50, null=True, blank=True)
-    onset_period_start = models.DateTimeField(null=True, blank=True)
-    onset_period_end = models.DateTimeField(null=True, blank=True)
-    onset_range = models.CharField(max_length=100, null=True, blank=True)
-    onset_string = models.CharField(max_length=255, null=True, blank=True)
+    onset_age = models.DateField(null=True, blank=True)
+    onset_period_start = models.DateField(null=True, blank=True)
+    onset_period_end = models.DateField(null=True, blank=True)
+    
+    # Abatement timing
     abatement_datetime = models.DateTimeField(null=True, blank=True)
-    abatement_age = models.CharField(max_length=50, null=True, blank=True)
-    abatement_period_start = models.DateTimeField(null=True, blank=True)
-    abatement_period_end = models.DateTimeField(null=True, blank=True)
-    abatement_range = models.CharField(max_length=100, null=True, blank=True)
-    abatement_string = models.CharField(max_length=255, null=True, blank=True)
-    recorded_date = models.DateTimeField(null=True, blank=True)
-    recorder = models.ForeignKey('accounts.Practitioner', on_delete=models.PROTECT, db_column='recorder_id', null=True, blank=True)
-    asserter = models.ForeignKey('accounts.Practitioner', on_delete=models.PROTECT, db_column='asserter_id', null=True, blank=True, related_name='asserted_conditions')
-    stage_summary = models.CharField(max_length=255, null=True, blank=True)
+    abatement_age = models.DateField(null=True, blank=True)
+    abatement_period_start = models.DateField(null=True, blank=True)
+    abatement_period_end = models.DateField(null=True, blank=True)
+    
+    # Recording
+    recorded_date = models.DateField(null=True, blank=True)
+    recorder_id = models.ForeignKey(
+        'accounts.Practitioner',
+        on_delete=models.PROTECT,
+        db_column='recorder_id',
+        null=True,
+        blank=True,
+        related_name='recorded_conditions'
+    )
+    asserter_id = models.ForeignKey(
+        'accounts.Practitioner',
+        on_delete=models.PROTECT,
+        db_column='asserter_id',
+        null=True,
+        blank=True,
+        related_name='asserted_conditions'
+    )
+    
+    # Stage information
+    stage_summary = models.TextField(null=True, blank=True)
     stage_type = models.CharField(max_length=100, null=True, blank=True)
+    stage_assessment_id = models.IntegerField(null=True, blank=True)
+    
+    # Evidence
     evidence_code = models.CharField(max_length=100, null=True, blank=True)
+    evidence_detail_id = models.IntegerField(null=True, blank=True)
+    
+    # Notes
     note = models.TextField(null=True, blank=True)
-
+    
     class Meta:
         db_table = 'condition'
+        indexes = [
+            models.Index(fields=['identifier']),
+            models.Index(fields=['subject_id']),
+            models.Index(fields=['encounter_id']),
+        ]
+
+    def __str__(self):
+        return f"Condition {self.identifier}: {self.code}"
+
+
+class AllergyIntolerance(FHIRResourceModel):
+    """
+    FHIR Standard Allergy Intolerance Model
+    """
+    allergy_id = models.AutoField(primary_key=True)
+    identifier = models.CharField(max_length=100, unique=True, null=False, blank=False)
+    
+    # Status fields
+    clinical_status = models.CharField(max_length=100, null=True, blank=True)
+    verification_status = models.CharField(max_length=100, null=True, blank=True)
+    
+    # Type and category
+    type = models.CharField(max_length=100, null=True, blank=True)
+    category = models.CharField(max_length=255, null=True, blank=True)
+    criticality = models.CharField(max_length=255, null=True, blank=True)
+    
+    # Code
+    code = models.CharField(max_length=100, null=False, blank=False)
+    
+    # Relationships
+    patient_id = models.ForeignKey(
+        'patients.Patient',
+        on_delete=models.PROTECT,
+        db_column='patient_id',
+        null=False,
+        blank=False,
+        related_name='allergies'
+    )
+    encounter_id = models.ForeignKey(
+        'admission.Encounter',
+        on_delete=models.PROTECT,
+        db_column='encounter_id',
+        null=False,
+        blank=False,
+        related_name='allergies'
+    )
+    
+    # Onset timing
+    onset_datetime = models.DateTimeField(null=True, blank=True)
+    onset_age = models.DateField(null=True, blank=True)
+    onset_period_start = models.DateField(null=True, blank=True)
+    onset_period_end = models.DateField(null=True, blank=True)
+    onset_range_low = models.DateField(null=True, blank=True)
+    onset_range_high = models.DateField(null=True, blank=True)
+    
+    # Recording
+    recorded_date = models.DateField(null=True, blank=True)
+    recorder_id = models.ForeignKey(
+        'accounts.Practitioner',
+        on_delete=models.PROTECT,
+        db_column='recorder_id',
+        null=True,
+        blank=True,
+        related_name='recorded_allergies'
+    )
+    asserter_id = models.ForeignKey(
+        'accounts.Practitioner',
+        on_delete=models.PROTECT,
+        db_column='asserter_id',
+        null=True,
+        blank=True,
+        related_name='asserted_allergies'
+    )
+    
+    # Last occurrence
+    last_occurrence = models.CharField(max_length=255, null=True, blank=True)
+    
+    # Reaction details
+    reaction_description = models.TextField(null=True, blank=True)
+    reaction_onset = models.DateField(null=True, blank=True)
+    reaction_severity = models.CharField(max_length=255, null=True, blank=True)
+    reaction_exposure_route = models.CharField(max_length=255, null=True, blank=True)
+    reaction_note = models.TextField(null=True, blank=True)
+    reaction_manifestation = models.CharField(max_length=255, null=True, blank=True)
+    reaction_substance = models.CharField(max_length=255, null=True, blank=True)
+    
+    # Notes
+    note = models.TextField(null=True, blank=True)
+    
+    class Meta:
+        db_table = 'allergy_intolerance'
+        indexes = [
+            models.Index(fields=['identifier']),
+            models.Index(fields=['patient_id']),
+            models.Index(fields=['encounter_id']),
+        ]
+
+    def __str__(self):
+        return f"Allergy {self.identifier}: {self.code}"
+
+
+class Immunization(FHIRResourceModel):
+    """
+    PHCORE Standard Immunization Model
+    """
+    immunization_id = models.AutoField(primary_key=True)
+    identifier = models.CharField(max_length=100, unique=True, null=False, blank=False)
+    
+    # Status
+    status = models.CharField(max_length=100, null=False, blank=False)
+    status_reason_code = models.CharField(max_length=100, null=True, blank=True)
+    status_reason_display = models.CharField(max_length=100, null=True, blank=True)
+    
+    # Vaccine
+    vaccine_code = models.CharField(max_length=100, null=True, blank=True)
+    vaccine_display = models.CharField(max_length=100, null=True, blank=True)
+    
+    # Relationships
+    patient_id = models.ForeignKey(
+        'patients.Patient',
+        on_delete=models.PROTECT,
+        db_column='patient_id',
+        null=False,
+        blank=False,
+        related_name='immunizations'
+    )
+    encounter_id = models.ForeignKey(
+        'admission.Encounter',
+        on_delete=models.PROTECT,
+        db_column='encounter_id',
+        null=False,
+        blank=False,
+        related_name='immunizations'
+    )
+    
+    # Occurrence
+    occurrence_datetime = models.DateTimeField(null=True, blank=True)
+    occurrence_string = models.CharField(max_length=255, null=True, blank=True)
+    
+    # Recording
+    recorded_datetime = models.DateTimeField(null=True, blank=True)
+    primary_source = models.BooleanField(null=True, blank=True)
+    
+    # Report origin
+    report_origin_code = models.CharField(max_length=100, null=True, blank=True)
+    report_origin_display = models.CharField(max_length=100, null=True, blank=True)
+    
+    # Location
+    location_id = models.ForeignKey(
+        'accounts.Location',
+        on_delete=models.PROTECT,
+        db_column='location_id',
+        null=True,
+        blank=True,
+        related_name='immunizations'
+    )
+    
+    # Manufacturer
+    manufacturer_id = models.ForeignKey(
+        'accounts.Organization',
+        on_delete=models.PROTECT,
+        db_column='manufacturer_id',
+        null=True,
+        blank=True,
+        related_name='manufactured_vaccines'
+    )
+    
+    # Lot and expiration
+    lot_number = models.CharField(max_length=255, null=True, blank=True)
+    expiration_date = models.DateField(null=True, blank=True)
+    
+    # Site and route
+    site_code = models.CharField(max_length=100, null=True, blank=True)
+    site_display = models.CharField(max_length=100, null=True, blank=True)
+    route_code = models.CharField(max_length=100, null=True, blank=True)
+    route_display = models.CharField(max_length=100, null=True, blank=True)
+    
+    # Dose quantity
+    dose_quantity_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    dose_quantity_unit = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    
+    # Performer
+    performer_id = models.ForeignKey(
+        'accounts.Practitioner',
+        on_delete=models.PROTECT,
+        db_column='performer_id',
+        null=True,
+        blank=True,
+        related_name='performed_immunizations'
+    )
+    performer_function_code = models.CharField(max_length=100, null=True, blank=True)
+    performer_function_display = models.CharField(max_length=100, null=True, blank=True)
+    actor_id = models.ForeignKey(
+        'accounts.Practitioner',
+        on_delete=models.PROTECT,
+        db_column='actor_id',
+        null=True,
+        blank=True,
+        related_name='acted_immunizations'
+    )
+    
+    # Note
+    note = models.TextField(null=True, blank=True)
+    
+    # Reason
+    reason_code = models.CharField(max_length=100, null=True, blank=True)
+    reason_display = models.CharField(max_length=100, null=True, blank=True)
+    reason_reference_id = models.IntegerField(null=True, blank=True)
+    
+    # Subpotent
+    is_subpotent = models.BooleanField(null=True, blank=True)
+    subpotent_reason_code = models.CharField(max_length=100, null=True, blank=True)
+    subpotent_reason_display = models.CharField(max_length=100, null=True, blank=True)
+    
+    # Education
+    education_document_type = models.CharField(max_length=100, null=True, blank=True)
+    education_reference = models.CharField(max_length=255, null=True, blank=True)
+    education_publication_date = models.DateField(null=True, blank=True)
+    education_presentation_date = models.DateField(null=True, blank=True)
+    
+    # Program eligibility
+    program_eligibility_code = models.CharField(max_length=100, null=True, blank=True)
+    program_eligibility_display = models.CharField(max_length=100, null=True, blank=True)
+    
+    # Funding source
+    funding_source_code = models.CharField(max_length=100, null=True, blank=True)
+    funding_source_display = models.CharField(max_length=100, null=True, blank=True)
+    
+    # Reaction
+    reaction_id = models.IntegerField(null=True, blank=True)
+    reaction_date = models.DateField(null=True, blank=True)
+    reaction_detail_id = models.IntegerField(null=True, blank=True)
+    reaction_reported = models.BooleanField(null=True, blank=True)
+    
+    # Protocol applied
+    protocol_applied_id = models.IntegerField(null=True, blank=True)
+    protocol_series = models.CharField(max_length=255, null=True, blank=True)
+    protocol_authority_id = models.IntegerField(null=True, blank=True)
+    protocol_target_disease_code = models.CharField(max_length=100, null=True, blank=True)
+    protocol_target_disease_display = models.CharField(max_length=100, null=True, blank=True)
+    
+    # Dose number
+    dose_number_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    dose_number_unit = models.CharField(max_length=255, null=True, blank=True)
+    
+    # Series doses
+    series_doses_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    series_doses_unit = models.CharField(max_length=255, null=True, blank=True)
+    
+    class Meta:
+        db_table = 'immunization'
+        indexes = [
+            models.Index(fields=['identifier']),
+            models.Index(fields=['patient_id']),
+            models.Index(fields=['encounter_id']),
+            models.Index(fields=['status']),
+        ]
+
+    def __str__(self):
+        return f"Immunization {self.identifier}: {self.vaccine_display or self.vaccine_code}"
