@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Loader2, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Eye, EyeOff, Activity } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -35,7 +36,7 @@ const Login = () => {
   const handleDemoLogin = async () => {
     if (isLoading) return;
     const demoEmail = 'doctor@gmail.com';
-    const demoPassword = 'Doctor123';
+    const demoPassword = 'doctor123';
     setEmail(demoEmail);
     setPassword(demoPassword);
     const success = await login(demoEmail, demoPassword);
@@ -47,93 +48,138 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full mx-auto mb-4 flex items-center justify-center">
-            <img src="/wah_logo.png" alt="WAH4Hospitals Logo" className="w-12 h-12" />
+    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#e4ebff] relative overflow-hidden p-4">
+      {/* Dynamic Background Elements */}
+      <div className="absolute inset-0 bg-blue-50/40 dark:bg-background/95 -z-10" />
+      <div className="absolute -top-24 -right-24 w-96 h-96 bg-[#e4ebff] rounded-full blur-3xl animate-pulse -z-10" />
+      <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-[#e4ebff] rounded-full blur-3xl animate-pulse delay-700 -z-10" />
+      
+      {/* Decorative Wave/Mesh (Optional) */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] -z-10" />
+
+      <Card className="w-full mx-4 md:mx-0 max-w-[90%] md:max-w-md border-border/50 bg-card/50 backdrop-blur-xl shadow-2xl animate-in fade-in zoom-in-95 duration-500 ease-out">
+        <CardHeader className="text-center space-y-2 pb-6">
+          <div className="w-16 h-16 bg-gradient-to-br from-primary to-secondary rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-lg shadow-primary/20 hover:scale-105 transition-transform duration-300">
+            {/* Using Lucide Icon as placeholder if image fails, or wrapping image */}
+            <div className="relative flex items-center justify-center">
+                 <img src="/wah_logo.png" alt="Logo" className="w-10 h-10 object-contain drop-shadow-md" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement?.classList.add('fallback-icon'); }} />
+                 <Activity className="w-8 h-8 text-white hidden fallback-icon-target" /> 
+            </div>
           </div>
-          <CardTitle className="text-2xl">Welcome Back</CardTitle>
-          <p className="text-gray-600">Sign in to WAH4H</p>
+          <CardTitle className="text-3xl font-bold tracking-tight bg-gradient-to-br from-primary to-secondary bg-clip-text text-transparent">
+            Welcome Back
+          </CardTitle>
+          <CardDescription className="text-muted-foreground text-base">
+            Portal Access for Medical Staff
+          </CardDescription>
         </CardHeader>
 
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-foreground/80">Email Address</Label>
               <Input
                 id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className={errors.email ? 'border-red-500' : ''}
-                placeholder="Enter your email"
+                className={cn(
+                  "h-11 bg-background/50 border-input transition-all duration-200 focus:ring-2 focus:ring-primary/20",
+                  errors.email && "border-destructive ring-destructive/20"
+                )}
+                placeholder="doctor@hospital.com"
               />
-              {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
+              {errors.email && <p className="text-xs font-medium text-destructive animate-in slide-in-from-left-1">{errors.email}</p>}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password" className="text-foreground/80">Password</Label>
+                <Button 
+                  type="button" 
+                  variant="link" 
+                  className="p-0 h-auto text-xs text-muted-foreground hover:text-primary" 
+                  onClick={handleForgotPassword}
+                >
+                  Forgot password?
+                </Button>
+              </div>
               <div className="relative">
                 <Input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className={errors.password ? 'border-red-500 pr-10' : 'pr-10'}
-                  placeholder="Enter your password"
+                  className={cn(
+                    "h-11 bg-background/50 border-input pr-10 transition-all duration-200 focus:ring-2 focus:ring-primary/20",
+                    errors.password && "border-destructive ring-destructive/20"
+                  )}
+                  placeholder="••••••••"
                 />
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent text-muted-foreground hover:text-foreground"
                   onClick={() => setShowPassword(!showPassword)}
                 >
-                  {showPassword ? <EyeOff className="h-4 w-4 text-gray-400" /> : <Eye className="h-4 w-4 text-gray-400" />}
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
-              {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
+              {errors.password && <p className="text-xs font-medium text-destructive animate-in slide-in-from-left-1">{errors.password}</p>}
             </div>
 
-            <div className="flex items-center justify-between">
-              <Button type="button" variant="link" className="p-0 h-auto text-sm" onClick={handleForgotPassword}>
-                Forgot password?
-              </Button>
-            </div>
-
-            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={isLoading}>
+            <Button 
+              type="submit" 
+              className="w-full h-11 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98] font-semibold text-base" 
+              disabled={isLoading}
+            >
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Signing in...
+                  Authenticating...
                 </>
               ) : (
-                'Sign In'
+                'Sign In to Dashboard'
               )}
             </Button>
           </form>
 
-          <div className="relative my-2">
+          <div className="relative">
             <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
+              <span className="w-full border-t border-border/50" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-2 text-gray-500">Or</span>
+              <span className="bg-background/50 backdrop-blur-xl px-2 text-muted-foreground">Or continue with</span>
             </div>
           </div>
 
-          <Button variant="outline" className="w-full" onClick={handleDemoLogin} disabled={isLoading}>
-            Try Demo Account
+          <Button 
+            variant="outline" 
+            className="w-full h-11 border-primary/20 hover:bg-accent/5 hover:text-primary transition-colors" 
+            onClick={handleDemoLogin} 
+            disabled={isLoading}
+          >
+            <Activity className="mr-2 h-4 w-4" />
+            Launch Demo Environment
           </Button>
 
-          <div className="text-center mt-2">
-            <Button variant="link" onClick={() => navigate('/register')}>
-              Don't have an account? Register here
+          <div className="text-center pt-2">
+            <Button 
+              variant="link" 
+              className="text-primary font-semibold transition-all duration-200 hover:scale-105 hover:underline decoration-primary/50 underline-offset-4" 
+              onClick={() => navigate('/register')}
+            >
+              Don't have an account? Register access
             </Button>
           </div>
         </CardContent>
       </Card>
+      
+      {/* Footer / Copyright */}
+      <div className="mt-8 text-center w-full text-xs text-muted-foreground/50">
+        © 2026 WAH4Hospitals System. Secure Enterprise Portal.
+      </div>
     </div>
   );
 };
