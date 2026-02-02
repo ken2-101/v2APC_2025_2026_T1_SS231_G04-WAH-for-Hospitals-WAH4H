@@ -43,6 +43,7 @@ from patients.serializers import (
     ImmunizationInputSerializer
 )
 from accounts.models import Organization, Location, Practitioner
+from admission.models import Encounter
 
 User = get_user_model()
 
@@ -82,6 +83,27 @@ class TestDataFactory:
             first_name=first_name,
             last_name=last_name,
             active=True
+        )
+    
+    @staticmethod
+    def create_encounter(patient, identifier=None, status="finished"):
+        """
+        Create a test encounter for clinical data linkage.
+        
+        Per admission.csv requirements:
+        - identifier: NOT NULL, UNIQUE
+        - status: NOT NULL
+        - subject_patient_id: NOT NULL (FK to Patient)
+        """
+        if identifier is None:
+            # Generate unique identifier using timestamp
+            timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
+            identifier = f"ENC-TEST-{timestamp}"
+        
+        return Encounter.objects.create(
+            identifier=identifier,
+            status=status,
+            subject_patient_id=patient.id
         )
     
     @staticmethod
@@ -327,8 +349,8 @@ class ClinicalServiceTest(TestCase):
         self.patient = PatientService.register_patient(patient_data)
         self.practitioner = TestDataFactory.create_practitioner()
         
-        # Note: We need an Encounter model for proper testing
-        # For now, we'll pass None and ensure service handles it
+        # Create a valid Encounter (required by admission.csv schema)
+        self.encounter = TestDataFactory.create_encounter(self.patient)
     
     def test_record_condition_with_auto_identifier(self):
         """Test: Condition identifier auto-generated if not provided"""
@@ -342,7 +364,7 @@ class ClinicalServiceTest(TestCase):
             patient=self.patient,
             data=condition_data,
             recorder=self.practitioner,
-            encounter=None
+            encounter=self.encounter
         )
         
         self.assertIsNotNone(condition.identifier)
@@ -360,7 +382,7 @@ class ClinicalServiceTest(TestCase):
                 patient=self.patient,
                 data=condition_data,
                 recorder=self.practitioner,
-                encounter=None
+                encounter=self.encounter
             )
         
         self.assertIn("code", str(context.exception).lower())
@@ -377,7 +399,7 @@ class ClinicalServiceTest(TestCase):
             patient=self.patient,
             data=allergy_data,
             recorder=self.practitioner,
-            encounter=None
+            encounter=self.encounter
         )
         
         self.assertIsNotNone(allergy.identifier)
@@ -394,7 +416,7 @@ class ClinicalServiceTest(TestCase):
                 patient=self.patient,
                 data=immunization_data,
                 performer=self.practitioner,
-                encounter=None
+                encounter=self.encounter
             )
         
         self.assertIn("status", str(context.exception).lower())
@@ -730,6 +752,9 @@ class ClinicalAPITest(APITestCase):
         
         # Create practitioner
         self.practitioner = TestDataFactory.create_practitioner()
+        
+        # Create a valid Encounter (required by admission.csv schema)
+        self.encounter = TestDataFactory.create_encounter(self.patient)
     
     def test_create_condition_requires_code(self):
         """
@@ -737,7 +762,8 @@ class ClinicalAPITest(APITestCase):
         """
         condition_data = {
             'subject_id': self.patient.id,
-            'clinical_status': 'active'
+            'clinical_status': 'active',
+            'encounter_id': self.encounter.encounter_id
             # Missing 'code'
         }
         
