@@ -26,7 +26,7 @@ class EncounterAdmin(admin.ModelAdmin):
         'status',
         'get_class_display',
         'type',
-        'subject_patient_id',
+        'patient_info',
         'period_start',
     )
     
@@ -158,6 +158,12 @@ class EncounterAdmin(admin.ModelAdmin):
     get_class_display.short_description = 'Class'
     get_class_display.admin_order_field = 'class_field'
     
+    def patient_info(self, obj):
+        """Human-readable patient ID display."""
+        return f"Patient ID: {obj.subject_patient_id}"
+    patient_info.short_description = 'Patient'
+    patient_info.admin_order_field = 'subject_patient_id'
+    
     # List per page
     list_per_page = 25
     
@@ -181,8 +187,8 @@ class ProcedureAdmin(admin.ModelAdmin):
         'identifier',
         'status',
         'code_display',
-        'subject_id',
-        'encounter_id',
+        'patient_info',
+        'encounter_info',
         'performed_datetime',
     )
     
@@ -333,6 +339,18 @@ class ProcedureAdmin(admin.ModelAdmin):
         }),
     )
     
+    def patient_info(self, obj):
+        """Human-readable patient ID display."""
+        return f"Patient ID: {obj.subject_id}"
+    patient_info.short_description = 'Patient'
+    patient_info.admin_order_field = 'subject_id'
+    
+    def encounter_info(self, obj):
+        """Human-readable encounter ID display."""
+        return f"Encounter ID: {obj.encounter_id}"
+    encounter_info.short_description = 'Encounter'
+    encounter_info.admin_order_field = 'encounter_id'
+    
     # List per page
     list_per_page = 25
     
@@ -346,45 +364,164 @@ class ProcedureAdmin(admin.ModelAdmin):
 @admin.register(ProcedurePerformer)
 class ProcedurePerformerAdmin(admin.ModelAdmin):
     """
-    Admin interface for managing procedure performers (detail model).
+    Production-grade admin interface for Procedure Performer management.
+    Expanded to match full CSV schema with all clinical details.
     """
     
+    # List Display
     list_display = (
         'procedure_performer_id',
-        'procedure_id',
-        'performer_actor_id',
-        'performer_function_code',
+        'identifier',
+        'status',
+        'procedure_info',
+        'patient_info',
+        'encounter_info',
         'performer_function_display',
+        'performed_datetime',
     )
     
+    # List Filters
     list_filter = (
+        'status',
         'performer_function_code',
+        'category_code',
+        'performed_datetime',
     )
     
+    # Date Hierarchy
+    date_hierarchy = 'performed_datetime'
+    
+    # Search Fields
     search_fields = (
+        'identifier',
         '=procedure_id',
+        '=subject_id',
+        '=encounter_id',
         '=performer_actor_id',
         'performer_function_display',
+        'code_display',
     )
     
+    # Ordering
+    ordering = ('-performed_datetime', '-procedure_performer_id')
+    
+    # Read-Only Fields
     readonly_fields = (
         'procedure_performer_id',
         'created_at',
         'updated_at',
     )
     
+    # Fieldsets - Complete CSV alignment
     fieldsets = (
-        ('Performer Information', {
+        ('Identity & Status', {
             'fields': (
                 'procedure_performer_id',
+                'identifier',
+                'status',
+                'status_reason_code',
+                'status_reason_display',
+            ),
+            'description': 'Core identification and status of the procedure performer record.'
+        }),
+        
+        ('Procedure Coding', {
+            'fields': (
+                'code_code',
+                'code_display',
+                'category_code',
+                'category_display',
+                'body_site_code',
+                'body_site_display',
+            ),
+            'description': 'Clinical coding information (ICD, SNOMED, etc.).',
+        }),
+        
+        ('Subject & Context', {
+            'fields': (
                 'procedure_id',
+                'subject_id',
+                'encounter_id',
+                'based_on_id',
+                'part_of_id',
+                'location_id',
+            ),
+            'description': 'Patient, procedure, encounter, and location references. Note: IDs are integer references.'
+        }),
+        
+        ('Performance Timing', {
+            'fields': (
+                'performed_datetime',
+                'performed_period_start',
+                'performed_period_end',
+                'performed_string',
+                'performed_age_value',
+                'performed_age_unit',
+                'performed_range_low',
+                'performed_range_high',
+            ),
+            'description': 'When the procedure was performed.',
+        }),
+        
+        ('Performers', {
+            'fields': (
                 'performer_actor_id',
                 'performer_function_code',
                 'performer_function_display',
                 'performer_on_behalf_of_id',
+                'recorder_id',
+                'asserter_id',
             ),
-            'description': 'Details of healthcare provider performing the procedure.'
+            'description': 'Healthcare providers who performed, recorded, or asserted the procedure.',
         }),
+        
+        ('Clinical Reasoning', {
+            'fields': (
+                'reason_code_code',
+                'reason_code_display',
+                'reason_reference_id',
+            ),
+            'description': 'Why the procedure was performed.',
+            'classes': ('collapse',),
+        }),
+        
+        ('Outcome & Complications', {
+            'fields': (
+                'outcome_code',
+                'outcome_display',
+                'complication_code',
+                'complication_display',
+                'complication_detail_id',
+                'follow_up_code',
+                'follow_up_display',
+            ),
+            'description': 'Results and any complications from the procedure.',
+        }),
+        
+        ('Devices & Materials', {
+            'fields': (
+                'focal_device_manipulated_id',
+                'focal_device_action_code',
+                'focal_device_action_display',
+                'used_reference_id',
+                'used_code_code',
+                'used_code_display',
+            ),
+            'description': 'Devices and materials used during the procedure.',
+            'classes': ('collapse',),
+        }),
+        
+        ('Additional Information', {
+            'fields': (
+                'instantiates_canonical',
+                'instantiates_uri',
+                'note',
+                'report_id',
+            ),
+            'description': 'Notes, reports, and protocol references.',
+            'classes': ('collapse',),
+        }),
+        
         ('System Metadata', {
             'fields': (
                 'created_at',
@@ -394,7 +531,30 @@ class ProcedurePerformerAdmin(admin.ModelAdmin):
         }),
     )
     
+    def procedure_info(self, obj):
+        """Human-readable procedure ID display."""
+        return f"Procedure ID: {obj.procedure_id}"
+    procedure_info.short_description = 'Procedure'
+    procedure_info.admin_order_field = 'procedure_id'
+    
+    def patient_info(self, obj):
+        """Human-readable patient ID display."""
+        return f"Patient ID: {obj.subject_id}"
+    patient_info.short_description = 'Patient'
+    patient_info.admin_order_field = 'subject_id'
+    
+    def encounter_info(self, obj):
+        """Human-readable encounter ID display."""
+        return f"Encounter ID: {obj.encounter_id}"
+    encounter_info.short_description = 'Encounter'
+    encounter_info.admin_order_field = 'encounter_id'
+    
+    # List per page
     list_per_page = 25
+    
+    # Enable actions
+    actions_on_top = True
+    actions_on_bottom = False
 
 
 # ==================== STUB MODELS ADMIN ====================

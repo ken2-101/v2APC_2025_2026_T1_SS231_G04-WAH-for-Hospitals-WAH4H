@@ -22,7 +22,7 @@ class ClaimAdmin(admin.ModelAdmin):
     list_display = ('identifier', 'status', 'type', 'patient_id', 'created')
     search_fields = ('identifier', 'status')
     list_filter = ('status', 'type', 'created')
-    readonly_fields = ('claim_id', 'created')
+    readonly_fields = ('claim_id', 'created', 'created_at', 'updated_at')
 
 
 @admin.register(ClaimResponse)
@@ -30,7 +30,7 @@ class ClaimResponseAdmin(admin.ModelAdmin):
     list_display = ('identifier', 'status', 'patient_id', 'outcome', 'created')
     search_fields = ('identifier', 'status')
     list_filter = ('status', 'outcome')
-    readonly_fields = ('claimResponse_id', 'created')
+    readonly_fields = ('claimResponse_id', 'created', 'created_at', 'updated_at')
 
 
 @admin.register(Invoice)
@@ -38,7 +38,7 @@ class InvoiceAdmin(admin.ModelAdmin):
     list_display = ('identifier', 'status', 'subject_id', 'total_gross_value', 'invoice_datetime')
     search_fields = ('identifier', 'status')
     list_filter = ('status', 'invoice_datetime')
-    readonly_fields = ('invoice_id', 'created_at', 'updated_at')
+    readonly_fields = ('invoice_id', 'invoice_datetime', 'created_at', 'updated_at')
 
 
 @admin.register(PaymentReconciliation)
@@ -52,4 +52,4 @@ class PaymentReconciliationAdmin(admin.ModelAdmin):
 class PaymentNoticeAdmin(admin.ModelAdmin):
     list_display = ('identifier', 'status', 'payment_status', 'payment_date')
     list_filter = ('status', 'payment_status')
-    readonly_fields = ('payment_notice_id', 'created')
+    readonly_fields = ('payment_notice_id', 'created_datetime', 'created_at', 'updated_at')

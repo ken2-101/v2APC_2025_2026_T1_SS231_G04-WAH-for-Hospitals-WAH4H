@@ -7,10 +7,9 @@ from core.models import TimeStampedModel, FHIRResourceModel
 class Account(FHIRResourceModel):
     """
     FHIR Account Resource - strictly aligned with billing.csv
+    Inherits: identifier, status, created_at, updated_at from FHIRResourceModel
     """
     account_id = models.AutoField(primary_key=True)
-    identifier = models.CharField(max_length=100, unique=True)
-    status = models.CharField(max_length=100)
     type = models.CharField(max_length=100, null=True, blank=True)
     name = models.CharField(max_length=255, null=True, blank=True)
     subject_id = models.IntegerField()
@@ -25,8 +24,6 @@ class Account(FHIRResourceModel):
     guarantor_period_start = models.DateField(null=True, blank=True)
     guarantor_period_end = models.DateField(null=True, blank=True)
     partOf_id = models.IntegerField(null=True, blank=True)
-    created_at = models.DateTimeField(null=True, blank=True)
-    updated_at = models.DateTimeField(null=True, blank=True)
     
     class Meta:
         db_table = 'account'
@@ -35,10 +32,10 @@ class Account(FHIRResourceModel):
 class Claim(FHIRResourceModel):
     """
     FHIR Claim Resource - strictly aligned with billing.csv
+    Inherits: identifier, status, created_at, updated_at from FHIRResourceModel
+    Note: 'created' is a distinct FHIR field, separate from inherited 'created_at' audit field
     """
     claim_id = models.AutoField(primary_key=True)
-    identifier = models.CharField(max_length=100, unique=True)
-    status = models.CharField(max_length=100)
     type = models.CharField(max_length=100, null=True, blank=True)
     subType = models.CharField(max_length=100, null=True, blank=True)
     use = models.CharField(max_length=255, null=True, blank=True)
@@ -163,10 +160,10 @@ class Claim(FHIRResourceModel):
 class ClaimResponse(FHIRResourceModel):
     """
     FHIR ClaimResponse Resource (ClaimRequest in CSV) - strictly aligned with billing.csv
+    Inherits: identifier, status, created_at, updated_at from FHIRResourceModel
+    Note: 'created' is a distinct FHIR field, separate from inherited 'created_at' audit field
     """
     claimResponse_id = models.AutoField(primary_key=True)
-    identifier = models.CharField(max_length=100, unique=True)
-    status = models.CharField(max_length=100)
     type = models.CharField(max_length=100, null=True, blank=True)
     subType = models.CharField(max_length=100, null=True, blank=True)
     use = models.CharField(max_length=255, null=True, blank=True)
@@ -264,10 +261,10 @@ class ClaimResponse(FHIRResourceModel):
 class Invoice(FHIRResourceModel):
     """
     FHIR Invoice Resource - strictly aligned with billing.csv
+    Inherits: identifier, status, created_at, updated_at from FHIRResourceModel
+    Note: 'invoice_datetime' is a distinct FHIR field, separate from inherited 'created_at' audit field
     """
     invoice_id = models.AutoField(primary_key=True)
-    identifier = models.CharField(max_length=100, unique=True)
-    status = models.CharField(max_length=100)
     cancelled_reason = models.CharField(max_length=255, null=True, blank=True)
     type = models.CharField(max_length=100, null=True, blank=True)
     subject_id = models.IntegerField()
@@ -303,8 +300,6 @@ class Invoice(FHIRResourceModel):
     
     payment_terms = models.CharField(max_length=255, null=True, blank=True)
     note = models.TextField(null=True, blank=True)
-    created_at = models.DateTimeField(null=True, blank=True)
-    updated_at = models.DateTimeField(null=True, blank=True)
     
     class Meta:
         db_table = 'invoice'
@@ -313,10 +308,10 @@ class Invoice(FHIRResourceModel):
 class PaymentReconciliation(FHIRResourceModel):
     """
     FHIR PaymentReconciliation Resource - strictly aligned with billing.csv
+    Inherits: identifier, status, created_at, updated_at from FHIRResourceModel
+    Note: 'created_datetime' is a distinct FHIR field, separate from inherited 'created_at' audit field
     """
     payment_reconciliation_id = models.AutoField(primary_key=True)
-    identifier = models.CharField(max_length=100, unique=True)
-    status = models.CharField(max_length=100)
     period_start = models.DateField(null=True, blank=True)
     period_end = models.DateField(null=True, blank=True)
     created_datetime = models.DateTimeField(null=True, blank=True)
@@ -348,8 +343,6 @@ class PaymentReconciliation(FHIRResourceModel):
     process_note_text = models.TextField(null=True, blank=True)
     
     form_code = models.CharField(max_length=100, null=True, blank=True)
-    created_at = models.DateTimeField(null=True, blank=True)
-    updated_at = models.DateTimeField(null=True, blank=True)
     
     class Meta:
         db_table = 'payment_reconciliation'
@@ -358,10 +351,10 @@ class PaymentReconciliation(FHIRResourceModel):
 class PaymentNotice(FHIRResourceModel):
     """
     FHIR PaymentNotice Resource (Payment_Notice in CSV) - strictly aligned with billing.csv
+    Inherits: identifier, status, created_at, updated_at from FHIRResourceModel
+    Note: 'created_datetime' is a distinct FHIR field, separate from inherited 'created_at' audit field
     """
     payment_notice_id = models.AutoField(primary_key=True)
-    identifier = models.CharField(max_length=100, unique=True)
-    status = models.CharField(max_length=100)
     request_reference_id = models.IntegerField(null=True, blank=True)
     response_reference_id = models.IntegerField(null=True, blank=True)
     created_datetime = models.DateTimeField(null=True, blank=True)
@@ -373,8 +366,6 @@ class PaymentNotice(FHIRResourceModel):
     recipient_id = models.IntegerField(null=True, blank=True)
     amount_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     amount_currency = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    created_at = models.DateTimeField(null=True, blank=True)
-    updated_at = models.DateTimeField(null=True, blank=True)
     
     class Meta:
         db_table = 'payment_notice'

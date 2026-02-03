@@ -65,21 +65,9 @@ class Encounter(FHIRResourceModel):
     """
     Encounter: Represents a healthcare encounter (appointment, admission, visit).
     Flattened structure directly matching Philippine LGU Data Dictionary (admission.csv).
+    Inherits identifier, status, created_at, updated_at from FHIRResourceModel.
     """
     encounter_id = models.AutoField(primary_key=True)
-    identifier = models.CharField(
-        max_length=100,
-        null=False,
-        blank=False,
-        unique=True,
-        help_text="Unique identifier for the encounter (NOT NULL, UNIQUE)"
-    )
-    status = models.CharField(
-        max_length=100,
-        null=False,
-        blank=False,
-        help_text="Status of the encounter (NOT NULL)"
-    )
     
     # Classification and typing
     class_field = models.CharField(
@@ -149,9 +137,6 @@ class Encounter(FHIRResourceModel):
     # Pre-admission identifier
     pre_admission_identifier = models.CharField(max_length=100, null=True, blank=True)
     
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
     class Meta:
         db_table = 'encounter'
         verbose_name = 'Encounter'
@@ -165,21 +150,9 @@ class Procedure(FHIRResourceModel):
     """
     Procedure: Represents a medical procedure performed during an encounter.
     Flattened structure directly matching Philippine LGU Data Dictionary (admission.csv).
+    Inherits identifier, status, created_at, updated_at from FHIRResourceModel.
     """
     procedure_id = models.AutoField(primary_key=True)
-    identifier = models.CharField(
-        max_length=100,
-        null=False,
-        blank=False,
-        unique=True,
-        help_text="Unique identifier for the procedure (NOT NULL, UNIQUE)"
-    )
-    status = models.CharField(
-        max_length=100,
-        null=False,
-        blank=False,
-        help_text="Status of the procedure (NOT NULL)"
-    )
     status_reason_code = models.CharField(max_length=100, null=True, blank=True)
     status_reason_display = models.CharField(max_length=100, null=True, blank=True)
     
@@ -258,9 +231,6 @@ class Procedure(FHIRResourceModel):
     used_code_code = models.CharField(max_length=100, null=True, blank=True)
     used_code_display = models.CharField(max_length=100, null=True, blank=True)
     
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
     class Meta:
         db_table = 'procedure'
         verbose_name = 'Procedure'
@@ -270,17 +240,96 @@ class Procedure(FHIRResourceModel):
         return f"Procedure {self.identifier} - {self.status}"
 
 
-class ProcedurePerformer(TimeStampedModel):
+class ProcedurePerformer(FHIRResourceModel):
     """
     ProcedurePerformer: Detail model for procedure performers.
     Flattened structure directly matching Philippine LGU Data Dictionary (admission.csv).
+    Inherits identifier, status, created_at, updated_at from FHIRResourceModel.
+    Full CSV alignment with all Procedure_Performer fields.
     """
     procedure_performer_id = models.AutoField(primary_key=True)
-    procedure_id = models.IntegerField(null=False, blank=False)  # FK to Procedure
-    performer_actor_id = models.IntegerField(null=False, blank=False)  # FK to Practitioner
+    
+    # Core relationships - procedure_id is PK+FK per CSV
+    procedure_id = models.IntegerField(null=False, blank=False)  # FK to Procedure (PK, FK per CSV)
+    
+    # Status reason
+    status_reason_code = models.CharField(max_length=100, null=True, blank=True)
+    status_reason_display = models.CharField(max_length=100, null=True, blank=True)
+    
+    # Instantiation
+    instantiates_canonical = models.CharField(max_length=255, null=True, blank=True)
+    instantiates_uri = models.CharField(max_length=255, null=True, blank=True)
+    
+    # Relationships
+    based_on_id = models.IntegerField(null=True, blank=True)  # FK to ServiceRequest
+    part_of_id = models.IntegerField(null=True, blank=True)  # FK to self (Procedure)
+    
+    # Classification and coding
+    category_code = models.CharField(max_length=100, null=True, blank=True)
+    category_display = models.CharField(max_length=100, null=True, blank=True)
+    code_code = models.CharField(max_length=100, null=True, blank=True)
+    code_display = models.CharField(max_length=100, null=True, blank=True)
+    
+    # Subject (Patient) and Encounter - Required per CSV
+    subject_id = models.IntegerField(null=False, blank=False)  # FK to patients.Patient (NOT NULL per CSV)
+    encounter_id = models.IntegerField(null=False, blank=False)  # FK to Encounter (NOT NULL per CSV)
+    
+    # Timing
+    performed_datetime = models.DateTimeField(null=True, blank=True)
+    performed_period_start = models.DateField(null=True, blank=True)
+    performed_period_end = models.DateField(null=True, blank=True)
+    performed_string = models.CharField(max_length=255, null=True, blank=True)
+    performed_age_value = models.CharField(max_length=255, null=True, blank=True)
+    performed_age_unit = models.CharField(max_length=255, null=True, blank=True)
+    performed_range_low = models.CharField(max_length=255, null=True, blank=True)
+    performed_range_high = models.CharField(max_length=255, null=True, blank=True)
+    
+    # Performers
+    performer_actor_id = models.IntegerField(null=True, blank=True)  # FK to Practitioner
     performer_function_code = models.CharField(max_length=100, null=True, blank=True)
     performer_function_display = models.CharField(max_length=100, null=True, blank=True)
     performer_on_behalf_of_id = models.IntegerField(null=True, blank=True)  # FK to Organization
+    
+    # Recording and Assertion
+    recorder_id = models.IntegerField(null=True, blank=True)  # FK to Practitioner
+    asserter_id = models.IntegerField(null=True, blank=True)  # FK to Practitioner
+    
+    # Location
+    location_id = models.IntegerField(null=True, blank=True)  # FK to Location
+    
+    # Reason
+    reason_code_code = models.CharField(max_length=100, null=True, blank=True)
+    reason_code_display = models.CharField(max_length=100, null=True, blank=True)
+    reason_reference_id = models.IntegerField(null=True, blank=True)  # FK to Condition
+    
+    # Body Site
+    body_site_code = models.CharField(max_length=100, null=True, blank=True)
+    body_site_display = models.CharField(max_length=100, null=True, blank=True)
+    
+    # Outcome and Complications
+    outcome_code = models.CharField(max_length=100, null=True, blank=True)
+    outcome_display = models.CharField(max_length=100, null=True, blank=True)
+    complication_code = models.CharField(max_length=100, null=True, blank=True)
+    complication_display = models.CharField(max_length=100, null=True, blank=True)
+    complication_detail_id = models.IntegerField(null=True, blank=True)  # FK to Condition
+    
+    # Follow-up
+    follow_up_code = models.CharField(max_length=100, null=True, blank=True)
+    follow_up_display = models.CharField(max_length=100, null=True, blank=True)
+    
+    # Notes and Reports
+    note = models.TextField(null=True, blank=True)
+    report_id = models.IntegerField(null=True, blank=True)  # FK to DiagnosticReport
+    
+    # Focal Device
+    focal_device_manipulated_id = models.IntegerField(null=True, blank=True)  # FK to Device
+    focal_device_action_code = models.CharField(max_length=100, null=True, blank=True)
+    focal_device_action_display = models.CharField(max_length=100, null=True, blank=True)
+    
+    # Used (Medications, devices, etc.)
+    used_reference_id = models.IntegerField(null=True, blank=True)  # FK to Medication
+    used_code_code = models.CharField(max_length=100, null=True, blank=True)
+    used_code_display = models.CharField(max_length=100, null=True, blank=True)
     
     class Meta:
         db_table = 'procedure_performer'

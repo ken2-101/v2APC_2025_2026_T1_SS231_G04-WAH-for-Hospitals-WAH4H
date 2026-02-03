@@ -2,30 +2,47 @@ from django.db import models
 from core.models import TimeStampedModel, FHIRResourceModel
 
 class Medication(FHIRResourceModel):
+    """
+    FHIR Medication Resource
+    Inherits: identifier, status, created_at, updated_at from FHIRResourceModel
+    """
     medication_id = models.AutoField(primary_key=True)
     code_code = models.CharField(max_length=100, unique=True, null=True, blank=True)
     code_display = models.CharField(max_length=100, null=True, blank=True)
     code_system = models.CharField(max_length=100, null=True, blank=True)
     code_version = models.CharField(max_length=100, null=True, blank=True)
     implicit_rules = models.CharField(max_length=255, null=True, blank=True)
+    
     class Meta:
         db_table = 'medication'
 
+
 class MedicationRequest(FHIRResourceModel):
+    """
+    FHIR MedicationRequest Resource
+    Inherits: identifier, status, created_at, updated_at from FHIRResourceModel
+    Decoupled: All foreign relationships converted to IntegerField (Fortress Architecture)
+    """
     medication_request_id = models.AutoField(primary_key=True)
-    subject = models.ForeignKey('patients.Patient', on_delete=models.PROTECT, db_column='subject_id')
-    encounter = models.ForeignKey('admission.Encounter', on_delete=models.PROTECT, db_column='encounter_id')
-    requester = models.ForeignKey('accounts.Practitioner', on_delete=models.PROTECT, db_column='requester_id', null=True, blank=True, related_name='medication_requests_requested')
-    performer = models.ForeignKey('accounts.Practitioner', on_delete=models.PROTECT, db_column='performer_id', null=True, blank=True, related_name='medication_requests_performed')
-    recorder = models.ForeignKey('accounts.Practitioner', on_delete=models.PROTECT, db_column='recorder_id', null=True, blank=True, related_name='medication_requests_recorded')
-    based_on = models.ForeignKey('admission.ServiceRequest', on_delete=models.PROTECT, db_column='based_on_id', null=True, blank=True, related_name='medication_requests')
-    insurance = models.ForeignKey('billing.Coverage', on_delete=models.PROTECT, db_column='insurance_id', null=True, blank=True, related_name='medication_requests')
-    reported_reference = models.ForeignKey('accounts.Practitioner', on_delete=models.PROTECT, db_column='reported_reference_id', null=True, blank=True, related_name='reported_medication_requests')
-    reason_reference = models.ForeignKey('patients.Condition', on_delete=models.PROTECT, db_column='reason_reference_id', null=True, blank=True, related_name='reason_medication_requests')
+    
+    # Decoupled Reference Fields (Manual Integer Fields - No ForeignKey)
+    subject_id = models.IntegerField(db_index=True)  # Reference to patients.Patient
+    encounter_id = models.IntegerField(db_index=True)  # Reference to admission.Encounter
+    requester_id = models.IntegerField(null=True, blank=True, db_index=True)  # Reference to accounts.Practitioner
+    performer_id = models.IntegerField(null=True, blank=True, db_index=True)  # Reference to accounts.Practitioner
+    recorder_id = models.IntegerField(null=True, blank=True, db_index=True)  # Reference to accounts.Practitioner
+    based_on_id = models.IntegerField(null=True, blank=True, db_index=True)  # Reference to admission.ServiceRequest
+    insurance_id = models.IntegerField(null=True, blank=True, db_index=True)  # Reference to billing.Coverage (FIXED CRASH)
+    reported_reference_id = models.IntegerField(null=True, blank=True, db_index=True)  # Reference to accounts.Practitioner
+    reason_reference_id = models.IntegerField(null=True, blank=True, db_index=True)  # Reference to patients.Condition
+    
+    # Medication CodeableConcept or Reference
     medication_reference = models.CharField(max_length=255, null=True, blank=True)
     medication_code = models.CharField(max_length=100, null=True, blank=True)
     medication_display = models.CharField(max_length=100, null=True, blank=True)
     medication_system = models.CharField(max_length=100, null=True, blank=True)
+    
+    # Request Details
     intent = models.CharField(max_length=255, null=True, blank=True)
     category = models.CharField(max_length=255, null=True, blank=True)
     priority = models.CharField(max_length=255, null=True, blank=True)
@@ -35,6 +52,8 @@ class MedicationRequest(FHIRResourceModel):
     status_reason = models.CharField(max_length=100, null=True, blank=True)
     reason_code = models.CharField(max_length=100, null=True, blank=True)
     note = models.TextField(null=True, blank=True)
+    
+    # Dosage Instructions
     dosage_text = models.TextField(null=True, blank=True)
     dosage_site = models.CharField(max_length=255, null=True, blank=True)
     dosage_route = models.CharField(max_length=255, null=True, blank=True)
@@ -42,9 +61,11 @@ class MedicationRequest(FHIRResourceModel):
     dosage_dose_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     dosage_dose_unit = models.CharField(max_length=255, null=True, blank=True)
     dosage_rate_quantity_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    dosage_rate_quantity_unit = models.CharField(max_length=50, null=True, blank=True)
+    dosage_rate_quantity_unit = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # CSV specifies DECIMAL(10,2)
     dosage_rate_ratio_numerator = models.CharField(max_length=255, null=True, blank=True)
     dosage_rate_ratio_denominator = models.CharField(max_length=255, null=True, blank=True)
+    
+    # Dispense Request
     dispense_quantity = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     dispense_initial_fill_quantity = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     dispense_initial_fill_duration = models.CharField(max_length=255, null=True, blank=True)
@@ -52,15 +73,23 @@ class MedicationRequest(FHIRResourceModel):
     dispense_validity_period_start = models.CharField(max_length=255, null=True, blank=True)
     dispense_validity_period_end = models.CharField(max_length=255, null=True, blank=True)
     dispense_repeats_allowed = models.CharField(max_length=255, null=True, blank=True)
+    
+    # Additional Fields
     group_identifier = models.CharField(max_length=100, null=True, blank=True)
     course_of_therapy_type = models.CharField(max_length=100, null=True, blank=True)
     instantiates_canonical = models.CharField(max_length=255, null=True, blank=True)
     instantiates_uri = models.CharField(max_length=255, null=True, blank=True)
     performer_type = models.CharField(max_length=100, null=True, blank=True)
+    
     class Meta:
         db_table = 'medication_request'
 
+
 class Inventory(TimeStampedModel):
+    """
+    Pharmacy Inventory Management
+    Inherits: created_at, updated_at from TimeStampedModel
+    """
     inventory_id = models.AutoField(primary_key=True)
     item_code = models.CharField(max_length=100, null=True, blank=True)
     item_name = models.CharField(max_length=255, null=True, blank=True)
@@ -74,23 +103,36 @@ class Inventory(TimeStampedModel):
     expiry_date = models.DateField(null=True, blank=True)
     last_restocked_datetime = models.DateTimeField(null=True, blank=True)
     created_by = models.CharField(max_length=255, null=True, blank=True)
+    
     class Meta:
         db_table = 'inventory'
 
+
 class MedicationAdministration(FHIRResourceModel):
+    """
+    FHIR MedicationAdministration Resource
+    Inherits: identifier, status, created_at, updated_at from FHIRResourceModel
+    Decoupled: All foreign relationships converted to IntegerField (Fortress Architecture)
+    """
     medication_administration_id = models.AutoField(primary_key=True)
-    subject = models.ForeignKey('patients.Patient', on_delete=models.PROTECT, db_column='subject_id')
-    context = models.ForeignKey('admission.Encounter', on_delete=models.PROTECT, db_column='context_id', null=True, blank=True, related_name='medication_administrations')
-    performer_actor = models.ForeignKey('accounts.Practitioner', on_delete=models.PROTECT, db_column='performer_actor_id', null=True, blank=True)
-    request = models.ForeignKey('pharmacy.MedicationRequest', on_delete=models.PROTECT, db_column='request_id', null=True, blank=True)
-    part_of = models.ForeignKey('admission.Procedure', on_delete=models.PROTECT, db_column='part_of_id', null=True, blank=True, related_name='medication_administrations')
-    device = models.ForeignKey('admission.Device', on_delete=models.PROTECT, db_column='device_id', null=True, blank=True, related_name='medication_administrations')
-    event_history = models.ForeignKey('monitoring.Observation', on_delete=models.PROTECT, db_column='event_history_id', null=True, blank=True, related_name='event_medication_administrations')
-    reason_reference = models.ForeignKey('patients.Condition', on_delete=models.PROTECT, db_column='reason_reference_id', null=True, blank=True, related_name='reason_medication_administrations')
+    
+    # Decoupled Reference Fields (Manual Integer Fields - No ForeignKey)
+    subject_id = models.IntegerField(db_index=True)  # Reference to patients.Patient
+    context_id = models.IntegerField(null=True, blank=True, db_index=True)  # Reference to admission.Encounter
+    performer_actor_id = models.IntegerField(null=True, blank=True, db_index=True)  # Reference to accounts.Practitioner
+    request_id = models.IntegerField(null=True, blank=True, db_index=True)  # Reference to pharmacy.MedicationRequest
+    part_of_id = models.IntegerField(null=True, blank=True, db_index=True)  # Reference to admission.Procedure
+    device_id = models.IntegerField(null=True, blank=True, db_index=True)  # Reference to admission.Device
+    event_history_id = models.IntegerField(null=True, blank=True, db_index=True)  # Reference to monitoring.Observation
+    reason_reference_id = models.IntegerField(null=True, blank=True, db_index=True)  # Reference to patients.Condition
+    
+    # Medication CodeableConcept or Reference
     medication_reference = models.CharField(max_length=255, null=True, blank=True)
     medication_code = models.CharField(max_length=100, null=True, blank=True)
     medication_display = models.CharField(max_length=100, null=True, blank=True)
     medication_system = models.CharField(max_length=100, null=True, blank=True)
+    
+    # Administration Details
     instantiates_uri = models.CharField(max_length=255, null=True, blank=True)
     status_reason = models.CharField(max_length=100, null=True, blank=True)
     category = models.CharField(max_length=255, null=True, blank=True)
@@ -100,6 +142,8 @@ class MedicationAdministration(FHIRResourceModel):
     performer_function = models.CharField(max_length=255, null=True, blank=True)
     reason_code = models.CharField(max_length=100, null=True, blank=True)
     note = models.TextField(null=True, blank=True)
+    
+    # Dosage
     dosage_text = models.TextField(null=True, blank=True)
     dosage_site = models.CharField(max_length=255, null=True, blank=True)
     dosage_route = models.CharField(max_length=255, null=True, blank=True)
@@ -107,8 +151,9 @@ class MedicationAdministration(FHIRResourceModel):
     dosage_dose_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     dosage_dose_unit = models.CharField(max_length=255, null=True, blank=True)
     dosage_rate_quantity_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    dosage_rate_quantity_unit = models.CharField(max_length=50, null=True, blank=True)
+    dosage_rate_quantity_unit = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # CSV specifies DECIMAL(10,2)
     dosage_rate_ratio_numerator = models.CharField(max_length=255, null=True, blank=True)
     dosage_rate_ratio_denominator = models.CharField(max_length=255, null=True, blank=True)
+    
     class Meta:
         db_table = 'medication_administration'
