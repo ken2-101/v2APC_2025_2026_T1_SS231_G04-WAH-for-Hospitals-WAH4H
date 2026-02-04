@@ -1,146 +1,235 @@
+"""
+admission/api/serializers.py
+
+CQRS-Lite Serializers for the Admission Module.
+Strict separation between Input (Validation) and Output (DTO) serializers.
+
+Architecture Pattern: Fortress Pattern - API Layer
+- InputSerializers: Validation only, NO save() logic
+- OutputSerializers: DTO serialization, read-only
+- Write operations delegated to Service Layer (admission_services.py)
+
+Context: Philippine LGU Hospital System
+"""
+
 from rest_framework import serializers
-from admission.models import Encounter, Procedure, ProcedurePerformer
-from admission.services.admission_acl import EncounterService, ProcedureService, PatientACL
+from admission.models import Encounter, Procedure
 
 
-class EncounterSerializer(serializers.ModelSerializer):
-    subject_id = serializers.IntegerField(required=True)
-    patient_details = serializers.SerializerMethodField(read_only=True)
-    
-    class Meta:
-        model = Encounter
-        fields = [
-            'encounter_id',
-            'identifier',
-            'status',
-            'class_field',
-            'type',
-            'service_type',
-            'priority',
-            'subject_id',
-            'patient_details',
-            'episode_of_care_id',
-            'based_on_service_request_id',
-            'appointment_id',
-            'participant_individual_id',
-            'participant_type',
-            'reason_reference_id',
-            'diagnosis_condition_id',
-            'location_id',
-            'discharge_destination_id',
-            'service_provider_id',
-            'account_id',
-            'period_start',
-            'period_end',
-            'length',
-            'reason_code',
-            'diagnosis_rank',
-            'diagnosis_use',
-            'location_status',
-            'location_period_start',
-            'location_period_end',
-            'location_physical_type',
-            'admit_source',
-            're_admission',
-            'diet_preference',
-            'special_courtesy',
-            'special_arrangement',
-            'discharge_disposition',
-            'part_of_encounter_id',
-            'pre_admission_identifier',
-            'created_at',
-            'updated_at',
-        ]
-        read_only_fields = ['encounter_id', 'identifier', 'created_at', 'updated_at']
-    
-    def get_patient_details(self, obj):
-        return PatientACL.get_patient_summary(obj.subject_id)
-    
-    def create(self, validated_data):
-        return EncounterService.create_encounter(validated_data)
+# ============================================================================
+# ENCOUNTER SERIALIZERS
+# ============================================================================
+
+class EncounterInputSerializer(serializers.Serializer):
+    """
+    Input Serializer for Encounter creation/updates.
+    Validation only - NO model binding or save() logic.
+    """
+    subject_id = serializers.IntegerField(required=True, help_text="Patient ID")
+    class_field = serializers.CharField(
+        max_length=100, 
+        required=False, 
+        default='inpatient',
+        help_text="Encounter class: inpatient, outpatient, emergency"
+    )
+    type = serializers.CharField(max_length=100, required=False, allow_null=True)
+    service_type = serializers.CharField(max_length=100, required=False, allow_null=True)
+    priority = serializers.CharField(max_length=255, required=False, allow_null=True)
+    reason_code = serializers.CharField(max_length=100, required=False, allow_null=True)
+    period_start = serializers.DateField(required=False, allow_null=True)
+    location_id = serializers.IntegerField(required=False, allow_null=True)
+    participant_individual_id = serializers.IntegerField(required=False, allow_null=True, help_text="Admitting practitioner ID")
+    participant_type = serializers.CharField(max_length=100, required=False, allow_null=True)
+    admit_source = serializers.CharField(max_length=255, required=False, allow_null=True)
+    account_id = serializers.IntegerField(required=False, allow_null=True)
+    pre_admission_identifier = serializers.CharField(max_length=100, required=False, allow_null=True)
 
 
-class ProcedureSerializer(serializers.ModelSerializer):
-    encounter_id = serializers.IntegerField(required=True, source='encounter.encounter_id')
-    subject_id = serializers.IntegerField(required=True)
-    
-    class Meta:
-        model = Procedure
-        fields = [
-            'procedure_id',
-            'identifier',
-            'status',
-            'status_reason_code',
-            'status_reason_display',
-            'instantiates_canonical',
-            'instantiates_uri',
-            'based_on_id',
-            'part_of_id',
-            'subject_id',
-            'encounter_id',
-            'performer_actor_id',
-            'performer_on_behalf_of_id',
-            'recorder_id',
-            'asserter_id',
-            'location_id',
-            'reason_reference_id',
-            'complication_detail_id',
-            'report_id',
-            'focal_device_manipulated_id',
-            'used_reference_id',
-            'category_code',
-            'category_display',
-            'code_code',
-            'code_display',
-            'performed_datetime',
-            'performed_period_start',
-            'performed_period_end',
-            'performed_string',
-            'performed_age_value',
-            'performed_age_unit',
-            'performed_range_low',
-            'performed_range_high',
-            'performer_function_code',
-            'performer_function_display',
-            'reason_code_code',
-            'reason_code_display',
-            'body_site_code',
-            'body_site_display',
-            'outcome_code',
-            'outcome_display',
-            'complication_code',
-            'complication_display',
-            'follow_up_code',
-            'follow_up_display',
-            'note',
-            'focal_device_action_code',
-            'focal_device_action_display',
-            'used_code_code',
-            'used_code_display',
-            'created_at',
-            'updated_at',
-        ]
-        read_only_fields = ['procedure_id', 'identifier', 'created_at', 'updated_at']
-    
-    def create(self, validated_data):
-        encounter_id = validated_data.pop('encounter', {}).get('encounter_id')
-        validated_data['encounter_id'] = encounter_id
-        return ProcedureService.create_procedure(validated_data)
+class EncounterDischargeInputSerializer(serializers.Serializer):
+    """
+    Input Serializer for Encounter discharge.
+    Validation only - NO model binding or save() logic.
+    """
+    period_end = serializers.DateField(required=False, allow_null=True, help_text="Discharge date")
+    discharge_disposition = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    discharge_destination_id = serializers.IntegerField(required=False, allow_null=True, help_text="Discharge destination location ID")
 
 
-class ProcedurePerformerSerializer(serializers.ModelSerializer):
-    procedure_id = serializers.IntegerField(required=True, source='procedure.procedure_id')
-    
-    class Meta:
-        model = ProcedurePerformer
-        fields = [
-            'procedure_performer_id',
-            'procedure_id',
-            'performer_actor_id',
-            'performer_on_behalf_of_id',
-            'performer_function_code',
-            'performer_function_display',
-            'created_at',
-            'updated_at',
-        ]
-        read_only_fields = ['procedure_performer_id', 'created_at', 'updated_at']
+class EncounterOutputSerializer(serializers.Serializer):
+    """
+    Output Serializer for Encounter DTOs.
+    Read-only, DTO-based serialization.
+    """
+    encounter_id = serializers.IntegerField()
+    identifier = serializers.CharField()
+    status = serializers.CharField()
+    class_field = serializers.CharField()
+    type = serializers.CharField(allow_null=True)
+    service_type = serializers.CharField(allow_null=True)
+    priority = serializers.CharField(allow_null=True)
+    subject_id = serializers.IntegerField()
+    patient_summary = serializers.DictField(allow_null=True)
+    period_start = serializers.CharField(allow_null=True)
+    period_end = serializers.CharField(allow_null=True)
+    reason_code = serializers.CharField(allow_null=True)
+    location_id = serializers.IntegerField(allow_null=True)
+    location_summary = serializers.DictField(allow_null=True)
+    participant_individual_id = serializers.IntegerField(allow_null=True)
+    practitioner_summary = serializers.DictField(allow_null=True)
+    admit_source = serializers.CharField(allow_null=True)
+    discharge_disposition = serializers.CharField(allow_null=True)
+    created_at = serializers.CharField(allow_null=True)
+    updated_at = serializers.CharField(allow_null=True)
+
+
+class EncounterListOutputSerializer(serializers.Serializer):
+    """
+    Output Serializer for Encounter list/summary DTOs.
+    Lightweight DTO for list views.
+    """
+    encounter_id = serializers.IntegerField()
+    identifier = serializers.CharField()
+    status = serializers.CharField()
+    class_field = serializers.CharField()
+    service_type = serializers.CharField(allow_null=True)
+    subject_id = serializers.IntegerField()
+    patient_summary = serializers.DictField(allow_null=True)
+    period_start = serializers.CharField(allow_null=True)
+    period_end = serializers.CharField(allow_null=True)
+    location_id = serializers.IntegerField(allow_null=True)
+
+
+# ============================================================================
+# PROCEDURE SERIALIZERS
+# ============================================================================
+
+class ProcedurePerformerInputSerializer(serializers.Serializer):
+    """
+    Input Serializer for ProcedurePerformer (nested in ProcedureInputSerializer).
+    Validation only.
+    """
+    performer_actor_id = serializers.IntegerField(required=False, allow_null=True, help_text="Practitioner ID")
+    performer_function_code = serializers.CharField(max_length=100, required=False, allow_null=True)
+    performer_function_display = serializers.CharField(max_length=100, required=False, allow_null=True)
+    performer_on_behalf_of_id = serializers.IntegerField(required=False, allow_null=True, help_text="Organization ID")
+
+
+class ProcedureInputSerializer(serializers.Serializer):
+    """
+    Input Serializer for Procedure creation.
+    Validation only - NO model binding or save() logic.
+    """
+    encounter_id = serializers.IntegerField(required=True, help_text="Encounter ID (internal FK)")
+    subject_id = serializers.IntegerField(required=True, help_text="Patient ID")
+    code_code = serializers.CharField(max_length=100, required=True, help_text="Procedure code")
+    code_display = serializers.CharField(max_length=100, required=False, allow_null=True)
+    status = serializers.CharField(max_length=50, required=False, default='completed')
+    performed_datetime = serializers.DateTimeField(required=False, allow_null=True)
+    performed_period_start = serializers.DateField(required=False, allow_null=True)
+    performed_period_end = serializers.DateField(required=False, allow_null=True)
+    category_code = serializers.CharField(max_length=100, required=False, allow_null=True)
+    category_display = serializers.CharField(max_length=100, required=False, allow_null=True)
+    body_site_code = serializers.CharField(max_length=100, required=False, allow_null=True)
+    body_site_display = serializers.CharField(max_length=100, required=False, allow_null=True)
+    outcome_code = serializers.CharField(max_length=100, required=False, allow_null=True)
+    outcome_display = serializers.CharField(max_length=100, required=False, allow_null=True)
+    note = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    location_id = serializers.IntegerField(required=False, allow_null=True)
+    recorder_id = serializers.IntegerField(required=False, allow_null=True)
+    asserter_id = serializers.IntegerField(required=False, allow_null=True)
+    performers = serializers.ListField(
+        child=ProcedurePerformerInputSerializer(),
+        required=False,
+        default=list,
+        help_text="List of performers"
+    )
+
+
+class ProcedureOutputSerializer(serializers.Serializer):
+    """
+    Output Serializer for Procedure DTOs.
+    Read-only, DTO-based serialization.
+    """
+    procedure_id = serializers.IntegerField()
+    identifier = serializers.CharField()
+    status = serializers.CharField()
+    code_code = serializers.CharField()
+    code_display = serializers.CharField(allow_null=True)
+    category_code = serializers.CharField(allow_null=True)
+    category_display = serializers.CharField(allow_null=True)
+    subject_id = serializers.IntegerField()
+    patient_summary = serializers.DictField(allow_null=True)
+    encounter_id = serializers.IntegerField(allow_null=True)
+    performed_datetime = serializers.CharField(allow_null=True)
+    performed_period_start = serializers.CharField(allow_null=True)
+    performed_period_end = serializers.CharField(allow_null=True)
+    body_site_code = serializers.CharField(allow_null=True)
+    body_site_display = serializers.CharField(allow_null=True)
+    outcome_code = serializers.CharField(allow_null=True)
+    outcome_display = serializers.CharField(allow_null=True)
+    note = serializers.CharField(allow_null=True)
+    performers = serializers.ListField(allow_null=True)
+    location_id = serializers.IntegerField(allow_null=True)
+    created_at = serializers.CharField(allow_null=True)
+    updated_at = serializers.CharField(allow_null=True)
+
+
+class ProcedureListOutputSerializer(serializers.Serializer):
+    """
+    Output Serializer for Procedure list/summary DTOs.
+    Lightweight DTO for list views.
+    """
+    procedure_id = serializers.IntegerField()
+    identifier = serializers.CharField()
+    status = serializers.CharField()
+    code_code = serializers.CharField()
+    code_display = serializers.CharField(allow_null=True)
+    subject_id = serializers.IntegerField()
+    patient_summary = serializers.DictField(allow_null=True)
+    encounter_id = serializers.IntegerField(allow_null=True)
+    performed_datetime = serializers.CharField(allow_null=True)
+    outcome_code = serializers.CharField(allow_null=True)
+class ProcedureOutputSerializer(serializers.Serializer):
+    """
+    Output Serializer for Procedure DTOs.
+    Read-only, DTO-based serialization.
+    """
+    procedure_id = serializers.IntegerField()
+    identifier = serializers.CharField()
+    status = serializers.CharField()
+    code_code = serializers.CharField()
+    code_display = serializers.CharField(allow_null=True)
+    category_code = serializers.CharField(allow_null=True)
+    category_display = serializers.CharField(allow_null=True)
+    subject_id = serializers.IntegerField()
+    patient_summary = serializers.DictField(allow_null=True)
+    encounter_id = serializers.IntegerField(allow_null=True)
+    performed_datetime = serializers.CharField(allow_null=True)
+    performed_period_start = serializers.CharField(allow_null=True)
+    performed_period_end = serializers.CharField(allow_null=True)
+    body_site_code = serializers.CharField(allow_null=True)
+    body_site_display = serializers.CharField(allow_null=True)
+    outcome_code = serializers.CharField(allow_null=True)
+    outcome_display = serializers.CharField(allow_null=True)
+    note = serializers.CharField(allow_null=True)
+    performers = serializers.ListField(allow_null=True)
+    location_id = serializers.IntegerField(allow_null=True)
+    created_at = serializers.CharField(allow_null=True)
+    updated_at = serializers.CharField(allow_null=True)
+
+
+class ProcedureListOutputSerializer(serializers.Serializer):
+    """
+    Output Serializer for Procedure list/summary DTOs.
+    Lightweight DTO for list views.
+    """
+    procedure_id = serializers.IntegerField()
+    identifier = serializers.CharField()
+    status = serializers.CharField()
+    code_code = serializers.CharField()
+    code_display = serializers.CharField(allow_null=True)
+    subject_id = serializers.IntegerField()
+    patient_summary = serializers.DictField(allow_null=True)
+    encounter_id = serializers.IntegerField(allow_null=True)
+    performed_datetime = serializers.CharField(allow_null=True)
+    outcome_code = serializers.CharField(allow_null=True)
