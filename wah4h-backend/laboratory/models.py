@@ -2,6 +2,25 @@ from django.db import models
 from core.models import FHIRResourceModel
 
 
+class LabTestDefinition(FHIRResourceModel):
+    """
+    Service Catalog (Charge Master) for Laboratory Tests.
+    Links lab tests to billing system via code (SKU).
+    """
+    test_id = models.AutoField(primary_key=True)
+    code = models.CharField(max_length=50, unique=True, db_index=True)
+    name = models.CharField(max_length=255)
+    category = models.CharField(max_length=100)
+    base_price = models.DecimalField(max_digits=10, decimal_places=2)
+    turnaround_time = models.CharField(max_length=100, null=True, blank=True)
+
+    class Meta:
+        db_table = 'laboratory_test_definition'
+
+    def __str__(self):
+        return f"{self.code} - {self.name}"
+
+
 class DiagnosticReport(FHIRResourceModel):
     diagnostic_report_id = models.AutoField(primary_key=True)
     subject_id = models.BigIntegerField(db_index=True)
