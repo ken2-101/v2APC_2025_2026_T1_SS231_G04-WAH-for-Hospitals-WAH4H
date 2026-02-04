@@ -50,7 +50,8 @@ from billing.models import (
 )
 
 # FORTRESS PATTERN: Import ACLs from external apps (NOT direct models)
-from admission.services.admission_acl import EncounterService, PatientACL
+from admission.services.admission_acl import EncounterACL
+from patients.services.patient_acl import get_patient_summary
 from pharmacy.services.pharmacy_acl import MedicationRequestACL, InventoryACL
 from laboratory.services.laboratory_acl import LabReportACL, LabCatalogACL
 from accounts.services.accounts_acl import OrganizationACL
@@ -112,12 +113,12 @@ class InvoiceOrchestrator:
         # STEP 1: VALIDATE ENCOUNTER & RETRIEVE ENCOUNTER DATA
         # ====================================================================
         
-        if not EncounterService.validate_encounter_exists(encounter_id):
+        if not EncounterACL.validate_encounter_exists(encounter_id):
             raise ValidationError(
                 f"Encounter with id={encounter_id} does not exist"
             )
         
-        encounter_data = EncounterService.get_encounter_with_patient(encounter_id)
+        encounter_data = EncounterACL.get_encounter_details(encounter_id)
         if not encounter_data:
             raise ValidationError(
                 f"Failed to retrieve encounter data for id={encounter_id}"
@@ -356,7 +357,8 @@ class AccountService:
             raise ValidationError("subject_id is required")
         
         # Fortress Pattern: Validate patient exists via ACL
-        if not PatientACL.validate_patient_exists(subject_id):
+        from patients.services.patient_acl import validate_patient_exists
+        if not validate_patient_exists(subject_id):
             raise ValidationError(f"Patient with id {subject_id} does not exist")
         
         # Validate owner if provided (could be Practitioner or Organization)
@@ -468,7 +470,8 @@ class InvoiceService:
             raise ValidationError("subject_id is required")
         
         # Fortress Pattern: Validate patient exists via ACL
-        if not PatientACL.validate_patient_exists(subject_id):
+        from patients.services.patient_acl import validate_patient_exists
+        if not validate_patient_exists(subject_id):
             raise ValidationError(f"Patient with id {subject_id} does not exist")
         
         # Validate account if provided
@@ -650,7 +653,8 @@ class ClaimService:
             raise ValidationError("insurer_id is required")
         
         # Fortress Pattern: Validate patient exists via ACL
-        if not PatientACL.validate_patient_exists(patient_id):
+        from patients.services.patient_acl import validate_patient_exists
+        if not validate_patient_exists(patient_id):
             raise ValidationError(f"Patient with id {patient_id} does not exist")
         
         # Fortress Pattern: Validate insurer organization exists via ACL

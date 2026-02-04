@@ -25,21 +25,21 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
 
-    # Apps
-    "patients",
-    "admission",
-    "monitoring",
-    "discharge",
-    "accounts",
-    "pharmacy",
-    "laboratory", # added here
-    "billing", # added billing
-    "core", # added core
+    # Local Apps (8 Core Modules)
+    "accounts.apps.AccountsConfig",
+    "patients.apps.PatientsConfig",
+    "admission.apps.AdmissionConfig",
+    "pharmacy.apps.PharmacyConfig",
+    "laboratory.apps.LaboratoryConfig",
+    "monitoring.apps.MonitoringConfig",
+    "billing.apps.BillingConfig",
+    "discharge.apps.DischargeConfig",
+    "core.apps.CoreConfig",
 
     # Third-party
     "rest_framework",
     "corsheaders",
-    "django_filters",  # ← Add this line
+    "django_filters",
 ]
 
 MIDDLEWARE = [
@@ -116,13 +116,22 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.AllowAny",
     ),
-
-    # Add these lines:
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend",
         "rest_framework.filters.SearchFilter",
         "rest_framework.filters.OrderingFilter",
     ],
+    # Pagination
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 50,
+    # Production-like strictness: JSON-only (disable Browsable API)
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+    ],
+    "DEFAULT_PARSER_CLASSES": [
+        "rest_framework.parsers.JSONParser",
+    ],
+    "TEST_REQUEST_DEFAULT_FORMAT": "json",
 }
 
 # JWT Settings

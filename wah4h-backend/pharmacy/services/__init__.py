@@ -2,21 +2,23 @@
 pharmacy/services/__init__.py
 
 Public Interface for the Pharmacy Service Layer.
-Exports Inventory/Dispensing Services and Read-Only ACLs.
+Exports Inventory/Medication Services and Read-Only ACLs.
 """
 
 from .pharmacy_acl import (
     MedicationRequestACL,
     InventoryACL,
 )
-from .inventory_service import (
-    StockManagementService,
-    DispensingService,
+from .pharmacy_services import (
+    InventoryService,
+    MedicationService,
+    AdministrationService,
 )
 
 __all__ = [
     'MedicationRequestACL',
     'InventoryACL',
-    'StockManagementService',
-    'DispensingService',
+    'InventoryService',
+    'MedicationService',
+    'AdministrationService',
 ]

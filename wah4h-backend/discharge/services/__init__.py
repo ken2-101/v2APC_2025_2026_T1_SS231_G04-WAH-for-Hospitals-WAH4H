@@ -4,23 +4,23 @@ Discharge Module Public Interface
 Exposes the public services and ACLs for the Discharge App.
 
 Consumers:
-- Write Operations: Use DischargeService, ProcedureService
+- Write Operations: Use DischargeWorkflowService, ProcedureService
 - Read Operations: Use DischargeACL, ProcedureACL
 """
 
-from discharge.services.discharge_service import (
-    DischargeService,
+from .discharge_services import (
+    DischargeWorkflowService,
     ProcedureService,
 )
 
-from discharge.services.discharge_acl import (
+from .discharge_acl import (
     DischargeACL,
     ProcedureACL,
 )
 
 __all__ = [
     # Write Services
-    'DischargeService',
+    'DischargeWorkflowService',
     'ProcedureService',
     
     # Read ACLs

@@ -1,20 +1,26 @@
 """
 patients/services/__init__.py
 
-Public Interface for the Patients Service Layer.
-Exports both Read-Only ACLs (for other apps) and Write Services (for this app).
+Export public services and ACLs for the Patients module.
 """
 
-from .patient_acl import PatientACL
+from .patient_acl import (
+    validate_patient_exists,
+    get_patient_summary,
+    get_patient_details
+)
+
 from .patients_services import (
     PatientRegistrationService,
-    ClinicalDataService,
     PatientUpdateService,
+    ClinicalDataService,
 )
 
 __all__ = [
-    'PatientACL',
+    'validate_patient_exists',
+    'get_patient_summary',
+    'get_patient_details',
     'PatientRegistrationService',
-    'ClinicalDataService',
     'PatientUpdateService',
+    'ClinicalDataService',
 ]

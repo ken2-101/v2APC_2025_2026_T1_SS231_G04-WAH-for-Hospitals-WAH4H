@@ -177,7 +177,6 @@ class InventoryACL:
 
 class MedicationRequestACL:
     """
-    """
     Read-Only Service Layer for MedicationRequest data.
     
     CRITICAL FOR BILLING: Provides medication order data
@@ -462,28 +461,3 @@ class MedicationAdministrationACL:
             ]
         except Exception:
             return []
-
-        except ObjectDoesNotExist:
-            return None
-    
-    @staticmethod
-    def get_all_active_medications() -> List[Dict[str, Any]]:
-        """
-        Retrieve all active medications from the lookup table.
-        
-        Returns:
-            List of medication dictionaries
-        """
-        medications = Medication.objects.filter(status='active').order_by('code_display')
-        
-        results = []
-        for medication in medications:
-            results.append({
-                'medication_id': medication.medication_id,
-                'code_code': medication.code_code,
-                'code_display': medication.code_display,
-                'code_system': medication.code_system,
-                'status': medication.status,
-            })
-        
-        return results

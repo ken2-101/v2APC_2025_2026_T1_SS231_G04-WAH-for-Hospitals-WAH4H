@@ -9,13 +9,11 @@ Exports:
 """
 
 # Internal Services (Write Operations & Business Logic)
-from .services import (
+from .accounts_services import (
     OrganizationService,
     LocationService,
     PractitionerService,
     PractitionerRoleService,
-    AuthService,
-    ServiceRegistry,
 )
 
 # Anti-Corruption Layer (Read-Only DTOs for External Apps)
@@ -35,8 +33,6 @@ __all__ = [
     'LocationService',
     'PractitionerService',
     'PractitionerRoleService',
-    'AuthService',
-    'ServiceRegistry',
 
     # ACL Classes
     'PractitionerACL',

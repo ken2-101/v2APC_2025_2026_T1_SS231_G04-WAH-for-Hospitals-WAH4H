@@ -1,17 +1,22 @@
-from .admission_acl import (
+"""
+admission/services/__init__.py
+
+Public Interface for the Admission Service Layer.
+"""
+
+from .admission_services import (
     EncounterService,
     ProcedureService,
-    PatientACL,
-    PractitionerACL,
-    LocationACL,
-    OrganizationACL
+)
+
+from .admission_acl import (
+    EncounterACL,
+    ProcedureACL,
 )
 
 __all__ = [
     'EncounterService',
     'ProcedureService',
-    'PatientACL',
-    'PractitionerACL',
-    'LocationACL',
-    'OrganizationACL',
+    'EncounterACL',
+    'ProcedureACL',
 ]

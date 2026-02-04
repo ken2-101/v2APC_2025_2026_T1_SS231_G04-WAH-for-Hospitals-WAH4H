@@ -5,18 +5,17 @@ Exposes the public services and ACLs for the Monitoring App.
 
 Consumers:
 - Write Operations: Use ObservationService, ChargeItemService
-- Read Operations: Use MonitoringACL, BillingACL, DashboardACL
+- Read Operations: Use ObservationACL, ChargeItemACL
 """
 
-from monitoring.services.monitoring_service import (
+from .monitoring_services import (
     ObservationService,
     ChargeItemService,
 )
 
-from monitoring.services.monitoring_acl import (
-    MonitoringACL,
-    BillingACL,
-    DashboardACL,
+from .monitoring_acl import (
+    ObservationACL,
+    ChargeItemACL,
 )
 
 __all__ = [
@@ -25,7 +24,6 @@ __all__ = [
     'ChargeItemService',
     
     # Read ACLs
-    'MonitoringACL',
-    'BillingACL',
-    'DashboardACL',
+    'ObservationACL',
+    'ChargeItemACL',
 ]
