@@ -1,20 +1,36 @@
+"""
+billing/urls.py
+
+URL Configuration for Billing Module.
+Registers ViewSets for billing accounts, invoices, insurance claims, and payment reconciliation.
+
+Routes:
+- /api/billing/accounts/
+- /api/billing/invoices/
+- /api/billing/claims/
+- /api/billing/payments/
+"""
+
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import (
-    AccountViewSet, 
-    ClaimViewSet, 
-    InvoiceViewSet, 
-    PaymentReconciliationViewSet, 
-    PaymentNoticeViewSet
+
+from billing.api.views import (
+    AccountViewSet,
+    InvoiceViewSet,
+    ClaimViewSet,
+    PaymentReconciliationViewSet,
 )
 
+# Initialize router
 router = DefaultRouter()
-router.register(r'accounts', AccountViewSet)
-router.register(r'claims', ClaimViewSet)
-router.register(r'invoices', InvoiceViewSet)
-router.register(r'payment-reconciliations', PaymentReconciliationViewSet)
-router.register(r'payment-notices', PaymentNoticeViewSet)
 
+# Register ViewSets with specific route prefixes
+router.register(r'accounts', AccountViewSet, basename='account')
+router.register(r'invoices', InvoiceViewSet, basename='invoice')
+router.register(r'claims', ClaimViewSet, basename='claim')
+router.register(r'payments', PaymentReconciliationViewSet, basename='payment')
+
+# URL patterns
 urlpatterns = [
     path('', include(router.urls)),
 ]

@@ -1,10 +1,30 @@
+"""
+discharge/urls.py
+
+URL Configuration for Discharge Module.
+Registers ViewSets for clinical procedures and discharge workflow management.
+
+Routes:
+- /api/discharge/procedures/
+- /api/discharge/discharges/
+"""
+
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import DischargeViewSet
 
+from discharge.api.views import (
+    ProcedureViewSet,
+    DischargeViewSet,
+)
+
+# Initialize router
 router = DefaultRouter()
-router.register(r'discharges', DischargeViewSet)
 
+# Register ViewSets with specific route prefixes
+router.register(r'procedures', ProcedureViewSet, basename='procedure')
+router.register(r'discharges', DischargeViewSet, basename='discharge')
+
+# URL patterns
 urlpatterns = [
     path('', include(router.urls)),
 ]

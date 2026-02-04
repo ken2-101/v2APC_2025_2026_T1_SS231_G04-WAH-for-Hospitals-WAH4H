@@ -1,18 +1,30 @@
+"""
+monitoring/urls.py
+
+URL Configuration for Monitoring Module.
+Registers ViewSets for clinical observations (vital signs, labs) and charge items.
+
+Routes:
+- /api/monitoring/observations/
+- /api/monitoring/charge-items/
+"""
+
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import (
+
+from monitoring.api.views import (
     ObservationViewSet,
     ChargeItemViewSet,
-    ChargeItemDefinitionViewSet
 )
 
-app_name = 'monitoring'
-
+# Initialize router
 router = DefaultRouter()
-router.register(r'observations', ObservationViewSet, basename='observation')
-router.register(r'charge-items', ChargeItemViewSet, basename='chargeitem')
-router.register(r'charge-item-definitions', ChargeItemDefinitionViewSet, basename='chargeitemdefinition')
 
+# Register ViewSets with specific route prefixes
+router.register(r'observations', ObservationViewSet, basename='observation')
+router.register(r'charge-items', ChargeItemViewSet, basename='charge-item')
+
+# URL patterns
 urlpatterns = [
     path('', include(router.urls)),
 ]

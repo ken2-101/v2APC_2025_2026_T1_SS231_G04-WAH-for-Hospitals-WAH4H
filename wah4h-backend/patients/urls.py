@@ -1,13 +1,19 @@
 """
-Patient App URL Configuration
-==============================
-Fortress Pattern: API endpoints for patient resources.
+patients/urls.py
 
-All endpoints use ViewSets with ACL-backed serializers.
+URL Configuration for Patients Module.
+Registers ViewSets for Patient registration, clinical conditions, allergies, and immunizations.
+
+Routes:
+- /api/patients/
+- /api/patients/conditions/
+- /api/patients/allergies/
+- /api/patients/immunizations/
 """
 
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
+
 from patients.api.views import (
     PatientViewSet,
     ConditionViewSet,
@@ -15,12 +21,16 @@ from patients.api.views import (
     ImmunizationViewSet,
 )
 
+# Initialize router
 router = DefaultRouter()
+
+# Register ViewSets with specific route prefixes
 router.register(r'patients', PatientViewSet, basename='patient')
 router.register(r'conditions', ConditionViewSet, basename='condition')
 router.register(r'allergies', AllergyViewSet, basename='allergy')
 router.register(r'immunizations', ImmunizationViewSet, basename='immunization')
 
+# URL patterns
 urlpatterns = [
     path('', include(router.urls)),
 ]

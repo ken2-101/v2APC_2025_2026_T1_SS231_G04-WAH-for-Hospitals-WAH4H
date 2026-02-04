@@ -1,18 +1,33 @@
+"""
+pharmacy/urls.py
+
+URL Configuration for Pharmacy Module.
+Registers ViewSets for inventory management, medication requests, and medication administration.
+
+Routes:
+- /api/pharmacy/inventory/
+- /api/pharmacy/requests/
+- /api/pharmacy/administrations/
+"""
+
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import (
-    InventoryViewSet, 
-    MedicationViewSet, 
-    MedicationRequestViewSet, 
-    MedicationAdministrationViewSet
+
+from pharmacy.api.views import (
+    InventoryViewSet,
+    MedicationRequestViewSet,
+    MedicationAdministrationViewSet,
 )
 
+# Initialize router
 router = DefaultRouter()
-router.register(r'inventory', InventoryViewSet)
-router.register(r'medications', MedicationViewSet)
-router.register(r'medication-requests', MedicationRequestViewSet)
-router.register(r'medication-administrations', MedicationAdministrationViewSet)
 
+# Register ViewSets with specific route prefixes
+router.register(r'inventory', InventoryViewSet, basename='inventory')
+router.register(r'requests', MedicationRequestViewSet, basename='medication-request')
+router.register(r'administrations', MedicationAdministrationViewSet, basename='medication-administration')
+
+# URL patterns
 urlpatterns = [
     path('', include(router.urls)),
 ]
