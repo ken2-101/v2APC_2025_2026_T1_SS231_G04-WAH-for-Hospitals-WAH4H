@@ -18,6 +18,22 @@ class DischargeACL:
     """Read-only access layer for discharge summaries"""
     
     @staticmethod
+    def validate_discharge_exists(discharge_id: int) -> bool:
+        """
+        Check if a discharge exists in the system.
+        
+        Args:
+            discharge_id: Primary key of the discharge
+            
+        Returns:
+            bool: True if discharge exists, False otherwise
+        """
+        try:
+            return Discharge.objects.filter(discharge_id=discharge_id).exists()
+        except Exception:
+            return False
+    
+    @staticmethod
     def is_encounter_discharged(encounter_id: int) -> bool:
         """
         System-wide source of truth for encounter discharge status.
@@ -53,6 +69,25 @@ class DischargeACL:
             return None
     
     @staticmethod
+    def get_discharge_by_id(discharge_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Get discharge summary by discharge ID.
+        
+        Args:
+            discharge_id: Primary key of the discharge
+            
+        Returns:
+            Dictionary with discharge details or None if not found
+        """
+        try:
+            discharge = Discharge.objects.get(discharge_id=discharge_id)
+            return _discharge_to_dict(discharge)
+        except ObjectDoesNotExist:
+            return None
+        except Exception:
+            return None
+    
+    @staticmethod
     def get_discharge_summary_by_patient(patient_id: int, limit: int = 10) -> List[Dict[str, Any]]:
         """
         Get recent discharge summaries for a patient.
@@ -78,6 +113,43 @@ class ProcedureACL:
     """Read-only access layer for procedure records"""
     
     @staticmethod
+    def validate_procedure_exists(procedure_id: int) -> bool:
+        """
+        Check if a procedure exists in the system.
+        
+        Args:
+            procedure_id: Primary key of the procedure
+            
+        Returns:
+            bool: True if procedure exists, False otherwise
+        """
+        try:
+            return Procedure.objects.filter(procedure_id=procedure_id).exists()
+        except Exception:
+            return False
+    
+    @staticmethod
+    def get_procedure_details(procedure_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Get detailed information for a specific procedure.
+        
+        Args:
+            procedure_id: Primary key of the procedure
+            
+        Returns:
+            Dictionary with procedure details or None if not found
+        """
+        try:
+            procedure = Procedure.objects.prefetch_related('performers').get(
+                procedure_id=procedure_id
+            )
+            return _procedure_to_dict(procedure)
+        except ObjectDoesNotExist:
+            return None
+        except Exception:
+            return None
+    
+    @staticmethod
     def get_encounter_procedures(encounter_id: int) -> List[Dict[str, Any]]:
         """
         Get all procedures for an encounter with nested performers.
@@ -92,6 +164,34 @@ class ProcedureACL:
             procedures = Procedure.objects.filter(
                 encounter_id=encounter_id
             ).prefetch_related('performers').order_by('-performed_datetime', '-created_at')
+            
+            return [_procedure_to_dict(procedure) for procedure in procedures]
+        except Exception:
+            return []
+    
+    @staticmethod
+    def get_patient_procedures(patient_id: int, encounter_id: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        Get all procedures for a patient's clinical history.
+        
+        Optionally filter by encounter_id for a specific hospitalization.
+        
+        Args:
+            patient_id: Patient primary key (integer)
+            encounter_id: Optional encounter ID to filter by
+            
+        Returns:
+            List of procedure dictionaries ordered by most recent
+        """
+        try:
+            procedures = Procedure.objects.filter(subject_id=patient_id)
+            
+            if encounter_id is not None:
+                procedures = procedures.filter(encounter_id=encounter_id)
+            
+            procedures = procedures.prefetch_related('performers').order_by(
+                '-performed_datetime', '-created_at'
+            )
             
             return [_procedure_to_dict(procedure) for procedure in procedures]
         except Exception:
