@@ -1,5 +1,5 @@
 """
-accounts/services.py
+accounts/services/accounts_services.py
 Service Layer for Identity & Structure Management
 
 Context: Philippine LGU Hospital System
@@ -16,7 +16,7 @@ from django.contrib.auth.hashers import make_password
 from django.db.models import Q
 from datetime import datetime
 
-from .models import (
+from accounts.models import (
     Organization,
     Location,
     Practitioner,
@@ -519,7 +519,7 @@ class ServiceRegistry:
     Centralized registry for service access.
     
     Usage:
-        from accounts.services import ServiceRegistry
+        from accounts.services.accounts_services import ServiceRegistry
         
         practitioner = ServiceRegistry.practitioner.register_practitioner(data)
         role = ServiceRegistry.role.assign_role(practitioner, org, role_data)
