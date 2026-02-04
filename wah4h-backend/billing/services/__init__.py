@@ -1,19 +1,29 @@
 """
-billing/services/__init__.py
+Billing Module Public Interface
+===============================
+Exposes the public services and ACLs for the Billing App.
 
-Public Interface for the Billing Service Layer.
-
-Exports:
-1. InvoiceOrchestrator: The main engine for generating invoices.
-2. BillingService: Alias for backward compatibility.
+Consumers:
+- Write Operations: Use InvoiceOrchestrator (or alias BillingService)
+- Read Operations: Use BillingACL, AccountACL
 """
 
-from .billing_services import (
+from billing.services.billing_services import (
     InvoiceOrchestrator,
-    BillingService,
+    BillingService,  # Alias
+)
+
+from billing.services.billing_acl import (
+    BillingACL,
+    AccountACL,
 )
 
 __all__ = [
+    # Write Services
     'InvoiceOrchestrator',
     'BillingService',
+    
+    # Read ACLs
+    'BillingACL',
+    'AccountACL',
 ]

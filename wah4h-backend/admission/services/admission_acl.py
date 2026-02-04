@@ -2,21 +2,21 @@
 Anti-Corruption Layer (ACL) for Admission Module
 =================================================
 
-Fortress Boundary: ALL external app communication flows through this ACL.
+Fortress Boundary: Read-Only Interface for External App Communication.
 
-Phase 2 Refactoring: PatientACL now acts as a pure proxy to patients.services.patient_acl.
-NO direct model imports from patients app - full decoupling achieved.
+Phase 3 Refactoring (2026-02-04):
+- Read-Only Focus: Removed all write operations (moved to admission_service.py)
+- Renamed EncounterService -> EncounterACL
+- Renamed ProcedureService -> ProcedureACL
+- All methods return DTOs (dictionaries), not model instances
 
 External Dependencies:
 - patients.services.patient_acl: Patient data operations (Source of Truth)
-- accounts app: Practitioner (future)
-- core app: Organization, Location (future)
+- accounts.services.accounts_acl: Practitioner, Location, Organization operations
 """
 
 from typing import Optional, Dict, Any, List
-from django.db import transaction
-from django.core.exceptions import ValidationError
-from admission.models import Encounter, Procedure, ProcedurePerformer
+from admission.models import Encounter, Procedure
 
 # FORTRESS INTEGRATION: Proxy to Patient Service Layer
 from patients.services import patient_acl
@@ -51,27 +51,53 @@ class PatientACL:
         return patient_acl.search_patients(query, limit)
 
 
-class EncounterService:
+class EncounterACL:
+    """
+    Read-Only Service for Encounter queries and validation.
+    All write operations moved to admission_service.EncounterService.
+    """
     
     @staticmethod
     def validate_encounter_exists(encounter_id: int) -> bool:
+        """
+        Check if an encounter exists in the system.
+        
+        Args:
+            encounter_id: Primary key of the encounter
+            
+        Returns:
+            bool: True if encounter exists, False otherwise
+        """
         return Encounter.objects.filter(encounter_id=encounter_id).exists()
     
     @staticmethod
-    @transaction.atomic
-    def create_encounter(data: Dict[str, Any]) -> Encounter:
-        subject_id = data.get('subject_id')
-        if not subject_id:
-            raise ValidationError("subject_id (patient ID) is required")
-        
-        if not PatientACL.validate_patient_exists(subject_id):
-            raise ValidationError(f"Patient with id={subject_id} does not exist")
-        
-        encounter = Encounter.objects.create(**data)
-        return encounter
-    
-    @staticmethod
     def get_encounter_with_patient(encounter_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve encounter details with embedded patient summary.
+        
+        Args:
+            encounter_id: Primary key of the encounter
+            
+        Returns:
+            Dictionary with encounter data and patient summary, or None if not found.
+            
+            DTO Fields:
+                - encounter_id (int)
+                - identifier (str)
+                - status (str)
+                - class (str)
+                - type (str)
+                - subject_id (int): Critical for patient mismatch validation
+                - patient (Dict): Embedded patient summary from PatientACL
+                - period_start (date)
+                - period_end (date)
+                - location_id (int|None)
+                - service_provider_id (int|None)
+                - admit_source (str|None)
+                - discharge_disposition (str|None)
+                - created_at (datetime)
+                - updated_at (datetime)
+        """
         try:
             encounter = Encounter.objects.get(encounter_id=encounter_id)
         except Encounter.DoesNotExist:
@@ -99,6 +125,25 @@ class EncounterService:
     
     @staticmethod
     def get_patient_encounters(patient_id: int) -> List[Dict[str, Any]]:
+        """
+        Retrieve all encounters for a specific patient.
+        
+        Args:
+            patient_id: Primary key of the patient
+            
+        Returns:
+            List of encounter summary dictionaries, ordered by period_start (descending).
+            
+            DTO Fields (per encounter):
+                - encounter_id (int)
+                - identifier (str)
+                - status (str)
+                - class (str)
+                - type (str)
+                - period_start (date)
+                - period_end (date)
+                - admit_source (str|None)
+        """
         encounters = Encounter.objects.filter(subject_id=patient_id).order_by('-period_start')
         
         return [
@@ -116,37 +161,38 @@ class EncounterService:
         ]
 
 
-class ProcedureService:
-    
-    @staticmethod
-    @transaction.atomic
-    def create_procedure(data: Dict[str, Any]) -> Procedure:
-        subject_id = data.get('subject_id')
-        encounter_id = data.get('encounter_id')
-        
-        if not subject_id:
-            raise ValidationError("subject_id (patient ID) is required")
-        if not encounter_id:
-            raise ValidationError("encounter_id is required")
-        
-        if not PatientACL.validate_patient_exists(subject_id):
-            raise ValidationError(f"Patient with id={subject_id} does not exist")
-        
-        if not Encounter.objects.filter(encounter_id=encounter_id).exists():
-            raise ValidationError(f"Encounter with id={encounter_id} does not exist")
-        
-        encounter = Encounter.objects.get(encounter_id=encounter_id)
-        if encounter.subject_id != subject_id:
-            raise ValidationError(
-                f"Patient mismatch: Encounter {encounter_id} belongs to patient {encounter.subject_id}, "
-                f"not patient {subject_id}"
-            )
-        
-        procedure = Procedure.objects.create(**data)
-        return procedure
+class ProcedureACL:
+    """
+    Read-Only Service for Procedure queries.
+    All write operations moved to admission_service.ProcedureService.
+    """
     
     @staticmethod
     def get_encounter_procedures(encounter_id: int) -> List[Dict[str, Any]]:
+        """
+        Retrieve all procedures for a specific encounter.
+        
+        Args:
+            encounter_id: Primary key of the encounter
+            
+        Returns:
+            List of procedure dictionaries, ordered by performed_datetime (descending).
+            
+            DTO Fields (per procedure):
+                - procedure_id (int)
+                - identifier (str)
+                - status (str)
+                - code_code (str)
+                - code_display (str)
+                - performed_datetime (datetime)
+                - performed_period_start (date)
+                - performed_period_end (date)
+                - category_code (str)
+                - category_display (str)
+                - outcome_code (str)
+                - outcome_display (str)
+                - note (str)
+        """
         procedures = Procedure.objects.filter(encounter_id=encounter_id).order_by('-performed_datetime')
         
         return [
@@ -216,8 +262,8 @@ class OrganizationACL:
 
 __all__ = [
     'PatientACL',
-    'EncounterService',
-    'ProcedureService',
+    'EncounterACL',
+    'ProcedureACL',
     'PractitionerACL',
     'LocationACL',
     'OrganizationACL',
