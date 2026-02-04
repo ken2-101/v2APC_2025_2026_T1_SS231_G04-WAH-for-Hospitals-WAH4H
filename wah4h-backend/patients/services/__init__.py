@@ -1,21 +1,20 @@
-from .patient_acl import (
-    validate_patient_exists,
-    get_patient_summary,
-    get_patient_details,
-    search_patients,
-    get_patient_conditions,
-    get_active_patient_conditions,
-    get_patient_allergies,
-    get_active_patient_allergies
+"""
+patients/services/__init__.py
+
+Public Interface for the Patients Service Layer.
+Exports both Read-Only ACLs (for other apps) and Write Services (for this app).
+"""
+
+from .patient_acl import PatientACL
+from .patients_services import (
+    PatientRegistrationService,
+    ClinicalDataService,
+    PatientUpdateService,
 )
 
 __all__ = [
-    'validate_patient_exists',
-    'get_patient_summary',
-    'get_patient_details',
-    'search_patients',
-    'get_patient_conditions',
-    'get_active_patient_conditions',
-    'get_patient_allergies',
-    'get_active_patient_allergies',
+    'PatientACL',
+    'PatientRegistrationService',
+    'ClinicalDataService',
+    'PatientUpdateService',
 ]
