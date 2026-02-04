@@ -1,69 +1,33 @@
 """
 Patient API Serializers
 =======================
-Fortress Pattern: All data transformation delegated to Service Layer (ACL).
+CQRS-Lite Pattern: Separate Input/Output serializers with Service delegation.
 
-These serializers use patient_acl functions to ensure consistent DTOs
-across the entire WAH ecosystem.
+Input Serializers: Validation only (ModelSerializer for field rules)
+Output Serializers: Pure DTO mapping (Serializer for ACL data)
 """
 
 from rest_framework import serializers
 from patients.models import Patient, Condition, AllergyIntolerance, Immunization
-from patients.services import patient_acl
+from datetime import date
 
 
 # ============================================================================
-# PATIENT SERIALIZERS
+# PATIENT SERIALIZERS (CQRS-Lite)
 # ============================================================================
 
-class PatientListSerializer(serializers.ModelSerializer):
+class PatientInputSerializer(serializers.ModelSerializer):
     """
-    Patient List Serializer
+    Patient Input Serializer (Write Operations)
     
-    Returns standardized patient summary via ACL.
-    Used for list views, search results, and quick lookups.
-    """
+    Used for: POST, PUT, PATCH
+    Purpose: Validation only - enforces business rules
+    Delegates to: PatientRegistrationService
     
-    class Meta:
-        model = Patient
-        fields = ['id', 'patient_id', 'first_name', 'last_name', 'gender', 'birthdate']
-    
-    def to_representation(self, instance):
-        """
-        Override to use ACL summary DTO for consistent output.
-        Delegates to patient_acl.get_patient_summary().
-        """
-        summary = patient_acl.get_patient_summary(instance.id)
-        return summary if summary else {}
-
-
-class PatientDetailSerializer(serializers.ModelSerializer):
-    """
-    Patient Detail Serializer
-    
-    Returns complete patient details via ACL.
-    Used for detail views and full patient profiles.
-    """
-    
-    class Meta:
-        model = Patient
-        fields = '__all__'
-    
-    def to_representation(self, instance):
-        """
-        Override to use ACL detail DTO for consistent output.
-        Delegates to patient_acl.get_patient_details().
-        """
-        details = patient_acl.get_patient_details(instance.id)
-        return details if details else {}
-
-
-class PatientCreateUpdateSerializer(serializers.ModelSerializer):
-    """
-    Patient Create/Update Serializer
-    
-    Handles patient creation and updates.
-    Uses standard Django validation without ACL delegation.
+    Validation Rules:
+    - birthdate cannot be in the future
+    - mobile_number must be valid format
+    - required fields enforced
     """
     
     class Meta:
@@ -82,7 +46,105 @@ class PatientCreateUpdateSerializer(serializers.ModelSerializer):
         ]
         extra_kwargs = {
             'patient_id': {'required': False},
+            'first_name': {'required': True},
+            'last_name': {'required': True},
+            'birthdate': {'required': True},
+            'gender': {'required': True},
         }
+    
+    def validate_birthdate(self, value):
+        """
+        Validate birthdate is not in the future.
+        """
+        if value > date.today():
+            raise serializers.ValidationError("Birthdate cannot be in the future.")
+        return value
+    
+    def validate_mobile_number(self, value):
+        """
+        Validate mobile number format (if provided).
+        """
+        if value:
+            # Remove common separators
+            cleaned = value.replace('-', '').replace(' ', '').replace('+', '')
+            if not cleaned.isdigit():
+                raise serializers.ValidationError("Mobile number must contain only digits and optional separators.")
+            if len(cleaned) < 10 or len(cleaned) > 15:
+                raise serializers.ValidationError("Mobile number must be between 10 and 15 digits.")
+        return value
+
+
+class PatientOutputSerializer(serializers.Serializer):
+    """
+    Patient Output Serializer (Read Operations)
+    
+    Used for: GET (list, retrieve)
+    Purpose: Pure DTO mapping - formats ACL data
+    Source: PatientACL.get_patient_details() or get_patient_summary()
+    
+    This is a pure Serializer (not ModelSerializer) because:
+    - Data comes from ACL, not direct model access
+    - Matches ACL DTO structure exactly
+    - No database binding needed
+    """
+    
+    # Identity
+    id = serializers.IntegerField()
+    patient_id = serializers.CharField()
+    
+    # Name
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+    middle_name = serializers.CharField(required=False, allow_null=True)
+    suffix_name = serializers.CharField(required=False, allow_null=True)
+    full_name = serializers.CharField(required=False)
+    
+    # Demographics
+    gender = serializers.CharField()
+    birthdate = serializers.DateField()
+    age = serializers.IntegerField(required=False)
+    civil_status = serializers.CharField(required=False, allow_null=True)
+    nationality = serializers.CharField(required=False, allow_null=True)
+    religion = serializers.CharField(required=False, allow_null=True)
+    
+    # Health Identifiers
+    philhealth_id = serializers.CharField(required=False, allow_null=True)
+    blood_type = serializers.CharField(required=False, allow_null=True)
+    pwd_type = serializers.CharField(required=False, allow_null=True)
+    
+    # Occupation and Education
+    occupation = serializers.CharField(required=False, allow_null=True)
+    education = serializers.CharField(required=False, allow_null=True)
+    
+    # Contact
+    mobile_number = serializers.CharField(required=False, allow_null=True)
+    
+    # Address
+    address_line = serializers.CharField(required=False, allow_null=True)
+    address_city = serializers.CharField(required=False, allow_null=True)
+    address_district = serializers.CharField(required=False, allow_null=True)
+    address_state = serializers.CharField(required=False, allow_null=True)
+    address_postal_code = serializers.CharField(required=False, allow_null=True)
+    address_country = serializers.CharField(required=False, allow_null=True)
+    full_address = serializers.CharField(required=False)
+    
+    # Emergency Contact
+    contact_first_name = serializers.CharField(required=False, allow_null=True)
+    contact_last_name = serializers.CharField(required=False, allow_null=True)
+    contact_mobile_number = serializers.CharField(required=False, allow_null=True)
+    contact_relationship = serializers.CharField(required=False, allow_null=True)
+    
+    # Indigenous and PWD
+    indigenous_flag = serializers.BooleanField(required=False, allow_null=True)
+    indigenous_group = serializers.CharField(required=False, allow_null=True)
+    
+    # Consent and Media
+    consent_flag = serializers.BooleanField(required=False, allow_null=True)
+    image_url = serializers.URLField(required=False, allow_null=True)
+    
+    # Timestamps
+    created_at = serializers.DateTimeField(required=False)
+    updated_at = serializers.DateTimeField(required=False)
 
 
 # ============================================================================
