@@ -20,6 +20,8 @@ from admission.models import Encounter, Procedure, ProcedurePerformer
 
 # FORTRESS INTEGRATION: Proxy to Patient Service Layer
 from patients.services import patient_acl
+# FORTRESS INTEGRATION: Proxy to Accounts Service Layer
+from accounts.services import accounts_acl
 
 
 class PatientACL:
@@ -168,47 +170,48 @@ class ProcedureService:
 
 
 class PractitionerACL:
+    """
+    Practitioner ACL Proxy - Delegates all operations to accounts.services.accounts_acl.
+    Maintains admission app's interface while decoupling from accounts models.
+    """
     
     @staticmethod
     def validate_practitioner_exists(practitioner_id: int) -> bool:
-        return True
+        return accounts_acl.PractitionerACL.validate_practitioner_exists(practitioner_id)
     
     @staticmethod
     def get_practitioner_summary(practitioner_id: int) -> Optional[Dict[str, Any]]:
-        return {
-            'id': practitioner_id,
-            'full_name': 'Dr. [Placeholder]',
-            'specialty': 'General Practice',
-        }
+        return accounts_acl.PractitionerACL.get_practitioner_summary(practitioner_id)
 
 
 class LocationACL:
+    """
+    Location ACL Proxy - Delegates all operations to accounts.services.accounts_acl.
+    Maintains admission app's interface while decoupling from accounts models.
+    """
     
     @staticmethod
     def validate_location_exists(location_id: int) -> bool:
-        return True
+        return accounts_acl.LocationACL.validate_location_exists(location_id)
     
     @staticmethod
     def get_location_summary(location_id: int) -> Optional[Dict[str, Any]]:
-        return {
-            'id': location_id,
-            'name': 'Ward [Placeholder]',
-            'type': 'Inpatient Ward',
-        }
+        return accounts_acl.LocationACL.get_location_summary(location_id)
 
 
 class OrganizationACL:
+    """
+    Organization ACL Proxy - Delegates all operations to accounts.services.accounts_acl.
+    Maintains admission app's interface while decoupling from accounts models.
+    """
     
     @staticmethod
     def validate_organization_exists(organization_id: int) -> bool:
-        return True
+        return accounts_acl.OrganizationACL.validate_organization_exists(organization_id)
     
     @staticmethod
     def get_organization_summary(organization_id: int) -> Optional[Dict[str, Any]]:
-        return {
-            'id': organization_id,
-            'name': 'Hospital [Placeholder]',
-        }
+        return accounts_acl.OrganizationACL.get_organization_summary(organization_id)
 
 
 __all__ = [
