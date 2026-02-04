@@ -10,6 +10,7 @@ Consumers:
 - Billing Module: Access ChargeItem data
 - Dashboard/Analytics: Vital sign trends
 - Patient Module: Clinical observations history
+- Laboratory Module: Validate observations exist
 """
 
 from typing import List, Dict, Optional, Any
@@ -17,6 +18,295 @@ from django.core.exceptions import ObjectDoesNotExist
 
 # Local Model Imports (Allowed within module boundary)
 from monitoring.models import Observation, ObservationComponent, ChargeItem
+
+
+class ObservationACL:
+    """
+    Read-Only Service Layer for Observation data.
+    
+    CRITICAL: This is the dependency that Laboratory module is waiting for.
+    Provides validation and data retrieval for observations without exposing
+    the underlying model structure to external apps.
+    """
+    
+    @staticmethod
+    def validate_observation_exists(observation_id: int) -> bool:
+        """
+        Check if an observation exists in the system.
+        
+        CRITICAL: Laboratory module depends on this method.
+        
+        Args:
+            observation_id: Primary key of the observation
+            
+        Returns:
+            bool: True if observation exists, False otherwise
+        """
+        try:
+            Observation.objects.get(observation_id=observation_id)
+            return True
+        except ObjectDoesNotExist:
+            return False
+    
+    @staticmethod
+    def get_observation_details(observation_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve observation details as a DTO with nested components.
+        
+        Args:
+            observation_id: Primary key of the observation
+            
+        Returns:
+            Dictionary with observation data or None if not found.
+            
+            DTO Fields:
+                - observation_id (int): Observation ID
+                - identifier (str): FHIR identifier
+                - status (str): Observation status
+                - code (str): Observation code
+                - category (str): Observation category
+                - subject_id (int): Patient ID
+                - encounter_id (int): Encounter ID
+                - performer_id (int): Practitioner ID
+                - effective_datetime (str): When observed
+                - issued (str): When result released
+                - value_quantity (float): Primary numeric value
+                - value_string (str): String value
+                - value_codeableconcept (str): Coded value
+                - interpretation (str): Clinical interpretation
+                - note (str): Additional notes
+                - reference_range_low (str): Lower reference limit
+                - reference_range_high (str): Upper reference limit
+                - components (list): List of component dictionaries
+                - created_at (str): Creation timestamp
+                - updated_at (str): Update timestamp
+        """
+        try:
+            observation = Observation.objects.get(observation_id=observation_id)
+            return _observation_to_dict(observation)
+        except ObjectDoesNotExist:
+            return None
+    
+    @staticmethod
+    def get_patient_observations(
+        patient_id: int, 
+        category: Optional[str] = None,
+        encounter_id: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Get all observations for a patient, optionally filtered by category or encounter.
+        
+        Args:
+            patient_id: Patient ID (subject_id)
+            category: Optional category filter (e.g., 'vital-signs', 'laboratory')
+            encounter_id: Optional encounter ID filter
+            
+        Returns:
+            List of observation summary dictionaries
+        """
+        try:
+            queryset = Observation.objects.filter(subject_id=patient_id)
+            
+            if category:
+                queryset = queryset.filter(category=category)
+            
+            if encounter_id:
+                queryset = queryset.filter(encounter_id=encounter_id)
+            
+            observations = queryset.order_by('-effective_datetime')[:100]
+            
+            return [_observation_to_dict(obs) for obs in observations]
+        except Exception:
+            return []
+    
+    @staticmethod
+    def get_encounter_observations(
+        encounter_id: int,
+        category: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Get all observations for an encounter, optionally filtered by category.
+        
+        Args:
+            encounter_id: Encounter ID
+            category: Optional category filter (e.g., 'vital-signs', 'laboratory')
+            
+        Returns:
+            List of observation summary dictionaries
+        """
+        try:
+            queryset = Observation.objects.filter(encounter_id=encounter_id)
+            
+            if category:
+                queryset = queryset.filter(category=category)
+            
+            observations = queryset.order_by('-effective_datetime')
+            
+            return [_observation_to_dict(obs) for obs in observations]
+        except Exception:
+            return []
+    
+    @staticmethod
+    def get_latest_observation(
+        patient_id: int,
+        code: str,
+        encounter_id: Optional[int] = None
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get the most recent observation for a patient by code.
+        
+        Useful for retrieving latest vital sign or lab result.
+        
+        Args:
+            patient_id: Patient ID (subject_id)
+            code: Observation code (e.g., 'blood-pressure', 'heart-rate')
+            encounter_id: Optional encounter ID filter
+            
+        Returns:
+            Observation dictionary or None if not found
+        """
+        try:
+            queryset = Observation.objects.filter(
+                subject_id=patient_id,
+                code=code
+            )
+            
+            if encounter_id:
+                queryset = queryset.filter(encounter_id=encounter_id)
+            
+            observation = queryset.order_by('-effective_datetime').first()
+            
+            if observation:
+                return _observation_to_dict(observation)
+            return None
+        except Exception:
+            return None
+
+
+class ChargeItemACL:
+    """
+    Read-Only Service Layer for ChargeItem data.
+    
+    Provides validation and data retrieval for charge items without exposing
+    the underlying model structure to external apps.
+    """
+    
+    @staticmethod
+    def validate_charge_item_exists(chargeitem_id: int) -> bool:
+        """
+        Check if a charge item exists in the system.
+        
+        Args:
+            chargeitem_id: Primary key of the charge item
+            
+        Returns:
+            bool: True if charge item exists, False otherwise
+        """
+        try:
+            ChargeItem.objects.get(chargeitem_id=chargeitem_id)
+            return True
+        except ObjectDoesNotExist:
+            return False
+    
+    @staticmethod
+    def get_charge_item_details(chargeitem_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve charge item details as a DTO.
+        
+        Args:
+            chargeitem_id: Primary key of the charge item
+            
+        Returns:
+            Dictionary with charge item data or None if not found
+        """
+        try:
+            charge_item = ChargeItem.objects.get(chargeitem_id=chargeitem_id)
+            return _charge_item_to_full_dict(charge_item)
+        except ObjectDoesNotExist:
+            return None
+    
+    @staticmethod
+    def get_encounter_charges(encounter_id: int) -> List[Dict[str, Any]]:
+        """
+        Get all charge items for an encounter.
+        
+        CRITICAL: Billing module depends on this method.
+        
+        Args:
+            encounter_id: Encounter ID (context_id)
+            
+        Returns:
+            List of charge item dictionaries for billing
+        """
+        try:
+            charge_items = ChargeItem.objects.filter(
+                context_id=encounter_id
+            ).order_by('-entered_date')
+            
+            return [_charge_item_to_billing_dict(item) for item in charge_items]
+        except Exception:
+            return []
+    
+    @staticmethod
+    def get_patient_charges(
+        patient_id: int,
+        account_id: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Get all charge items for a patient, optionally filtered by account.
+        
+        Args:
+            patient_id: Patient ID (subject_id)
+            account_id: Optional billing account ID filter
+            
+        Returns:
+            List of charge item dictionaries
+        """
+        try:
+            queryset = ChargeItem.objects.filter(subject_id=patient_id)
+            
+            if account_id:
+                queryset = queryset.filter(account_id=account_id)
+            
+            charge_items = queryset.order_by('-entered_date')[:100]
+            
+            return [_charge_item_to_billing_dict(item) for item in charge_items]
+        except Exception:
+            return []
+    
+    @staticmethod
+    def get_charge_items_by_code(
+        code: str,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Get charge items by service/product code, optionally filtered by date range.
+        
+        Useful for analytics and reporting.
+        
+        Args:
+            code: Charge item code
+            start_date: Optional start date (ISO format)
+            end_date: Optional end date (ISO format)
+            
+        Returns:
+            List of charge item dictionaries
+        """
+        try:
+            queryset = ChargeItem.objects.filter(code=code)
+            
+            if start_date:
+                queryset = queryset.filter(occurrence_datetime__gte=start_date)
+            
+            if end_date:
+                queryset = queryset.filter(occurrence_datetime__lte=end_date)
+            
+            charge_items = queryset.order_by('-occurrence_datetime')[:200]
+            
+            return [_charge_item_to_billing_dict(item) for item in charge_items]
+        except Exception:
+            return []
 
 
 class MonitoringACL:
