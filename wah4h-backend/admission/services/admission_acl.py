@@ -2,18 +2,13 @@
 Anti-Corruption Layer (ACL) for Admission Module
 =================================================
 
-This module serves as the FORTRESS BOUNDARY for the admission app.
-It encapsulates ALL external communication with other apps in the system.
+Fortress Boundary: ALL external app communication flows through this ACL.
 
-Architecture Principles:
-1. NO direct model imports from other apps in views/serializers
-2. ALL cross-app communication goes through this ACL
-3. External references are validated before persistence
-4. Returns DTOs/dicts, not model instances from other apps
-5. Fails fast with clear error messages
+Phase 2 Refactoring: PatientACL now acts as a pure proxy to patients.services.patient_acl.
+NO direct model imports from patients app - full decoupling achieved.
 
 External Dependencies:
-- patients app: Patient, Condition, AllergyIntolerance, Immunization
+- patients.services.patient_acl: Patient data operations (Source of Truth)
 - accounts app: Practitioner (future)
 - core app: Organization, Location (future)
 """
@@ -23,106 +18,35 @@ from django.db import transaction
 from django.core.exceptions import ValidationError
 from admission.models import Encounter, Procedure, ProcedurePerformer
 
+# FORTRESS INTEGRATION: Proxy to Patient Service Layer
+from patients.services import patient_acl
+
 
 class PatientACL:
+    """
+    Patient ACL Proxy - Delegates all operations to patients.services.patient_acl.
+    Maintains admission app's interface while decoupling from patient models.
+    """
     
     @staticmethod
     def validate_patient_exists(patient_id: int) -> bool:
-        from patients.models import Patient
-        return Patient.objects.filter(id=patient_id).exists()
+        return patient_acl.validate_patient_exists(patient_id)
     
     @staticmethod
     def get_patient_summary(patient_id: int) -> Optional[Dict[str, Any]]:
-        from patients.models import Patient
-        
-        try:
-            patient = Patient.objects.get(id=patient_id)
-            return {
-                'id': patient.id,
-                'patient_id': patient.patient_id,
-                'full_name': f"{patient.first_name} {patient.middle_name or ''} {patient.last_name} {patient.suffix_name or ''}".strip(),
-                'first_name': patient.first_name,
-                'last_name': patient.last_name,
-                'middle_name': patient.middle_name,
-                'suffix_name': patient.suffix_name,
-                'gender': patient.gender,
-                'birthdate': patient.birthdate,
-                'mobile_number': patient.mobile_number,
-                'philhealth_id': patient.philhealth_id,
-                'blood_type': patient.blood_type,
-                'address_line': patient.address_line,
-                'address_city': patient.address_city,
-            }
-        except Patient.DoesNotExist:
-            return None
+        return patient_acl.get_patient_summary(patient_id)
     
     @staticmethod
     def get_patient_conditions(patient_id: int, encounter_id: Optional[int] = None) -> List[Dict[str, Any]]:
-        from patients.models import Condition
-        
-        queryset = Condition.objects.filter(patient_id=patient_id)
-        if encounter_id:
-            queryset = queryset.filter(encounter_id=encounter_id)
-        
-        return [
-            {
-                'condition_id': c.condition_id,
-                'identifier': c.identifier,
-                'code': c.code,
-                'clinical_status': c.clinical_status,
-                'verification_status': c.verification_status,
-                'category': c.category,
-                'severity': c.severity,
-                'onset_datetime': c.onset_datetime,
-                'recorded_date': c.recorded_date,
-            }
-            for c in queryset
-        ]
+        return patient_acl.get_patient_conditions(patient_id, encounter_id)
     
     @staticmethod
-    def get_patient_allergies(patient_id: int) -> List[Dict[str, Any]]:
-        from patients.models import AllergyIntolerance
-        
-        allergies = AllergyIntolerance.objects.filter(patient_id=patient_id)
-        
-        return [
-            {
-                'allergy_id': a.allergy_id,
-                'identifier': a.identifier,
-                'code': a.code,
-                'clinical_status': a.clinical_status,
-                'verification_status': a.verification_status,
-                'type': a.type,
-                'category': a.category,
-                'criticality': a.criticality,
-                'reaction_severity': a.reaction_severity,
-                'last_occurrence': a.last_occurrence,
-            }
-            for a in allergies
-        ]
+    def get_patient_allergies(patient_id: int, encounter_id: Optional[int] = None) -> List[Dict[str, Any]]:
+        return patient_acl.get_patient_allergies(patient_id, encounter_id)
     
     @staticmethod
     def search_patients(query: str, limit: int = 10) -> List[Dict[str, Any]]:
-        from patients.models import Patient
-        from django.db.models import Q
-        
-        patients = Patient.objects.filter(
-            Q(patient_id__icontains=query) |
-            Q(first_name__icontains=query) |
-            Q(last_name__icontains=query)
-        )[:limit]
-        
-        return [
-            {
-                'id': p.id,
-                'patient_id': p.patient_id,
-                'full_name': f"{p.first_name} {p.middle_name or ''} {p.last_name} {p.suffix_name or ''}".strip(),
-                'gender': p.gender,
-                'birthdate': p.birthdate,
-                'mobile_number': p.mobile_number,
-            }
-            for p in patients
-        ]
+        return patient_acl.search_patients(query, limit)
 
 
 class EncounterService:
