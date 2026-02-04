@@ -29,11 +29,11 @@ class Account(FHIRResourceModel):
     partOf_id = models.BigIntegerField(null=True, blank=True)
     
     class Meta:
-        db_table = 'billing_account'
+        db_table = 'account'
         indexes = [
             models.Index(fields=['subject_id']),
             models.Index(fields=['status']),
-        ]db_table = 'account'
+        ]
 
 
 class Claim(FHIRResourceModel):
@@ -261,10 +261,10 @@ class ClaimItemDetailSubDetail(models.Model):
     udi = models.CharField(max_length=255, null=True, blank=True)
     
     class Meta:
-        db_table = 'billing_claim_item_detail_sub_detail'
+        db_table = 'claim_item_detail_sub_detail'
         indexes = [
             models.Index(fields=['detail']),
-        ]db_table = 'claim'
+        ]
 
 
 class ClaimResponse(FHIRResourceModel):

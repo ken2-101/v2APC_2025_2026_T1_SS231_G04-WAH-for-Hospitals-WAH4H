@@ -8,7 +8,7 @@ class Patient(TimeStampedModel):
     Aligned with Philippine LGU requirements and Data Dictionary
     """
     id = models.BigAutoField(primary_key=True)
-    patient_id = models.CharField(max_length=255, unique=True, null=True, blank=True)
+    patient_id = models.CharField(max_length=255, unique=True, null=True, blank=True, db_index=True)
     
     # Name fields
     first_name = models.CharField(max_length=255, null=True, blank=True)
@@ -86,22 +86,15 @@ class Condition(FHIRResourceModel):
     code = models.CharField(max_length=100, null=False, blank=False)
     
     # Relationships
-    subject_id = models.ForeignKey(
-        'patients.Patient',
-        on_delete=models.PROTECT,
+    patient = models.ForeignKey(
+        'Patient',
+        on_delete=models.CASCADE,
         db_column='subject_id',
         null=False,
         blank=False,
         related_name='conditions'
     )
-    encounter_id = models.ForeignKey(
-        'admission.Encounter',
-        on_delete=models.PROTECT,
-        db_column='encounter_id',
-        null=False,
-        blank=False,
-        related_name='conditions'
-    )
+    encounter_id = models.BigIntegerField(db_index=True, null=False, blank=False)
     
     # Body site
     body_site = models.CharField(max_length=255, null=True, blank=True)
@@ -120,22 +113,8 @@ class Condition(FHIRResourceModel):
     
     # Recording
     recorded_date = models.DateField(null=True, blank=True)
-    recorder_id = models.ForeignKey(
-        'accounts.Practitioner',
-        on_delete=models.PROTECT,
-        db_column='recorder_id',
-        null=True,
-        blank=True,
-        related_name='recorded_conditions'
-    )
-    asserter_id = models.ForeignKey(
-        'accounts.Practitioner',
-        on_delete=models.PROTECT,
-        db_column='asserter_id',
-        null=True,
-        blank=True,
-        related_name='asserted_conditions'
-    )
+    recorder_id = models.BigIntegerField(db_index=True, null=True, blank=True)
+    asserter_id = models.BigIntegerField(db_index=True, null=True, blank=True)
     
     # Stage information
     stage_summary = models.TextField(null=True, blank=True)
@@ -153,8 +132,7 @@ class Condition(FHIRResourceModel):
         db_table = 'condition'
         indexes = [
             models.Index(fields=['identifier']),
-            models.Index(fields=['subject_id']),
-            models.Index(fields=['encounter_id']),
+            models.Index(fields=['patient']),
         ]
 
     def __str__(self):
@@ -181,22 +159,15 @@ class AllergyIntolerance(FHIRResourceModel):
     code = models.CharField(max_length=100, null=False, blank=False)
     
     # Relationships
-    patient_id = models.ForeignKey(
-        'patients.Patient',
-        on_delete=models.PROTECT,
+    patient = models.ForeignKey(
+        'Patient',
+        on_delete=models.CASCADE,
         db_column='patient_id',
         null=False,
         blank=False,
         related_name='allergies'
     )
-    encounter_id = models.ForeignKey(
-        'admission.Encounter',
-        on_delete=models.PROTECT,
-        db_column='encounter_id',
-        null=False,
-        blank=False,
-        related_name='allergies'
-    )
+    encounter_id = models.BigIntegerField(db_index=True, null=False, blank=False)
     
     # Onset timing
     onset_datetime = models.DateTimeField(null=True, blank=True)
@@ -208,22 +179,8 @@ class AllergyIntolerance(FHIRResourceModel):
     
     # Recording
     recorded_date = models.DateField(null=True, blank=True)
-    recorder_id = models.ForeignKey(
-        'accounts.Practitioner',
-        on_delete=models.PROTECT,
-        db_column='recorder_id',
-        null=True,
-        blank=True,
-        related_name='recorded_allergies'
-    )
-    asserter_id = models.ForeignKey(
-        'accounts.Practitioner',
-        on_delete=models.PROTECT,
-        db_column='asserter_id',
-        null=True,
-        blank=True,
-        related_name='asserted_allergies'
-    )
+    recorder_id = models.BigIntegerField(db_index=True, null=True, blank=True)
+    asserter_id = models.BigIntegerField(db_index=True, null=True, blank=True)
     
     # Last occurrence
     last_occurrence = models.CharField(max_length=255, null=True, blank=True)
@@ -244,8 +201,7 @@ class AllergyIntolerance(FHIRResourceModel):
         db_table = 'allergy_intolerance'
         indexes = [
             models.Index(fields=['identifier']),
-            models.Index(fields=['patient_id']),
-            models.Index(fields=['encounter_id']),
+            models.Index(fields=['patient']),
         ]
 
     def __str__(self):
@@ -269,22 +225,15 @@ class Immunization(FHIRResourceModel):
     vaccine_display = models.CharField(max_length=100, null=True, blank=True)
     
     # Relationships
-    patient_id = models.ForeignKey(
-        'patients.Patient',
-        on_delete=models.PROTECT,
+    patient = models.ForeignKey(
+        'Patient',
+        on_delete=models.CASCADE,
         db_column='patient_id',
         null=False,
         blank=False,
         related_name='immunizations'
     )
-    encounter_id = models.ForeignKey(
-        'admission.Encounter',
-        on_delete=models.PROTECT,
-        db_column='encounter_id',
-        null=False,
-        blank=False,
-        related_name='immunizations'
-    )
+    encounter_id = models.BigIntegerField(db_index=True, null=False, blank=False)
     
     # Occurrence
     occurrence_datetime = models.DateTimeField(null=True, blank=True)
@@ -299,24 +248,10 @@ class Immunization(FHIRResourceModel):
     report_origin_display = models.CharField(max_length=100, null=True, blank=True)
     
     # Location
-    location_id = models.ForeignKey(
-        'accounts.Location',
-        on_delete=models.PROTECT,
-        db_column='location_id',
-        null=True,
-        blank=True,
-        related_name='immunizations'
-    )
+    location_id = models.BigIntegerField(db_index=True, null=True, blank=True)
     
     # Manufacturer
-    manufacturer_id = models.ForeignKey(
-        'accounts.Organization',
-        on_delete=models.PROTECT,
-        db_column='manufacturer_id',
-        null=True,
-        blank=True,
-        related_name='manufactured_vaccines'
-    )
+    manufacturer_id = models.BigIntegerField(db_index=True, null=True, blank=True)
     
     # Lot and expiration
     lot_number = models.CharField(max_length=255, null=True, blank=True)
@@ -330,27 +265,13 @@ class Immunization(FHIRResourceModel):
     
     # Dose quantity
     dose_quantity_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    dose_quantity_unit = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    dose_quantity_unit = models.CharField(max_length=50, null=True, blank=True)
     
     # Performer
-    performer_id = models.ForeignKey(
-        'accounts.Practitioner',
-        on_delete=models.PROTECT,
-        db_column='performer_id',
-        null=True,
-        blank=True,
-        related_name='performed_immunizations'
-    )
+    performer_id = models.BigIntegerField(db_index=True, null=True, blank=True)
     performer_function_code = models.CharField(max_length=100, null=True, blank=True)
     performer_function_display = models.CharField(max_length=100, null=True, blank=True)
-    actor_id = models.ForeignKey(
-        'accounts.Practitioner',
-        on_delete=models.PROTECT,
-        db_column='actor_id',
-        null=True,
-        blank=True,
-        related_name='acted_immunizations'
-    )
+    actor_id = models.BigIntegerField(db_index=True, null=True, blank=True)
     
     # Note
     note = models.TextField(null=True, blank=True)
@@ -404,8 +325,7 @@ class Immunization(FHIRResourceModel):
         db_table = 'immunization'
         indexes = [
             models.Index(fields=['identifier']),
-            models.Index(fields=['patient_id']),
-            models.Index(fields=['encounter_id']),
+            models.Index(fields=['patient']),
             models.Index(fields=['status']),
         ]
 

@@ -1,70 +1,10 @@
 from django.db import models
 from core.models import TimeStampedModel, FHIRResourceModel
 
-# ==================== STUB MODELS (Mirror Models for FK Targets) ====================
-# These minimal stub models exist for internal data organization and cross-app references.
-# They will be integrated/replaced when the respective apps are fully implemented.
-# Note: ForeignKey relationships are implemented as IntegerField to avoid circular dependencies.
-
-class Appointment(FHIRResourceModel):
-    """Stub model: Appointment (from scheduling module)"""
-    appointment_id = models.AutoField(primary_key=True)
-    identifier = models.CharField(max_length=100, null=True, blank=True)
-    status = models.CharField(max_length=100, null=True, blank=True)
-    
-    class Meta:
-        db_table = 'admission_appointment'
-
-
-class ServiceRequest(FHIRResourceModel):
-    """Stub model: ServiceRequest (from clinical module)"""
-    service_request_id = models.AutoField(primary_key=True)
-    identifier = models.CharField(max_length=100, null=True, blank=True)
-    status = models.CharField(max_length=100, null=True, blank=True)
-    intent = models.CharField(max_length=100, null=True, blank=True)
-    code = models.CharField(max_length=100, null=True, blank=True)
-    subject_id = models.IntegerField(null=True, blank=True)  # FK to Patient (via IntegerField)
-    
-    class Meta:
-        db_table = 'admission_service_request'
-
-
-class EpisodeOfCare(FHIRResourceModel):
-    """Stub model: EpisodeOfCare (from clinical module)"""
-    episode_of_care_id = models.AutoField(primary_key=True)
-    identifier = models.CharField(max_length=100, null=True, blank=True)
-    status = models.CharField(max_length=100, null=True, blank=True)
-    type = models.CharField(max_length=100, null=True, blank=True)
-    patient_id = models.IntegerField(null=True, blank=True)  # FK to Patient
-    
-    class Meta:
-        db_table = 'admission_episode_of_care'
-
-
-class Device(FHIRResourceModel):
-    """Stub model: Device (from medical devices module)"""
-    device_id = models.AutoField(primary_key=True)
-    identifier = models.CharField(max_length=100, null=True, blank=True)
-    device_name = models.CharField(max_length=255, null=True, blank=True)
-    type = models.CharField(max_length=100, null=True, blank=True)
-    model = models.CharField(max_length=255, null=True, blank=True)
-    version = models.CharField(max_length=100, null=True, blank=True)
-    patient_id = models.IntegerField(null=True, blank=True)  # FK to Patient
-    owner_id = models.IntegerField(null=True, blank=True)  # FK to Organization
-    location_id = models.IntegerField(null=True, blank=True)  # FK to Location
-    note = models.TextField(null=True, blank=True)
-    status = models.CharField(max_length=100, null=True, blank=True)
-    
-    class Meta:
-        db_table = 'admission_device'
-
-
-# ==================== CORE MODELS ====================
-
 class Encounter(FHIRResourceModel):
     """
     Encounter: Represents a healthcare encounter (appointment, admission, visit).
-    Flattened structure directly matching Philippine LGU Data Dictionary (admission.csv).
+    Normalized structure with Fortress Pattern for external decoupling.
     Inherits identifier, status, created_at, updated_at from FHIRResourceModel.
     """
     encounter_id = models.AutoField(primary_key=True)
@@ -81,18 +21,22 @@ class Encounter(FHIRResourceModel):
     service_type = models.CharField(max_length=100, null=True, blank=True)
     priority = models.CharField(max_length=255, null=True, blank=True)
     
-    # Subject (Patient) - Required FK
-    subject_patient_id = models.IntegerField(null=False, blank=False)  # FK to patients.Patient
+    # Subject (Patient) - External Reference with Fortress Pattern
+    subject_id = models.BigIntegerField(null=False, blank=False, db_index=True)  # Ref to patients.Patient
     
-    # Episode of Care and Service Request relationships
-    episode_of_care_id = models.IntegerField(null=True, blank=True)  # FK to EpisodeOfCare
-    based_on_service_request_id = models.IntegerField(null=True, blank=True)  # FK to ServiceRequest
-    
-    # Appointment relationship
-    appointment_id = models.IntegerField(null=True, blank=True)  # FK to Appointment
+    # External References - Fortress Pattern
+    episode_of_care_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to EpisodeOfCare
+    based_on_service_request_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to ServiceRequest
+    appointment_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to Appointment
+    participant_individual_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to Practitioner
+    reason_reference_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to Condition
+    diagnosis_condition_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to Condition
+    location_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to Location
+    discharge_destination_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to Location
+    service_provider_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to Organization
+    account_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to Account (billing)
     
     # Participant information
-    participant_individual_id = models.IntegerField(null=True, blank=True)  # FK to Practitioner
     participant_type = models.CharField(max_length=100, null=True, blank=True)
     
     # Period timing
@@ -104,35 +48,27 @@ class Encounter(FHIRResourceModel):
     
     # Reason for encounter
     reason_code = models.CharField(max_length=100, null=True, blank=True)
-    reason_reference_id = models.IntegerField(null=True, blank=True)  # FK to Condition
     
     # Diagnosis
-    diagnosis_condition_id = models.IntegerField(null=True, blank=True)  # FK to Condition
     diagnosis_rank = models.CharField(max_length=255, null=True, blank=True)
     diagnosis_use = models.CharField(max_length=255, null=True, blank=True)
     
     # Location information
-    location_id = models.IntegerField(null=True, blank=True)  # FK to Location
     location_status = models.CharField(max_length=100, null=True, blank=True)
     location_period_start = models.DateField(null=True, blank=True)
     location_period_end = models.DateField(null=True, blank=True)
     location_physical_type = models.CharField(max_length=100, null=True, blank=True)
     
-    # Hospitalization details (flattened)
+    # Hospitalization details
     admit_source = models.CharField(max_length=255, null=True, blank=True)
     re_admission = models.BooleanField(null=True, blank=True)
     diet_preference = models.CharField(max_length=255, null=True, blank=True)
     special_courtesy = models.CharField(max_length=255, null=True, blank=True)
     special_arrangement = models.CharField(max_length=255, null=True, blank=True)
-    discharge_destination_id = models.IntegerField(null=True, blank=True)  # FK to Location
     discharge_disposition = models.TextField(null=True, blank=True)
     
-    # Service Provider and Account
-    service_provider_id = models.IntegerField(null=True, blank=True)  # FK to Organization
-    account_id = models.IntegerField(null=True, blank=True)  # FK to Account (billing)
-    
-    # Hierarchical relationships
-    part_of_encounter_id = models.IntegerField(null=True, blank=True)  # FK to self (Encounter)
+    # Hierarchical relationships - Internal Reference
+    part_of_encounter_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to self
     
     # Pre-admission identifier
     pre_admission_identifier = models.CharField(max_length=100, null=True, blank=True)
@@ -143,13 +79,14 @@ class Encounter(FHIRResourceModel):
         verbose_name_plural = 'Encounters'
     
     def __str__(self):
-        return f"Encounter {self.identifier} - {self.status}"
+        return f"Encounter {self.encounter_id} - {self.identifier}"
 
 
 class Procedure(FHIRResourceModel):
     """
     Procedure: Represents a medical procedure performed during an encounter.
-    Flattened structure directly matching Philippine LGU Data Dictionary (admission.csv).
+    Normalized structure with Fortress Pattern for external references.
+    Internal integrity: ForeignKey to Encounter (within admission app).
     Inherits identifier, status, created_at, updated_at from FHIRResourceModel.
     """
     procedure_id = models.AutoField(primary_key=True)
@@ -160,19 +97,36 @@ class Procedure(FHIRResourceModel):
     instantiates_canonical = models.CharField(max_length=255, null=True, blank=True)
     instantiates_uri = models.CharField(max_length=255, null=True, blank=True)
     
-    # Relationships
-    based_on_id = models.IntegerField(null=True, blank=True)  # FK to ServiceRequest
-    part_of_id = models.IntegerField(null=True, blank=True)  # FK to self (Procedure)
+    # External References - Fortress Pattern
+    based_on_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to ServiceRequest
+    part_of_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to self (Procedure)
+    subject_id = models.BigIntegerField(null=False, blank=False, db_index=True)  # Ref to patients.Patient
+    performer_actor_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to Practitioner
+    performer_on_behalf_of_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to Organization
+    recorder_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to Practitioner
+    asserter_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to Practitioner
+    location_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to Location
+    reason_reference_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to Condition
+    complication_detail_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to Condition
+    report_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to DiagnosticReport
+    focal_device_manipulated_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to Device
+    used_reference_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to Medication
+    
+    # Internal Integrity - ForeignKey to Encounter (same app)
+    encounter = models.ForeignKey(
+        'Encounter',
+        on_delete=models.CASCADE,
+        related_name='procedures',
+        db_column='encounter_id',
+        null=False,
+        blank=False
+    )
     
     # Classification and coding
     category_code = models.CharField(max_length=100, null=True, blank=True)
     category_display = models.CharField(max_length=100, null=True, blank=True)
     code_code = models.CharField(max_length=100, null=True, blank=True)
     code_display = models.CharField(max_length=100, null=True, blank=True)
-    
-    # Subject (Patient) and Encounter - Required
-    subject_id = models.IntegerField(null=False, blank=False)  # FK to patients.Patient
-    encounter_id = models.IntegerField(null=False, blank=False)  # FK to Encounter
     
     # Timing
     performed_datetime = models.DateTimeField(null=True, blank=True)
@@ -184,23 +138,13 @@ class Procedure(FHIRResourceModel):
     performed_range_low = models.CharField(max_length=255, null=True, blank=True)
     performed_range_high = models.CharField(max_length=255, null=True, blank=True)
     
-    # Performers
-    performer_actor_id = models.IntegerField(null=True, blank=True)  # FK to Practitioner
+    # Performer function
     performer_function_code = models.CharField(max_length=100, null=True, blank=True)
     performer_function_display = models.CharField(max_length=100, null=True, blank=True)
-    performer_on_behalf_of_id = models.IntegerField(null=True, blank=True)  # FK to Organization
-    
-    # Recording and Assertion
-    recorder_id = models.IntegerField(null=True, blank=True)  # FK to Practitioner
-    asserter_id = models.IntegerField(null=True, blank=True)  # FK to Practitioner
-    
-    # Location
-    location_id = models.IntegerField(null=True, blank=True)  # FK to Location
     
     # Reason
     reason_code_code = models.CharField(max_length=100, null=True, blank=True)
     reason_code_display = models.CharField(max_length=100, null=True, blank=True)
-    reason_reference_id = models.IntegerField(null=True, blank=True)  # FK to Condition
     
     # Body Site
     body_site_code = models.CharField(max_length=100, null=True, blank=True)
@@ -211,23 +155,19 @@ class Procedure(FHIRResourceModel):
     outcome_display = models.CharField(max_length=100, null=True, blank=True)
     complication_code = models.CharField(max_length=100, null=True, blank=True)
     complication_display = models.CharField(max_length=100, null=True, blank=True)
-    complication_detail_id = models.IntegerField(null=True, blank=True)  # FK to Condition
     
     # Follow-up
     follow_up_code = models.CharField(max_length=100, null=True, blank=True)
     follow_up_display = models.CharField(max_length=100, null=True, blank=True)
     
-    # Notes and Reports
+    # Notes
     note = models.TextField(null=True, blank=True)
-    report_id = models.IntegerField(null=True, blank=True)  # FK to DiagnosticReport
     
     # Focal Device
-    focal_device_manipulated_id = models.IntegerField(null=True, blank=True)  # FK to Device
     focal_device_action_code = models.CharField(max_length=100, null=True, blank=True)
     focal_device_action_display = models.CharField(max_length=100, null=True, blank=True)
     
-    # Used (Medications, devices, etc.)
-    used_reference_id = models.IntegerField(null=True, blank=True)  # FK to Medication
+    # Used codes
     used_code_code = models.CharField(max_length=100, null=True, blank=True)
     used_code_display = models.CharField(max_length=100, null=True, blank=True)
     
@@ -237,99 +177,34 @@ class Procedure(FHIRResourceModel):
         verbose_name_plural = 'Procedures'
     
     def __str__(self):
-        return f"Procedure {self.identifier} - {self.status}"
+        return f"Procedure {self.procedure_id} - {self.identifier}"
 
 
-class ProcedurePerformer(FHIRResourceModel):
+class ProcedurePerformer(TimeStampedModel):
     """
-    ProcedurePerformer: Detail model for procedure performers.
-    Flattened structure directly matching Philippine LGU Data Dictionary (admission.csv).
-    Inherits identifier, status, created_at, updated_at from FHIRResourceModel.
-    Full CSV alignment with all Procedure_Performer fields.
+    ProcedurePerformer: Pure junction table for procedure performers.
+    Normalized structure - no duplicate clinical fields.
+    All clinical data (timing, body sites, outcomes) belongs to Procedure, not here.
     """
     procedure_performer_id = models.AutoField(primary_key=True)
     
-    # Core relationships - procedure_id is PK+FK per CSV
-    procedure_id = models.IntegerField(null=False, blank=False)  # FK to Procedure (PK, FK per CSV)
+    # Internal Integrity - ForeignKey to Procedure (same app)
+    procedure = models.ForeignKey(
+        'Procedure',
+        on_delete=models.CASCADE,
+        related_name='performers',
+        db_column='procedure_id',
+        null=False,
+        blank=False
+    )
     
-    # Status reason
-    status_reason_code = models.CharField(max_length=100, null=True, blank=True)
-    status_reason_display = models.CharField(max_length=100, null=True, blank=True)
+    # External References - Fortress Pattern
+    performer_actor_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to Practitioner
+    performer_on_behalf_of_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to Organization
     
-    # Instantiation
-    instantiates_canonical = models.CharField(max_length=255, null=True, blank=True)
-    instantiates_uri = models.CharField(max_length=255, null=True, blank=True)
-    
-    # Relationships
-    based_on_id = models.IntegerField(null=True, blank=True)  # FK to ServiceRequest
-    part_of_id = models.IntegerField(null=True, blank=True)  # FK to self (Procedure)
-    
-    # Classification and coding
-    category_code = models.CharField(max_length=100, null=True, blank=True)
-    category_display = models.CharField(max_length=100, null=True, blank=True)
-    code_code = models.CharField(max_length=100, null=True, blank=True)
-    code_display = models.CharField(max_length=100, null=True, blank=True)
-    
-    # Subject (Patient) and Encounter - Required per CSV
-    subject_id = models.IntegerField(null=False, blank=False)  # FK to patients.Patient (NOT NULL per CSV)
-    encounter_id = models.IntegerField(null=False, blank=False)  # FK to Encounter (NOT NULL per CSV)
-    
-    # Timing
-    performed_datetime = models.DateTimeField(null=True, blank=True)
-    performed_period_start = models.DateField(null=True, blank=True)
-    performed_period_end = models.DateField(null=True, blank=True)
-    performed_string = models.CharField(max_length=255, null=True, blank=True)
-    performed_age_value = models.CharField(max_length=255, null=True, blank=True)
-    performed_age_unit = models.CharField(max_length=255, null=True, blank=True)
-    performed_range_low = models.CharField(max_length=255, null=True, blank=True)
-    performed_range_high = models.CharField(max_length=255, null=True, blank=True)
-    
-    # Performers
-    performer_actor_id = models.IntegerField(null=True, blank=True)  # FK to Practitioner
+    # Performer function
     performer_function_code = models.CharField(max_length=100, null=True, blank=True)
     performer_function_display = models.CharField(max_length=100, null=True, blank=True)
-    performer_on_behalf_of_id = models.IntegerField(null=True, blank=True)  # FK to Organization
-    
-    # Recording and Assertion
-    recorder_id = models.IntegerField(null=True, blank=True)  # FK to Practitioner
-    asserter_id = models.IntegerField(null=True, blank=True)  # FK to Practitioner
-    
-    # Location
-    location_id = models.IntegerField(null=True, blank=True)  # FK to Location
-    
-    # Reason
-    reason_code_code = models.CharField(max_length=100, null=True, blank=True)
-    reason_code_display = models.CharField(max_length=100, null=True, blank=True)
-    reason_reference_id = models.IntegerField(null=True, blank=True)  # FK to Condition
-    
-    # Body Site
-    body_site_code = models.CharField(max_length=100, null=True, blank=True)
-    body_site_display = models.CharField(max_length=100, null=True, blank=True)
-    
-    # Outcome and Complications
-    outcome_code = models.CharField(max_length=100, null=True, blank=True)
-    outcome_display = models.CharField(max_length=100, null=True, blank=True)
-    complication_code = models.CharField(max_length=100, null=True, blank=True)
-    complication_display = models.CharField(max_length=100, null=True, blank=True)
-    complication_detail_id = models.IntegerField(null=True, blank=True)  # FK to Condition
-    
-    # Follow-up
-    follow_up_code = models.CharField(max_length=100, null=True, blank=True)
-    follow_up_display = models.CharField(max_length=100, null=True, blank=True)
-    
-    # Notes and Reports
-    note = models.TextField(null=True, blank=True)
-    report_id = models.IntegerField(null=True, blank=True)  # FK to DiagnosticReport
-    
-    # Focal Device
-    focal_device_manipulated_id = models.IntegerField(null=True, blank=True)  # FK to Device
-    focal_device_action_code = models.CharField(max_length=100, null=True, blank=True)
-    focal_device_action_display = models.CharField(max_length=100, null=True, blank=True)
-    
-    # Used (Medications, devices, etc.)
-    used_reference_id = models.IntegerField(null=True, blank=True)  # FK to Medication
-    used_code_code = models.CharField(max_length=100, null=True, blank=True)
-    used_code_display = models.CharField(max_length=100, null=True, blank=True)
     
     class Meta:
         db_table = 'procedure_performer'
@@ -337,4 +212,4 @@ class ProcedurePerformer(FHIRResourceModel):
         verbose_name_plural = 'Procedure Performers'
     
     def __str__(self):
-        return f"ProcedurePerformer {self.procedure_performer_id}"
+        return f"ProcedurePerformer {self.procedure_performer_id} for Procedure {self.procedure_id}"
