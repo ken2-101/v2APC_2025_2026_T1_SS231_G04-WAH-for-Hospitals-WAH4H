@@ -77,7 +77,8 @@ export const convertAPIToLocal = (api: APIBillingRecord): BillingRecord => {
             name: m.name,
             dosage: m.dosage,
             quantity: m.quantity,
-            unitPrice: Number(m.unit_price)
+            // Check both camelCase (from serializer) and snake_case (potential legacy)
+            unitPrice: Number((m as any).unitPrice || (m as any).unit_price)
         })),
         dietType: api.diet_type,
         mealsPerDay: api.meals_per_day,
@@ -151,7 +152,7 @@ export const convertLocalToAPI = (local: Partial<BillingRecord>, selectedDiscoun
             name: m.name,
             dosage: m.dosage,
             quantity: m.quantity,
-            unit_price: m.unitPrice.toString()
+            unitPrice: m.unitPrice.toString() // Backend expects unitPrice
         })) || [],
         diagnostics: local.diagnostics?.map(d => ({
             name: d.name,

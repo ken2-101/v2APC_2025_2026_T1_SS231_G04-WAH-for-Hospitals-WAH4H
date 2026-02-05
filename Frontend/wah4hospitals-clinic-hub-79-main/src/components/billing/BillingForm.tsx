@@ -99,6 +99,14 @@ export const BillingForm: React.FC<BillingFormProps> = ({
     const existingBilling = billingRecords.find(b => b.patientId === patient.id);
     const isFinalized = existingBilling?.isFinalized || false;
 
+    // State for Edit Mode
+    const [isEditing, setIsEditing] = useState(!existingBilling);
+
+    // Initialize Edit Mode based on existingBilling
+    useEffect(() => {
+        setIsEditing(!existingBilling);
+    }, [existingBilling?.id]); // Only re-run if ID changes (loading new bill vs existing)
+
     const resetBillingForm = () => {
         setRoomType('');
         setNumberOfDays(0);
@@ -243,6 +251,15 @@ export const BillingForm: React.FC<BillingFormProps> = ({
 
 
     const handleSaveBill = async () => {
+        if (!patient.id || patient.id === 0) {
+             toast({
+                variant: 'destructive',
+                title: 'Data Error',
+                description: 'Invalid Patient ID. Cannot proceed with billing. Please select a patient with valid data.',
+            });
+            return;
+        }
+
         if (!patientName || !hospitalId || !admissionDate) {
             toast({
                 variant: 'destructive',
@@ -281,6 +298,8 @@ export const BillingForm: React.FC<BillingFormProps> = ({
                 const updated = await billingService.update(existingBilling.id, apiData);
                 const localRecord = convertAPIToLocal(updated);
                 toast({ title: 'Success', description: 'Billing record updated.' });
+                // If we're editing, we might want to exit edit mode or just notify
+                setIsEditing(false);
                 onSaveSuccess();
             } else {
                 const created = await billingService.create(apiData);
@@ -322,26 +341,48 @@ export const BillingForm: React.FC<BillingFormProps> = ({
         <div className="space-y-6">
             <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-gray-100 sticky top-0 z-10">
                 <div>
-                   <h2 className="text-2xl font-bold flex items-center gap-2">
-                       <Receipt className="w-6 h-6 text-primary" />
-                       Patient Billing Statement
-                   </h2>
+                   <div className="flex items-center gap-3">
+                       <h2 className="text-2xl font-bold flex items-center gap-2">
+                           <Receipt className="w-6 h-6 text-primary" />
+                           Patient Billing Statement
+                       </h2>
+                       {existingBilling?.paymentStatus && (
+                           <Badge className={
+                               existingBilling.paymentStatus === 'Paid' ? 'bg-green-600' : 
+                               existingBilling.paymentStatus === 'Partial' ? 'bg-yellow-600' : 'bg-gray-500'
+                           }>
+                               {existingBilling.paymentStatus}
+                           </Badge>
+                       )}
+                   </div>
                     <p className="text-gray-500">
-                        {existingBilling ? `Editing Bill #${existingBilling.id}` : 'Creating New Bill'}
+                        {existingBilling ? `View Bill #${existingBilling.id}` : 'Creating New Bill'}
                     </p>
                 </div>
                 <div className="flex gap-2">
                     <Button variant="outline" onClick={onCancel}>
                         Cancel
                     </Button>
+                    {existingBilling && !isEditing && (
+                         <Button 
+                            variant="secondary" 
+                            onClick={() => setIsEditing(true)}
+                            disabled={existingBilling.paymentStatus === 'Paid'}
+                         >
+                            <FileText className="w-4 h-4 mr-2" />
+                            Edit Bill
+                        </Button>
+                    )}
                     <Button variant="outline" onClick={onPrint} disabled={!isFinalized}>
                         <Printer className="w-4 h-4 mr-2" />
                         Print Bill
                     </Button>
-                    <Button onClick={handleSaveBill} disabled={isLoading} className="bg-primary hover:bg-primary/90">
-                        <Save className="w-4 h-4 mr-2" />
-                        {isLoading ? 'Saving...' : 'Save & Finalize'}
-                    </Button>
+                    {isEditing && (
+                        <Button onClick={handleSaveBill} disabled={isLoading} className="bg-primary hover:bg-primary/90">
+                            <Save className="w-4 h-4 mr-2" />
+                            {isLoading ? 'Saving...' : (existingBilling ? 'Update Bill' : 'Save & Finalize')}
+                        </Button>
+                    )}
                 </div>
             </div>
 
@@ -365,26 +406,26 @@ export const BillingForm: React.FC<BillingFormProps> = ({
                         <CardContent className="space-y-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="patientName">Patient Name</Label>
-                                <Input id="patientName" value={patientName} onChange={e => setPatientName(e.target.value)} />
+                                <Input id="patientName" value={patientName} onChange={e => setPatientName(e.target.value)} disabled={!isEditing} />
                             </div>
                              <div className="grid grid-cols-2 gap-4">
                                 <div className="grid gap-2">
                                     <Label htmlFor="hospitalId">Hospital ID</Label>
-                                    <Input id="hospitalId" value={hospitalId} onChange={e => setHospitalId(e.target.value)} />
+                                    <Input id="hospitalId" value={hospitalId} onChange={e => setHospitalId(e.target.value)} disabled={!isEditing} />
                                 </div>
                                 <div className="grid gap-2">
                                     <Label htmlFor="roomWard">Room/Ward</Label>
-                                    <Input id="roomWard" value={roomWard} onChange={e => setRoomWard(e.target.value)} />
+                                    <Input id="roomWard" value={roomWard} onChange={e => setRoomWard(e.target.value)} disabled={!isEditing} />
                                 </div>
                              </div>
                              <div className="grid grid-cols-2 gap-4">
                                 <div className="grid gap-2">
                                     <Label htmlFor="admissionDate">Admission Date</Label>
-                                    <Input id="admissionDate" type="date" value={admissionDate} onChange={e => setAdmissionDate(e.target.value)} />
+                                    <Input id="admissionDate" type="date" value={admissionDate} onChange={e => setAdmissionDate(e.target.value)} disabled={!isEditing} />
                                 </div>
                                 <div className="grid gap-2">
                                     <Label htmlFor="dischargeDate">Discharge Date</Label>
-                                    <Input id="dischargeDate" type="date" value={dischargeDate} onChange={e => setDischargeDate(e.target.value)} />
+                                    <Input id="dischargeDate" type="date" value={dischargeDate} onChange={e => setDischargeDate(e.target.value)} disabled={!isEditing} />
                                 </div>
                              </div>
                         </CardContent>
@@ -398,7 +439,7 @@ export const BillingForm: React.FC<BillingFormProps> = ({
                               <div className="grid grid-cols-2 gap-4">
                                   <div className="grid gap-2">
                                       <Label>Room Type</Label>
-                                      <Select value={roomType} onValueChange={setRoomType}>
+                                      <Select value={roomType} onValueChange={setRoomType} disabled={!isEditing}>
                                           <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                                           <SelectContent>
                                               <SelectItem value="Ward">Ward</SelectItem>
@@ -410,11 +451,11 @@ export const BillingForm: React.FC<BillingFormProps> = ({
                                   </div>
                                   <div className="grid gap-2">
                                       <Label>No. of Days</Label>
-                                      <Input type="number" value={numberOfDays} onChange={e => setNumberOfDays(Number(e.target.value))} />
+                                      <Input type="number" value={numberOfDays} onChange={e => setNumberOfDays(Number(e.target.value))} disabled={!isEditing} />
                                   </div>
                                   <div className="grid gap-2">
                                       <Label>Rate per Day</Label>
-                                      <Input type="number" value={ratePerDay} onChange={e => setRatePerDay(Number(e.target.value))} />
+                                      <Input type="number" value={ratePerDay} onChange={e => setRatePerDay(Number(e.target.value))} disabled={!isEditing} />
                                   </div>
                                   <div className="grid gap-2">
                                       <Label>Total</Label>
@@ -431,19 +472,19 @@ export const BillingForm: React.FC<BillingFormProps> = ({
                           <CardContent className="space-y-4">
                                <div className="grid gap-2">
                                    <Label>Attending Physician</Label>
-                                   <Input type="number" value={attendingPhysicianFee} onChange={e => setAttendingPhysicianFee(Number(e.target.value))} />
+                                   <Input type="number" value={attendingPhysicianFee} onChange={e => setAttendingPhysicianFee(Number(e.target.value))} disabled={!isEditing} />
                                </div>
                                <div className="grid gap-2">
                                    <Label>Specialist</Label>
-                                   <Input type="number" value={specialistFee} onChange={e => setSpecialistFee(Number(e.target.value))} />
+                                   <Input type="number" value={specialistFee} onChange={e => setSpecialistFee(Number(e.target.value))} disabled={!isEditing} />
                                </div>
                                <div className="grid gap-2">
                                    <Label>Surgeon</Label>
-                                   <Input type="number" value={surgeonFee} onChange={e => setSurgeonFee(Number(e.target.value))} />
+                                   <Input type="number" value={surgeonFee} onChange={e => setSurgeonFee(Number(e.target.value))} disabled={!isEditing} />
                                </div>
                                <div className="grid gap-2">
                                    <Label>Other Fees</Label>
-                                   <Input type="number" value={otherProfessionalFees} onChange={e => setOtherProfessionalFees(Number(e.target.value))} />
+                                   <Input type="number" value={otherProfessionalFees} onChange={e => setOtherProfessionalFees(Number(e.target.value))} disabled={!isEditing} />
                                </div>
                                <div className="pt-2 border-t flex justify-between font-medium">
                                    <span>Total PF:</span>
@@ -458,7 +499,7 @@ export const BillingForm: React.FC<BillingFormProps> = ({
                       <Card>
                           <CardHeader className="flex flex-row items-center justify-between pb-2">
                               <CardTitle className="text-lg">Medicines</CardTitle>
-                              <Button variant="ghost" size="sm" onClick={addMedicine}><Plus className="w-4 h-4" /></Button>
+                              {isEditing && <Button variant="ghost" size="sm" onClick={addMedicine}><Plus className="w-4 h-4" /></Button>}
                           </CardHeader>
                           <CardContent className="space-y-4">
                               {pharmacyDataFetched && (
@@ -473,18 +514,20 @@ export const BillingForm: React.FC<BillingFormProps> = ({
                                   {medicines.map((med) => (
                                       <div key={med.id} className="grid grid-cols-12 gap-2 items-center bg-gray-50 p-2 rounded">
                                           <div className="col-span-12 md:col-span-4">
-                                              <Input placeholder="Name" value={med.name} onChange={e => updateMedicine(med.id, 'name', e.target.value)} className="h-8 text-sm" />
+                                              <Input placeholder="Name" value={med.name} onChange={e => updateMedicine(med.id, 'name', e.target.value)} className="h-8 text-sm" disabled={!isEditing} />
                                           </div>
                                           <div className="col-span-6 md:col-span-3">
-                                              <Input type="number" placeholder="Qty" value={med.quantity} onChange={e => updateMedicine(med.id, 'quantity', Number(e.target.value))} className="h-8 text-sm" />
+                                              <Input type="number" placeholder="Qty" value={med.quantity} onChange={e => updateMedicine(med.id, 'quantity', Number(e.target.value))} className="h-8 text-sm" disabled={!isEditing} />
                                           </div>
                                            <div className="col-span-6 md:col-span-3">
-                                              <Input type="number" placeholder="Price" value={med.unitPrice} onChange={e => updateMedicine(med.id, 'unitPrice', Number(e.target.value))} className="h-8 text-sm" />
+                                              <Input type="number" placeholder="Price" value={med.unitPrice} onChange={e => updateMedicine(med.id, 'unitPrice', Number(e.target.value))} className="h-8 text-sm" disabled={!isEditing} />
                                           </div>
                                           <div className="col-span-12 md:col-span-2 flex justify-end">
-                                               <Button variant="ghost" size="icon" onClick={() => removeMedicine(med.id)} className="h-8 w-8 text-red-500 hover:text-red-700">
-                                                   <Trash2 className="w-4 h-4" />
-                                               </Button>
+                                               {isEditing && (
+                                                   <Button variant="ghost" size="icon" onClick={() => removeMedicine(med.id)} className="h-8 w-8 text-red-500 hover:text-red-700">
+                                                       <Trash2 className="w-4 h-4" />
+                                                   </Button>
+                                               )}
                                           </div>
                                       </div>
                                   ))}
@@ -498,7 +541,7 @@ export const BillingForm: React.FC<BillingFormProps> = ({
                       <Card>
                           <CardHeader className="flex flex-row items-center justify-between pb-2">
                               <CardTitle className="text-lg">Diagnostics / Labs</CardTitle>
-                              <Button variant="ghost" size="sm" onClick={addDiagnostic}><Plus className="w-4 h-4" /></Button>
+                              {isEditing && <Button variant="ghost" size="sm" onClick={addDiagnostic}><Plus className="w-4 h-4" /></Button>}
                           </CardHeader>
                           <CardContent className="space-y-4">
                                {laboratoryDataFetched && (
@@ -513,15 +556,17 @@ export const BillingForm: React.FC<BillingFormProps> = ({
                                   {diagnostics.map((diag) => (
                                       <div key={diag.id} className="grid grid-cols-12 gap-2 items-center bg-gray-50 p-2 rounded">
                                           <div className="col-span-8">
-                                              <Input placeholder="Test Name" value={diag.name} onChange={e => updateDiagnostic(diag.id, 'name', e.target.value)} className="h-8 text-sm" />
+                                              <Input placeholder="Test Name" value={diag.name} onChange={e => updateDiagnostic(diag.id, 'name', e.target.value)} className="h-8 text-sm" disabled={!isEditing} />
                                           </div>
                                           <div className="col-span-3">
-                                              <Input type="number" placeholder="Cost" value={diag.cost} onChange={e => updateDiagnostic(diag.id, 'cost', Number(e.target.value))} className="h-8 text-sm" />
+                                              <Input type="number" placeholder="Cost" value={diag.cost} onChange={e => updateDiagnostic(diag.id, 'cost', Number(e.target.value))} className="h-8 text-sm" disabled={!isEditing} />
                                           </div>
                                            <div className="col-span-1 flex justify-end">
-                                               <Button variant="ghost" size="icon" onClick={() => removeDiagnostic(diag.id)} className="h-8 w-8 text-red-500">
-                                                   <Trash2 className="w-4 h-4" />
-                                               </Button>
+                                               {isEditing && (
+                                                   <Button variant="ghost" size="icon" onClick={() => removeDiagnostic(diag.id)} className="h-8 w-8 text-red-500">
+                                                       <Trash2 className="w-4 h-4" />
+                                                   </Button>
+                                               )}
                                           </div>
                                       </div>
                                   ))}
@@ -542,27 +587,27 @@ export const BillingForm: React.FC<BillingFormProps> = ({
                                     <div className="col-span-2">
                                         <Label>Dietary</Label>
                                         <div className="flex gap-2">
-                                            <Input placeholder="Type" value={dietType} onChange={e => setDietType(e.target.value)} className="w-1/3" />
-                                            <Input type="number" placeholder="Meals/Day" value={mealsPerDay} onChange={e => setMealsPerDay(Number(e.target.value))} className="w-1/4" />
-                                            <Input type="number" placeholder="Cost" value={costPerMeal} onChange={e => setCostPerMeal(Number(e.target.value))} className="w-1/3" />
+                                            <Input placeholder="Type" value={dietType} onChange={e => setDietType(e.target.value)} className="w-1/3" disabled={!isEditing} />
+                                            <Input type="number" placeholder="Meals/Day" value={mealsPerDay} onChange={e => setMealsPerDay(Number(e.target.value))} className="w-1/4" disabled={!isEditing} />
+                                            <Input type="number" placeholder="Cost" value={costPerMeal} onChange={e => setCostPerMeal(Number(e.target.value))} className="w-1/3" disabled={!isEditing} />
                                         </div>
                                          <div className="text-xs text-right mt-1 text-gray-500">Total: {totalDietaryCharge.toFixed(2)}</div>
                                     </div>
                                      <div className="grid gap-2">
                                         <Label>Supplies</Label>
-                                        <Input type="number" value={suppliesCharge} onChange={e => setSuppliesCharge(Number(e.target.value))} />
+                                        <Input type="number" value={suppliesCharge} onChange={e => setSuppliesCharge(Number(e.target.value))} disabled={!isEditing} />
                                     </div>
                                     <div className="grid gap-2">
                                         <Label>Procedures</Label>
-                                        <Input type="number" value={procedureCharge} onChange={e => setProcedureCharge(Number(e.target.value))} />
+                                        <Input type="number" value={procedureCharge} onChange={e => setProcedureCharge(Number(e.target.value))} disabled={!isEditing} />
                                     </div>
                                     <div className="grid gap-2">
                                         <Label>Nursing</Label>
-                                        <Input type="number" value={nursingCharge} onChange={e => setNursingCharge(Number(e.target.value))} />
+                                        <Input type="number" value={nursingCharge} onChange={e => setNursingCharge(Number(e.target.value))} disabled={!isEditing} />
                                     </div>
                                     <div className="grid gap-2">
                                         <Label>Misc</Label>
-                                        <Input type="number" value={miscellaneousCharge} onChange={e => setMiscellaneousCharge(Number(e.target.value))} />
+                                        <Input type="number" value={miscellaneousCharge} onChange={e => setMiscellaneousCharge(Number(e.target.value))} disabled={!isEditing} />
                                     </div>
                                 </div>
                           </CardContent>
@@ -571,7 +616,9 @@ export const BillingForm: React.FC<BillingFormProps> = ({
                       <Card className="bg-slate-50 border-slate-200">
                           <CardHeader><CardTitle className="text-lg">Summary & Discounts</CardTitle></CardHeader>
                           <CardContent className="space-y-4">
-                              <DiscountCheckboxGroup selectedDiscount={selectedDiscount} onDiscountChange={setSelectedDiscount} />
+                              <div className={!isEditing ? "opacity-50 pointer-events-none" : ""}>
+                                   <DiscountCheckboxGroup selectedDiscount={selectedDiscount} onDiscountChange={setSelectedDiscount} />
+                              </div>
 
                               <div className="space-y-2 pt-4 border-t border-slate-200">
                                    <div className="flex justify-between">
@@ -581,13 +628,13 @@ export const BillingForm: React.FC<BillingFormProps> = ({
                                     <div className="flex justify-between items-center text-red-600">
                                        <span>Discount</span>
                                        <div className="w-32">
-                                           <Input type="number" className="h-8 text-right" value={discount} onChange={e => setDiscount(Number(e.target.value))} />
+                                           <Input type="number" className="h-8 text-right" value={discount} onChange={e => setDiscount(Number(e.target.value))} disabled={!isEditing} />
                                        </div>
                                    </div>
                                     <div className="flex justify-between items-center text-blue-600">
                                        <span>PhilHealth</span>
                                         <div className="w-32">
-                                           <Input type="number" className="h-8 text-right" value={philhealthCoverage} onChange={e => setPhilhealthCoverage(Number(e.target.value))} />
+                                           <Input type="number" className="h-8 text-right" value={philhealthCoverage} onChange={e => setPhilhealthCoverage(Number(e.target.value))} disabled={!isEditing} />
                                        </div>
                                    </div>
                                    <Separator className="my-2" />

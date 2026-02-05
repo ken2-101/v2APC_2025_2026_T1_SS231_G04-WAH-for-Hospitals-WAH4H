@@ -90,8 +90,20 @@ export const PatientSelector: React.FC<PatientSelectorProps> = ({
                                     }
                                 }
 
+                                // Robust Patient ID extraction
+                                let patientId = 0;
+                                if (admission.subject_id) {
+                                    patientId = admission.subject_id;
+                                } else if (typeof admission.patient === 'number') {
+                                    patientId = admission.patient;
+                                } else if (typeof admission.patient === 'string' && !isNaN(parseInt(admission.patient))) {
+                                    patientId = parseInt(admission.patient);
+                                } else if (admission.patient_summary?.id) {
+                                     patientId = admission.patient_summary.id;
+                                }
+
                                 return {
-                                    id: admission.subject_id || parseInt(admission.patient) || admission.id,
+                                    id: patientId,
                                     patientName: patientName,
                                     room: admission.location_summary?.name || admission.location_status || admission.room || admission.ward || admission.bed || 'N/A',
                                     admissionDate: admission.period_start || admission.admission_date || '',

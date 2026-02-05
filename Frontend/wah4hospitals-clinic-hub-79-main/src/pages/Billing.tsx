@@ -172,6 +172,10 @@ const Billing = () => {
                       handleQuickPay(p);
                    }
                 }}
+                onDeletePatient={async (id) => {
+                    await billingService.delete(id);
+                    await fetchBillingData();
+                }}
               />
             )}
           </>
@@ -204,10 +208,62 @@ const Billing = () => {
                     b.suppliesCharge + b.procedureCharge + b.nursingCharge + b.miscellaneousCharge;
                 return Math.max(0, subtotal - b.discount - b.philhealthCoverage);
             })()}
-            onPaymentSuccess={() => {
-                fetchBillingData();
-                setIsPaymentModalOpen(false);
+            onPaymentSuccess={async (paymentData) => {
+                try {
+                    if (existingBilling && existingBilling.id) {
+                         setIsLoading(true);
+                         // Transform data for API
+                         const apiPaymentData = {
+                             amount: paymentData.amount,
+                             payment_method: paymentData.method,
+                             payment_date: paymentData.date,
+                             or_number: paymentData.orNumber,
+                             cashier: paymentData.cashier,
+                             // specific backend fields if needed
+                             paymentIdentifier: paymentData.orNumber
+                         };
+
+                         // We use 'any' casting here because the service type definition might be slightly off 
+                         // relative to what we actually want to send (e.g. or_number vs orNumber in Omit)
+                         await billingService.addPayment(existingBilling.id, apiPaymentData as any);
+                         
+                         toast({
+                             title: "Payment Recorded",
+                             description: "Payment has been successfully processed and saved.",
+                         });
+                         
+                         await fetchBillingData();
+                    }
+                } catch (err) {
+                    console.error("Error saving payment:", err);
+                    toast({
+                        variant: "destructive",
+                        title: "Payment Error",
+                        description: "Failed to save payment record to the system.",
+                    });
+                } finally {
+                    setIsLoading(false);
+                    // Do NOT close immediately if we want them to see the receipt in the modal?
+                    // The modal handles receipt view internally.
+                    // If modal calls onPaymentSuccess, it might be after "Process" click.
+                    // PaymentModal implementation: calls onPaymentSuccess -> shows receipt.
+                    // So we should NOT close the modal here if we want them to see the receipt.
+                    // But the modal has a "Close" button which calls onClose.
+                    // So we should just save data here.
+                    // However, we need to know if we should close or not.
+                    // Checking PaymentModal.tsx: it sets showReceipt(true) then calls onPaymentSuccess.
+                    // It stays open. Good.
+                    
+                    // Actually, if we refresh data, the parent re-renders. 
+                    // Does that unmount the modal?
+                    // Modal open state is controlled by isPaymentModalOpen in Billing.tsx.
+                    // Re-render is fine as long as isPaymentModalOpen stays true.
+                }
             }}
+            // Note: We don't close the modal here automatically to allow receipt printing.
+            // The modal's internal "Close" button will trigger onClose={...} which sets isOpen to false.
+            // But wait, the previous code had setIsPaymentModalOpen(false) in onPaymentSuccess. 
+            // I will remove that to let the user review the receipt.
           />
       )}
     </div>

@@ -27,11 +27,14 @@ Author: Senior Python Backend Architect
 Date: 2026-02-04
 """
 
+import uuid
 from typing import Optional, Dict, Any, List
 from decimal import Decimal
 from django.db import transaction
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+
+
 
 # FORTRESS PATTERN: Import ONLY from billing.models
 from billing.models import (
@@ -137,6 +140,7 @@ class InvoiceOrchestrator:
         # ====================================================================
         
         invoice = Invoice.objects.create(
+            identifier=f"INV-{uuid.uuid4().hex[:8].upper()}",
             status='draft',
             type='invoice',
             subject_id=patient_id,
@@ -495,7 +499,7 @@ class InvoiceService:
         
         # Create invoice
         invoice = Invoice.objects.create(
-            identifier=data.get('identifier', ''),
+            identifier=data.get('identifier') or f"INV-{uuid.uuid4().hex[:8].upper()}",
             status=data.get('status', 'draft'),
             type=data.get('type', ''),
             subject_id=subject_id,
@@ -555,6 +559,10 @@ class InvoiceService:
                 'priceComponents': created_price_components
             })
         
+        # Update line items count on invoice
+        invoice.line_items_count = len(created_line_items)
+        invoice.save()
+        
         # Create total price components
         total_price_components_data = data.get('total_price_components', [])
         created_total_price_components = []
@@ -594,6 +602,7 @@ class InvoiceService:
             'total_gross_currency': invoice.total_gross_currency,
             'payment_terms': invoice.payment_terms,
             'note': invoice.note,
+            'line_items_count': invoice.line_items_count,
             'line_items': created_line_items,
             'total_price_components': created_total_price_components,
             'created_at': invoice.created_at.isoformat() if hasattr(invoice, 'created_at') else None,
@@ -669,7 +678,7 @@ class ClaimService:
         
         # Create claim header
         claim = Claim.objects.create(
-            identifier=data.get('identifier', ''),
+            identifier=data.get('identifier') or f"CLM-{uuid.uuid4().hex[:8].upper()}",
             status=data.get('status', 'active'),
             type=data.get('type', ''),
             subType=data.get('subType', ''),
@@ -889,19 +898,20 @@ class PaymentService:
         
         # Create payment reconciliation header
         payment = PaymentReconciliation.objects.create(
-            identifier=data.get('identifier', ''),
+            identifier=data.get('identifier') or f"PAY-{uuid.uuid4().hex[:8].upper()}",
             status=data.get('status', 'active'),
             period_start=data.get('period_start'),
             period_end=data.get('period_end'),
             created_datetime=data.get('created_datetime'),
-            paymentIssuer_id=payment_issuer_id,
-            request_id=data.get('request_id'),
+            payment_issuer_id=payment_issuer_id,
+            request_task_id=data.get('request_id'),
             requestor_id=data.get('requestor_id'),
             outcome=data.get('outcome', ''),
             disposition=data.get('disposition', ''),
-            paymentDate=data.get('paymentDate'),
-            paymentAmount=data.get('paymentAmount'),
-            paymentIdentifier=data.get('paymentIdentifier', '')
+            payment_date=data.get('paymentDate'), # Keep input key as paymentDate if needed but model is payment_date
+            payment_amount_value=data.get('paymentAmount'),
+            payment_amount_currency='PHP',
+            payment_identifier=data.get('paymentIdentifier', '')
         )
         
         # Create payment details
@@ -921,18 +931,23 @@ class PaymentService:
                 date=detail_data.get('date'),
                 responsible_id=detail_data.get('responsible_id'),
                 payee_id=detail_data.get('payee_id'),
-                amount=detail_data.get('amount')
+                amount_value=detail_data.get('amount'),
+                amount_currency='PHP'
             )
             
-            if detail.amount:
-                total_payment += detail.amount
+            if detail.amount_value:
+                total_payment += detail.amount_value
             
             created_details.append({
                 'id': detail.id,
                 'type': detail.type,
-                'amount': float(detail.amount) if detail.amount else None,
+                'amount': float(detail.amount_value) if detail.amount_value else None,
                 'request_id': detail.request_id,
             })
+            
+        # If no details provided, use header amount for balancing logic
+        if not created_details and payment.payment_amount_value:
+             total_payment = payment.payment_amount_value
         
         # Optional: Update invoice status if payment covers total
         update_invoice = data.get('update_invoice_status', False)
@@ -941,7 +956,9 @@ class PaymentService:
         if update_invoice and invoice_id:
             try:
                 invoice = Invoice.objects.get(invoice_id=invoice_id)
-                if invoice.total_gross_value and total_payment >= invoice.total_gross_value:
+                # Check if payment covers the gross value
+                # Use total_payment which is either sum of details OR header amount
+                if invoice.total_gross_value is not None and total_payment >= invoice.total_gross_value:
                     invoice.status = 'balanced'
                     invoice.save()
             except Invoice.DoesNotExist:
@@ -955,12 +972,12 @@ class PaymentService:
             'period_start': payment.period_start.isoformat() if payment.period_start else None,
             'period_end': payment.period_end.isoformat() if payment.period_end else None,
             'created_datetime': payment.created_datetime.isoformat() if payment.created_datetime else None,
-            'paymentIssuer_id': payment.paymentIssuer_id,
+            'paymentIssuer_id': payment.payment_issuer_id,
             'outcome': payment.outcome,
             'disposition': payment.disposition,
-            'paymentDate': payment.paymentDate.isoformat() if payment.paymentDate else None,
-            'paymentAmount': float(payment.paymentAmount) if payment.paymentAmount else None,
-            'paymentIdentifier': payment.paymentIdentifier,
+            'paymentDate': payment.payment_date.isoformat() if payment.payment_date else None,
+            'paymentAmount': float(payment.payment_amount_value) if payment.payment_amount_value else None,
+            'paymentIdentifier': payment.payment_identifier,
             'details': created_details,
             'total_payment': float(total_payment),
             'created_at': payment.created_at.isoformat() if hasattr(payment, 'created_at') else None,
