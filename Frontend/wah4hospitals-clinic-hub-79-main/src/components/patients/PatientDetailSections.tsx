@@ -50,22 +50,11 @@ const calculateAge = (dob: string) => {
 // Utility: Format full address
 const formatAddress = (patient: Patient) => {
   const parts: string[] = [];
-  if (patient.house_no_street) parts.push(patient.house_no_street);
-  if (patient.barangay) parts.push(patient.barangay);
-
-  const cityName =
-    addressData.cities[patient.province]?.find((c: any) => c.code === patient.city_municipality)?.name ||
-    patient.city_municipality;
-  if (cityName) parts.push(cityName);
-
-  const provinceName =
-    addressData.provinces[patient.region]?.find((p: any) => p.code === patient.province)?.name || patient.province;
-  if (provinceName) parts.push(provinceName);
-
-  const regionName = addressData.regions.find((r: any) => r.code === patient.region)?.name || patient.region;
-  if (regionName) parts.push(regionName);
-
-  return parts.join(', ');
+  if (patient.address_line) parts.push(patient.address_line);
+  if (patient.address_city) parts.push(patient.address_city);
+  if (patient.address_district) parts.push(patient.address_district);
+  if (patient.address_state) parts.push(patient.address_state);
+  return parts.join(', ') || 'N/A';
 };
 
 // -------------------- Patient Detail Cards --------------------
@@ -75,11 +64,11 @@ export const PersonalInfoCard: React.FC<{ patient: Patient }> = ({ patient }) =>
     <div className="space-y-3 text-sm">
       <DetailItem
         label="Full Name"
-        value={`${patient.last_name}, ${patient.first_name} ${patient.middle_name ?? ''} ${patient.suffix ?? ''}`}
+        value={`${patient.last_name}, ${patient.first_name} ${patient.middle_name ?? ''} ${patient.suffix_name ?? ''}`}
       />
-      <DetailItem label="Date of Birth" value={patient.date_of_birth} />
-      <DetailItem label="Age" value={`${calculateAge(patient.date_of_birth)} years old`} />
-      <DetailItem label="Sex" value={patient.sex === 'M' ? 'Male' : 'Female'} />
+      <DetailItem label="Date of Birth" value={patient.birthdate} />
+      <DetailItem label="Age" value={`${calculateAge(patient.birthdate)} years old`} />
+      <DetailItem label="Sex" value={patient.gender === 'M' ? 'Male' : 'Female'} />
       <DetailItem label="Civil Status" value={patient.civil_status} />
       <DetailItem label="Nationality" value={patient.nationality} />
     </div>
@@ -90,8 +79,6 @@ export const ContactInfoCard: React.FC<{ patient: Patient }> = ({ patient }) => 
   <DetailCard title="Contact Information" icon={Phone} iconColor="text-green-600">
     <div className="space-y-3 text-sm">
       <DetailItem label="Mobile Number" value={patient.mobile_number} />
-      <DetailItem label="Telephone" value={patient.telephone} />
-      <DetailItem label="Email" value={patient.email} />
       <DetailItem label="Address" value={formatAddress(patient)} />
     </div>
   </DetailCard>
@@ -109,7 +96,6 @@ export const IdentificationCard: React.FC<{ patient: Patient }> = ({ patient }) 
   <DetailCard title="Identification & Status" icon={Briefcase} iconColor="text-indigo-600">
     <div className="space-y-3 text-sm">
       <DetailItem label="PhilHealth ID" value={patient.philhealth_id} className="font-medium font-mono" />
-      <DetailItem label="National ID" value={patient.national_id ?? 'N/A'} className="font-medium font-mono" />
       <DetailItem label="Status" value={patient.status} />
     </div>
   </DetailCard>

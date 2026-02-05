@@ -21,7 +21,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
 
 # FORTRESS BOUNDARY: Only this file imports patient models
-from patients.models import Patient, Condition, AllergyIntolerance
+from patients.models import Patient, Condition, AllergyIntolerance, Immunization
 
 
 # ============================================================================
@@ -103,7 +103,12 @@ def search_patients(query: str, limit: int = 50) -> List[Dict[str, Any]]:
     Returns:
         List of patient summary dictionaries
     """
-    if not query or len(query.strip()) < 2:
+    if not query:
+        # Default list behavior: Return recent/all patients if query is empty
+        patients = Patient.objects.all().order_by('last_name', 'first_name')[:limit]
+        return [_patient_to_summary_dict(patient) for patient in patients]
+
+    if len(query.strip()) < 2:
         return []
     
     try:
@@ -367,3 +372,52 @@ def _allergy_to_dict(allergy: AllergyIntolerance) -> Dict[str, Any]:
         'encounter_id': allergy.encounter_id,
         'patient_id': allergy.patient.patient_id if allergy.patient else None,
     }
+
+
+def _immunization_to_dict(immunization: Immunization) -> Dict[str, Any]:
+    """Convert Immunization model to dictionary (DTO)."""
+    return {
+        'immunization_id': immunization.immunization_id,
+        'identifier': immunization.identifier,
+        'status': immunization.status,
+        'vaccine_code': immunization.vaccine_code or "",
+        'vaccine_display': immunization.vaccine_display or "",
+        'occurrence_datetime': immunization.occurrence_datetime.isoformat() if immunization.occurrence_datetime else None,
+        'lot_number': immunization.lot_number or "",
+        'dose_quantity_value': immunization.dose_quantity_value or "",
+        'dose_quantity_unit': immunization.dose_quantity_unit or "",
+        'note': immunization.note or "",
+        'encounter_id': immunization.encounter_id,
+        'patient_id': immunization.patient.patient_id if immunization.patient else None,
+    }
+
+
+# ============================================================================
+# PATIENT IMMUNIZATIONS
+# ============================================================================
+
+def get_patient_immunizations(patient_id: int, encounter_id: Optional[int] = None) -> List[Dict[str, Any]]:
+    """
+    Get all immunizations for a patient.
+    
+    Args:
+        patient_id: Database primary key (integer)
+        encounter_id: Optional encounter ID to filter immunizations (integer)
+    
+    Returns:
+        List of immunization dictionaries
+    """
+    try:
+        patient = Patient.objects.get(id=patient_id)
+        immunizations = Immunization.objects.filter(patient=patient)
+        
+        # Filter by encounter if provided
+        if encounter_id is not None:
+            immunizations = immunizations.filter(encounter_id=encounter_id)
+        
+        immunizations = immunizations.order_by('-created_at')
+        return [_immunization_to_dict(immunization) for immunization in immunizations]
+    except ObjectDoesNotExist:
+        return []
+    except Exception:
+        return []

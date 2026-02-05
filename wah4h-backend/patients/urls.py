@@ -25,7 +25,7 @@ from patients.api.views import (
 router = DefaultRouter()
 
 # Register ViewSets with specific route prefixes
-router.register(r'patients', PatientViewSet, basename='patient')
+router.register(r'', PatientViewSet, basename='patient')
 router.register(r'conditions', ConditionViewSet, basename='condition')
 router.register(r'allergies', AllergyViewSet, basename='allergy')
 router.register(r'immunizations', ImmunizationViewSet, basename='immunization')

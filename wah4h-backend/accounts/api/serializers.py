@@ -412,3 +412,71 @@ class PractitionerRoleOutputSerializer(serializers.ModelSerializer):
         """Compute practitioner full name"""
         p = obj.practitioner
         return f"{p.first_name} {p.last_name}" if p else None
+
+
+# =============================================================================
+# Auth Serializers
+# =============================================================================
+
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """
+    Custom JWT Token Serializer to return User details along with tokens.
+    
+    Structure Matches Frontend Expectation:
+    {
+        "tokens": {
+            "access": "...",
+            "refresh": "..."
+        },
+        "user": {
+            "id": 1,
+            "email": "...",
+            "first_name": "...",
+            "last_name": "...",
+            "role": "..."
+        }
+    }
+    """
+    
+    def validate(self, attrs):
+        # Support login with email by mapping it to username
+        if 'email' in attrs and 'username' not in attrs:
+            attrs['username'] = attrs['email']
+            
+        data = super().validate(attrs)
+        
+        # Add user details to response
+        user_data = {
+            "id": self.user.practitioner_id,
+            "email": self.user.email,
+            "first_name": self.user.first_name,
+            "last_name": self.user.last_name,
+            "role": self.user.role,
+        }
+        
+        return {
+            "tokens": data,
+            "user": user_data
+        }
+
+
+class UserRegistrationSerializer(serializers.Serializer):
+    """
+    Serializer for simplified User Registration from Frontend.
+    
+    Adapts flat frontend data to Backend's Practitioner + User structure.
+    Generates required identifiers for Practitioner if missing.
+    """
+    first_name = serializers.CharField(max_length=255)
+    last_name = serializers.CharField(max_length=255)
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+    confirm_password = serializers.CharField(write_only=True)
+    role = serializers.CharField(max_length=50)
+    
+    def validate(self, data):
+        if data['password'] != data['confirm_password']:
+            raise serializers.ValidationError({"password": "Passwords must match."})
+        return data

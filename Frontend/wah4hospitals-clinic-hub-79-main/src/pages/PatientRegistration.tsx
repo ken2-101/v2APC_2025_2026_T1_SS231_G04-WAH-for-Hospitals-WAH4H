@@ -13,11 +13,8 @@ import { DeletePatientModal } from '@/components/patients/DeletePatientModal';
 import type { Patient, PatientFormData } from '../types/patient';
 import axios from 'axios';
 
-const API_URL =
-  import.meta.env.BACKEND_PATIENTS_8000 ||
-    import.meta.env.LOCAL_8000
-    ? `${import.meta.env.LOCAL_8000}/api/patients/`
-    : import.meta.env.BACKEND_PATIENTS;
+// NOTE: Ensure trailing slash for Django
+const API_URL = 'http://127.0.0.1:8000/api/patients/';
 
 export const PatientRegistration: React.FC = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -30,26 +27,34 @@ export const PatientRegistration: React.FC = () => {
   const [deletePatient, setDeletePatient] = useState<Patient | null>(null);
 
   const initialFormData: Omit<PatientFormData, 'patient_id'> = {
-    philhealth_id: '',
-    national_id: '',
-    last_name: '',
     first_name: '',
+    last_name: '',
     middle_name: '',
-    suffix: '',
-    sex: 'M',
-    date_of_birth: '',
+    suffix_name: '',
+    gender: 'M',
+    birthdate: '',
     civil_status: '',
     nationality: '',
-    mobile_number: '',
-    telephone: '',
-    email: '',
-    region: '',
-    province: '',
-    city_municipality: '',
-    barangay: '',
-    house_no_street: '',
-    status: 'Active',
+    religion: '',
+    philhealth_id: '',
+    blood_type: '',
+    pwd_type: '',
     occupation: '',
+    education: '',
+    mobile_number: '',
+    address_line: '',
+    address_city: '',
+    address_district: '',
+    address_state: '',
+    address_postal_code: '',
+    address_country: 'Philippines', // Default
+    contact_first_name: '',
+    contact_last_name: '',
+    contact_mobile_number: '',
+    contact_relationship: '',
+    indigenous_flag: false,
+    indigenous_group: '',
+    consent_flag: true
   };
 
   const [formData, setFormData] = useState({ ...initialFormData });
@@ -80,8 +85,8 @@ export const PatientRegistration: React.FC = () => {
   // Filter & search
   useEffect(() => {
     let temp = [...patients];
-    if (activeFilters.status.length) temp = temp.filter(p => activeFilters.status.includes(p.status));
-    if (activeFilters.gender.length) temp = temp.filter(p => activeFilters.gender.includes(p.sex));
+    if (activeFilters.status.length) temp = temp.filter(p => activeFilters.status.includes(p.status || 'Active'));
+    if (activeFilters.gender.length) temp = temp.filter(p => activeFilters.gender.includes(p.gender));
     if (activeFilters.civilStatus.length) temp = temp.filter(p => activeFilters.civilStatus.includes(p.civil_status));
     if (searchQuery) {
       const q = searchQuery.toLowerCase();

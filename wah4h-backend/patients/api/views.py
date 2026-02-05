@@ -316,6 +316,30 @@ class PatientViewSet(viewsets.ViewSet):
         allergies = patient_acl.get_patient_allergies(patient_id)
         return Response(allergies, status=status.HTTP_200_OK)
 
+    @action(detail=True, methods=['get'])
+    def immunizations(self, request, pk=None):
+        """
+        Get all immunizations for a patient.
+        
+        Example: GET /patients/{id}/immunizations/
+        
+        Delegates to: PatientACL.get_patient_immunizations(id)
+        """
+        try:
+            patient_id = int(pk)
+        except (ValueError, TypeError):
+            return Response(
+                {'error': 'Invalid patient ID'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Delegate to ACL (Assuming this method exists or you will add it)
+        # If it doesn't exist yet, we should check patient_acl.py
+        # For now, adding basic structure matching others
+        # You might need to add get_patient_immunizations to PatientACL if missing
+        immunizations = patient_acl.get_patient_immunizations(patient_id)
+        return Response(immunizations, status=status.HTTP_200_OK)
+
 
 # ============================================================================
 # CONDITION VIEWSET (FORTRESS PATTERN)

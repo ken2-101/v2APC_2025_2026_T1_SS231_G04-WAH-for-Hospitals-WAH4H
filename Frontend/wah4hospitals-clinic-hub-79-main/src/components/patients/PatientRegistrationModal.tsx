@@ -58,17 +58,18 @@ export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> =
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <InputField label="Last Name *" name="last_name" value={formData.last_name} onChange={handleFormChange} required />
               <InputField label="First Name *" name="first_name" value={formData.first_name} onChange={handleFormChange} required />
+              <InputField label="Mobile Number *" name="mobile_number" value={formData.mobile_number} onChange={handleFormChange} required placeholder="09123456789" />
               <InputField label="Middle Name" name="middle_name" value={formData.middle_name} onChange={handleFormChange} />
-              <InputField label="Suffix" name="suffix" value={formData.suffix} onChange={handleFormChange} placeholder="e.g., Jr, III" />
+              <InputField label="Suffix" name="suffix_name" value={formData.suffix_name} onChange={handleFormChange} placeholder="e.g., Jr, III" />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
-              <SelectField label="Sex *" name="sex" value={formData.sex} onChange={handleFormChange} required options={[
+              <SelectField label="Sex *" name="gender" value={formData.gender} onChange={handleFormChange} required options={[
                 { value: '', label: 'Select' },
                 { value: 'M', label: 'Male' },
                 { value: 'F', label: 'Female' }
               ]} />
-              <InputField label="Date of Birth *" type="date" name="date_of_birth" value={formData.date_of_birth} onChange={handleFormChange} required />
+              <InputField label="Date of Birth *" type="date" name="birthdate" value={formData.birthdate} onChange={handleFormChange} required />
               <SelectField label="Civil Status *" name="civil_status" value={formData.civil_status} onChange={handleFormChange} required options={[
                 { value: '', label: 'Select' },
                 { value: 'Single', label: 'Single' },
@@ -130,38 +131,38 @@ const AddressFields: React.FC<{ formData: PatientFormData, handleFormChange: any
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <SelectField
         label="Region *"
-        name="region"
-        value={formData.region}
+        name="address_state" 
+        value={formData.address_state}
         onChange={handleFormChange}
         required
         options={[{ value: '', label: 'Select Region' }, ...addressData.regions.map((r: any) => ({ value: r.code, label: r.name }))]}
       />
       <SelectField
         label="Province *"
-        name="province"
-        value={formData.province}
+        name="address_district" 
+        value={formData.address_district}
         onChange={handleFormChange}
         required
-        disabled={!formData.region}
-        options={[{ value: '', label: 'Select Province' }, ...(formData.region ? addressData.provinces[formData.region]?.map((p: any) => ({ value: p.code, label: p.name })) || [] : [])]}
+        disabled={!formData.address_state}
+        options={[{ value: '', label: 'Select Province' }, ...(formData.address_state ? addressData.provinces[formData.address_state]?.map((p: any) => ({ value: p.code, label: p.name })) || [] : [])]}
       />
       <SelectField
         label="City/Municipality *"
-        name="city_municipality"
-        value={formData.city_municipality}
+        name="address_city"
+        value={formData.address_city}
         onChange={handleFormChange}
         required
-        disabled={!formData.province}
-        options={[{ value: '', label: 'Select City/Municipality' }, ...(formData.province ? addressData.cities[formData.province]?.map((c: any) => ({ value: c.code, label: c.name })) || [] : [])]}
+        disabled={!formData.address_district}
+        options={[{ value: '', label: 'Select City/Municipality' }, ...(formData.address_district ? addressData.cities[formData.address_district]?.map((c: any) => ({ value: c.code, label: c.name })) || [] : [])]}
       />
       <SelectField
         label="Barangay *"
-        name="barangay"
-        value={formData.barangay}
+        name="address_line" // Mapping barangay to address_line for now as per simple schema
+        value={formData.address_line}
         onChange={handleFormChange}
         required
-        disabled={!formData.city_municipality}
-        options={[{ value: '', label: 'Select Barangay' }, ...(formData.city_municipality ? addressData.barangays[formData.city_municipality] || [] : []).map((b: any) => ({ value: b, label: b }))]}
+        disabled={!formData.address_city}
+        options={[{ value: '', label: 'Select Barangay' }, ...(formData.address_city ? addressData.barangays[formData.address_city] || [] : []).map((b: any) => ({ value: b, label: b }))]}
       />
     </div>
   </div>

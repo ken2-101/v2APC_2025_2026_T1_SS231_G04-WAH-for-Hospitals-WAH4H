@@ -1,40 +1,55 @@
 // src/types/admission.ts
 
+/**
+ * Matches EncounterOutputSerializer in backend
+ */
 export interface Admission {
-    id: string; // database ID
-    admission_id: string; // pre-generated ID from backend
-    patient: string; // ID of the patient
-    patient_details?: any; // optional nested patient info
-    admission_date: string;
-    attending_physician: string;
-    assigned_nurse: string; // added since backend provides this
-    ward: string;
-    room: string;
-    bed: string;
-    status: 'Active' | 'Discharged' | 'Transferred';
-    encounter_type: string; // can be 'Inpatient' or ICD-10 etc.
-    admitting_diagnosis: string;
-    reason_for_admission: string;
-    admission_category: 'Emergency' | 'Regular';
-    mode_of_arrival: 'Walk-in' | 'Ambulance' | 'Referral';
+    encounter_id: number; // primary key
+    identifier: string; // generated ID (e.g. ENC-123)
+    status: string;
+    class_field: string; // 'inpatient', 'outpatient', etc.
+    type?: string;
+    service_type?: string;
+    priority?: string;
+    
+    subject_id: number; // Patient ID
+    patient_summary?: Record<string, any>; // Flattened patient info
+    
+    period_start?: string; // Admission date
+    period_end?: string; // Discharge date
+    
+    reason_code?: string;
+    admit_source?: string;
+    discharge_disposition?: string;
+    
+    location_id?: number;
+    location_summary?: Record<string, any>; // Flattened location info
+    
+    participant_individual_id?: number; // Practitioner ID
+    practitioner_summary?: Record<string, any>; // Flattened practitioner info
+    
     created_at?: string;
     updated_at?: string;
 }
 
-// Type used when creating a new admission (id and patient_details are not needed)
-export type NewAdmission = Omit<Admission, 'id' | 'patient_details' | 'admission_id'>;
-
-export interface Bed {
-    id: string;
-    number: string;
-    isOccupied: boolean;
+/**
+ * Matches EncounterInputSerializer in backend
+ */
+export interface NewAdmission {
+    subject_id: number;
+    class_field?: string; // default: 'inpatient'
+    type?: string;
+    service_type?: string;
+    priority?: string;
+    reason_code?: string;
+    
+    period_start?: string;
+    location_id?: number;
+    participant_individual_id?: number;
+    participant_type?: string;
+    
+    admit_source?: string;
+    account_id?: number;
+    pre_admission_identifier?: string;
 }
 
-export interface Room {
-    id: string;
-    number: string;
-    ward: string;
-    capacity: number;
-    occupied: number;
-    beds: Bed[];
-}

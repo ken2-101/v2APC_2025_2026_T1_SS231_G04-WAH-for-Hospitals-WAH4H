@@ -31,7 +31,14 @@ from accounts.api.serializers import (
     PractitionerOutputSerializer,
     PractitionerRoleInputSerializer,
     PractitionerRoleOutputSerializer,
+    CustomTokenObtainPairSerializer,
+    UserRegistrationSerializer,
 )
+from rest_framework.views import APIView
+from rest_framework.permissions import AllowAny
+from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
+import uuid
 
 
 # =============================================================================
@@ -328,5 +335,102 @@ class PractitionerRoleViewSet(viewsets.ModelViewSet):
         except DjangoValidationError as e:
             return Response(
                 {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+# =============================================================================
+# Auth Views
+# =============================================================================
+
+class LoginView(TokenObtainPairView):
+    """
+    Login View that returns JWT tokens + User details.
+    Uses CustomTokenObtainPairSerializer.
+    """
+    serializer_class = CustomTokenObtainPairSerializer
+    
+    def post(self, request, *args, **kwargs):
+        # Support login with email by mapping it to the correct username
+        # This handles cases where username != email (e.g. superusers)
+        data = request.data
+        if hasattr(data, 'copy'):
+            data = data.copy()
+        else:
+            data = dict(data)
+            
+        if 'email' in data:
+            email = data['email']
+            # Try to find user by email
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            try:
+                user = User.objects.get(email=email)
+                data['username'] = user.username
+            except User.DoesNotExist:
+                # If no user found by email, we still pass email as username
+                # just in case, but it will likely fail authentication
+                if 'username' not in data:
+                    data['username'] = email
+
+        serializer = self.get_serializer(data=data)
+
+        try:
+            serializer.is_valid(raise_exception=True)
+        except TokenError as e:
+            raise InvalidToken(e.args[0])
+
+        return Response(serializer.validated_data, status=status.HTTP_200_OK)
+
+
+class RegisterView(APIView):
+    """
+    Simplified Registration View for Frontend.
+    Creates a Practitioner + Nested User account.
+    """
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        serializer = UserRegistrationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        
+        # 1. Prepare Practitioner Data (with auto-generated identifiers for now)
+        practitioner_data = {
+            "first_name": data['first_name'],
+            "last_name": data['last_name'],
+            # Generate temporary identifiers to satisfy DB constraints
+            "identifier": f"PRAC-{uuid.uuid4().hex[:8].upper()}",
+            "qualification_identifier": f"PRC-TEMP-{uuid.uuid4().hex[:8].upper()}",
+            "active": True,
+        }
+        
+        # 2. Prepare User Data
+        user_data = {
+            "username": data['email'],  # Use email as username
+            "email": data['email'],
+            "password": data['password'],
+            "role": data['role'],
+            "status": "active",
+            "first_name": data['first_name'],
+            "last_name": data['last_name'],
+        }
+        
+        try:
+            # 3. Delegate to Service Layer
+            practitioner = PractitionerService.register_practitioner(
+                practitioner_data=practitioner_data,
+                user_data=user_data
+            )
+            
+            return Response({
+                "message": "Registration successful",
+                "id": practitioner.practitioner_id,
+                "email": user_data['email']
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            return Response(
+                {"detail": str(e)}, 
                 status=status.HTTP_400_BAD_REQUEST
             )

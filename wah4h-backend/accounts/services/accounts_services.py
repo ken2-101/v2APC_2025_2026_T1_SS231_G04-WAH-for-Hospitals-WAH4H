@@ -278,12 +278,16 @@ class PractitionerService:
         if not raw_password:
             raise ValidationError("Password is required for user account creation.")
         
+        # Extract explicit fields to avoid duplication in **user_data
+        first_name = user_data.pop('first_name', practitioner.first_name)
+        last_name = user_data.pop('last_name', practitioner.last_name)
+
         # Create User with OneToOne link to Practitioner
         # Note: We use create() instead of create_user() because practitioner is the PK
         user = User.objects.create(
             practitioner=practitioner,
-            first_name=user_data.get('first_name', practitioner.first_name),
-            last_name=user_data.get('last_name', practitioner.last_name),
+            first_name=first_name,
+            last_name=last_name,
             password=make_password(raw_password),  # Django expects 'password' field
             **user_data
         )

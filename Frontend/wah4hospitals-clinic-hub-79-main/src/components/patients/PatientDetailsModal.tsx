@@ -39,7 +39,7 @@ export const PatientDetailsModal: React.FC<PatientDetailsModalProps> = ({ isOpen
             </div>
             <div>
               <h3 className="text-xl font-semibold">
-                {`${patient.last_name}, ${patient.first_name} ${patient.middle_name ?? ''} ${patient.suffix ?? ''}`}
+                {`${patient.last_name}, ${patient.first_name} ${patient.middle_name ?? ''} ${patient.suffix_name ?? ''}`}
               </h3>
               <p className="text-gray-600">Patient ID: {patient.patient_id}</p>
               <Badge className="mt-1">{patient.status}</Badge>

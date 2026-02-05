@@ -14,11 +14,14 @@ Routes:
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
+from rest_framework_simplejwt.views import TokenRefreshView
 from accounts.api.views import (
     OrganizationViewSet,
     LocationViewSet,
     PractitionerViewSet,
     PractitionerRoleViewSet,
+    LoginView,
+    RegisterView,
 )
 
 # Initialize router
@@ -33,5 +36,10 @@ router.register(r'practitioner-roles', PractitionerRoleViewSet, basename='practi
 # URL patterns
 urlpatterns = [
     path('', include(router.urls)),
+    
+    # Auth Endpoints
+    path('login/', LoginView.as_view(), name='auth_login'),
+    path('register/', RegisterView.as_view(), name='auth_register'),
+    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 ]
 

@@ -95,7 +95,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const refreshToken = localStorage.getItem('refreshToken');
         if (refreshToken) {
           try {
-            const response = await axios.post(`${API_BASE_URL}/accounts/token/refresh/`, {
+            const response = await axios.post(`${API_BASE_URL}/api/accounts/token/refresh/`, {
               refresh: refreshToken,
             });
 
@@ -125,7 +125,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
     try {
-      const res = await axiosInstance.post('/accounts/login/', {
+      const res = await axiosInstance.post('/api/accounts/login/', {
         email,
         password,
       });
@@ -178,7 +178,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
 
     try {
-      const res = await axiosInstance.post('/accounts/register/', {
+      const res = await axiosInstance.post('/api/accounts/register/', {
         first_name: data.firstName,
         last_name: data.lastName,
         email: data.email,
