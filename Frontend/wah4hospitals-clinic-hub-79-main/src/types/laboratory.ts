@@ -82,6 +82,7 @@ export interface LabRequest {
 }
 
 export interface LabRequestFormData {
+  subject_id: number;
   admission: number;
   requesting_doctor: number;
   test_type: LabTestType;

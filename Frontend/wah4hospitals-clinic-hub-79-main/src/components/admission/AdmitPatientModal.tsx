@@ -13,7 +13,7 @@ import type { NewAdmission } from '@/types/admission';
 interface AdmitPatientModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdmit: (data: NewAdmission) => void;
+  onAdmit: (data: NewAdmission) => Promise<void>;
   onNavigate?: (tabId: string) => void;
 }
 
@@ -83,8 +83,8 @@ export const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({
 
     setIsSearching(true);
     try {
-      // Correct search endpoint: /api/patients/search/?q=...
-      const BASE_URL = 'http://127.0.0.1:8000'; // Or use env logic if reliable
+      // Use relative path or env var for base URL in production
+      const BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
       const response = await axios.get(
         `${BASE_URL}/api/patients/search/?q=${encodeURIComponent(query)}`
       );
@@ -111,8 +111,14 @@ export const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({
     setSearchResults([]);
   };
 
-  const handleSubmit = () => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const handleSubmit = async () => {
     if (!formData.patientId) return;
+
+    setIsSubmitting(true);
+    setSubmitError(null);
 
     // Map form data to backend payload
     const payload: NewAdmission = {
@@ -124,32 +130,43 @@ export const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({
       admit_source: `${formData.modeOfArrival} - ${formData.admissionCategory}`,
       // We don't have real IDs for these yet, sending null as per serializer
       location_id: null,
+      // Sending text location details in location_status so they aren't lost
+      location_status: `Ward: ${formData.ward}, Room: ${formData.room}, Bed: ${formData.bed}`,
       participant_individual_id: null,
       service_type: formData.admittingDiagnosis, // Using service_type for diagnosis temporarily or mapped elsewhere
       priority: formData.admissionCategory === 'Emergency' ? 'ASAP' : 'Routine',
     };
 
-    onAdmit(payload);
+    try {
+      await onAdmit(payload);
 
-    // Reset form
-    onClose();
-    setStep(1);
-    setFormData({
-      patientId: '',
-      patientName: '',
-      admissionDate: new Date().toISOString().slice(0, 16),
-      admittingDiagnosis: '',
-      reasonForAdmission: '',
-      ward: '',
-      room: '',
-      bed: '',
-      attendingPhysician: '',
-      assignedNurse: '',
-      admissionCategory: 'Regular',
-      modeOfArrival: 'Walk-in',
-    });
-    setSelectedPatient(null);
-    setSearchResults([]);
+      // Reset form on success
+      onClose();
+      setStep(1);
+      setFormData({
+        patientId: '',
+        patientName: '',
+        admissionDate: new Date().toISOString().slice(0, 16),
+        admittingDiagnosis: '',
+        reasonForAdmission: '',
+        ward: '',
+        room: '',
+        bed: '',
+        attendingPhysician: '',
+        assignedNurse: '',
+        admissionCategory: 'Regular',
+        modeOfArrival: 'Walk-in',
+      });
+      setSelectedPatient(null);
+      setSearchResults([]);
+    } catch (err: any) {
+      console.error("Submission failed", err);
+      // Display error from backend if available
+      const msg = err.response?.data?.detail || err.message || "Failed to admit patient";
+      setSubmitError(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const SelectField: React.FC<{ label: string; value: string; onChange: (val: string) => void; options: string[] }> = ({
@@ -340,10 +357,11 @@ export const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({
           </Button>
           <Button
             onClick={step === 4 ? handleSubmit : () => setStep(step + 1)}
-            disabled={step === 1 && !selectedPatient}
+            disabled={(step === 1 && !selectedPatient) || isSubmitting}
           >
-            {step === 4 ? 'Admit Patient' : 'Next'}
+            {isSubmitting ? 'Admitting...' : (step === 4 ? 'Admit Patient' : 'Next')}
           </Button>
+          {submitError && <p className="text-red-500 text-sm mt-2 absolute bottom-2 left-4 max-w-[70%] truncate">{submitError}</p>}
         </DialogFooter>
       </DialogContent>
     </Dialog>

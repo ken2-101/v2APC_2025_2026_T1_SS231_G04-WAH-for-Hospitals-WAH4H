@@ -14,6 +14,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from django.db import models
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
 
 from laboratory.models import LabTestDefinition, DiagnosticReport
@@ -200,8 +201,9 @@ class DiagnosticReportViewSet(viewsets.ModelViewSet):
         """Use Input serializer for writes, Output for reads."""
         if self.action == 'create':
             return DiagnosticReportInputSerializer
+        # Use OutputSerializer for list as well to get patient_summary
         elif self.action == 'list':
-            return DiagnosticReportListSerializer
+            return DiagnosticReportOutputSerializer
         return DiagnosticReportOutputSerializer
 
     def get_queryset(self):
@@ -247,6 +249,27 @@ class DiagnosticReportViewSet(viewsets.ModelViewSet):
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({'error': 'Internal server error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['get'])
+    def dashboard_stats(self, request):
+        """
+        Get dashboard statistics.
+        GET /api/laboratory/reports/dashboard_stats/
+        """
+        from django.db.models import Count
+        from django.utils import timezone
+        
+        today = timezone.now().date()
+        
+        # Aggregate counts by status
+        stats = DiagnosticReport.objects.aggregate(
+            pending=Count('diagnostic_report_id', filter=models.Q(status='registered')),
+            in_progress=Count('diagnostic_report_id', filter=models.Q(status__in=['partial', 'preliminary'])),
+            completed_today=Count('diagnostic_report_id', filter=models.Q(status='final', updated_at__date=today))
+        )
+        
+        return Response(stats)
+
 
     @action(detail=True, methods=['patch'])
     def update_status(self, request, diagnostic_report_id=None):

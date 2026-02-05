@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
@@ -13,13 +12,8 @@ import {
 import { PatientMonitoringPage } from '@/components/monitoring/PatientMonitoringPage';
 import { MonitoringDashboard } from '@/components/monitoring/MonitoringDashboard';
 import { Activity, Users, AlertTriangle, Heart } from 'lucide-react';
-
-// Detect backend URL dynamically
-const API_BASE =
-  import.meta.env.BACKEND_MONITORING_8000 ||
-    import.meta.env.LOCAL_8000
-    ? `${import.meta.env.LOCAL_8000}/api`
-    : import.meta.env.BACKEND_MONITORING;
+import { admissionService } from '@/services/admissionService';
+import monitoringService from '@/services/monitoringService';
 
 const Monitoring: React.FC = () => {
   const [currentView, setCurrentView] = useState<'dashboard' | 'patient'>('dashboard');
@@ -38,27 +32,27 @@ const Monitoring: React.FC = () => {
   useEffect(() => {
     const fetchAdmissions = async () => {
       try {
-        const res = await axios.get(`${API_BASE}/admissions/`);
-        if (Array.isArray(res.data)) {
-          const mapped: MonitoringAdmission[] = res.data.map((adm: any) => ({
-            id: adm.id,
-            patientId: adm.patient,
-            patientName: adm.patient_details
-              ? `${adm.patient_details.last_name}, ${adm.patient_details.first_name}`
+        const data = await admissionService.getAll();
+        if (Array.isArray(data)) {
+          const mapped: MonitoringAdmission[] = data.map((adm: any) => ({
+            id: adm.encounter_id, // Use encounter_id as primary ID
+            patientId: adm.subject_id,
+            patientName: adm.patient_summary
+              ? `${adm.patient_summary.last_name}, ${adm.patient_summary.first_name}`
               : 'Unknown Patient',
-            room: adm.room || '—',
-            doctorName: adm.attending_physician || 'Unknown Doctor',
-            nurseName: adm.assigned_nurse || 'Unknown Nurse',
-            status: 'Stable', // default
-            encounterType: adm.encounter_type,
-            admittingDiagnosis: adm.admitting_diagnosis,
-            reasonForAdmission: adm.reason_for_admission,
-            admissionCategory: adm.admission_category,
-            modeOfArrival: adm.mode_of_arrival,
-            admissionDate: adm.admission_date,
-            attendingPhysician: adm.attending_physician,
-            assignedNurse: adm.assigned_nurse,
-            ward: adm.ward,
+            room: adm.location_summary?.name || '—',
+            doctorName: adm.participant_summary?.[0]?.name || 'Unknown Doctor', // Approximation
+            nurseName: 'Unknown Nurse',
+            status: adm.status === 'in-progress' ? 'Stable' : 'Observation', // Map status
+            encounterType: adm.class_code,
+            admittingDiagnosis: adm.hospitalization?.admitting_diagnosis_code || 'N/A',
+            reasonForAdmission: adm.reason_code?.[0] || 'N/A',
+            admissionCategory: adm.service_type,
+            modeOfArrival: adm.hospitalization?.admit_source,
+            admissionDate: adm.period_start,
+            attendingPhysician: adm.participant_summary?.[0]?.name,
+            assignedNurse: 'Unknown',
+            ward: adm.location_summary?.name || 'General Ward',
           }));
           setAdmissions(mapped);
         }
@@ -84,17 +78,18 @@ const Monitoring: React.FC = () => {
     setCurrentView('patient');
 
     try {
-      const [vitalsRes, notesRes, dietaryRes, historyRes] = await Promise.all([
-        axios.get(`${API_BASE}/monitoring/vitals/?admission=${adm.id}`),
-        axios.get(`${API_BASE}/monitoring/notes/?admission=${adm.id}`),
-        axios.get(`${API_BASE}/monitoring/dietary-orders/?admission=${adm.id}`),
-        axios.get(`${API_BASE}/monitoring/history/?admission=${adm.id}`),
+      // Fetch data using monitoringService
+      const [fetchedVitals, fetchedNotes, fetchedDietary] = await Promise.all([
+        monitoringService.getVitals(adm.id),
+        monitoringService.getNotes(adm.id),
+        monitoringService.getDietary(adm.id)
       ]);
 
-      setVitals(Array.isArray(vitalsRes.data) ? vitalsRes.data : []);
-      setNotes(Array.isArray(notesRes.data) ? notesRes.data : []);
-      setDietary(dietaryRes.data || null);
-      setHistory(Array.isArray(historyRes.data) ? historyRes.data : []);
+      setVitals(fetchedVitals);
+      setNotes(fetchedNotes);
+      setDietary(fetchedDietary);
+      // History not yet implemented in service
+      setHistory([]); 
     } catch (err) {
       console.error('Error fetching admission details:', err);
     }
@@ -119,20 +114,12 @@ const Monitoring: React.FC = () => {
   const handleAddVital = async (newVital: Omit<VitalSign, 'id'>) => {
     if (!selectedAdmission) return;
     try {
-      const payload = {
-        admission: newVital.admissionId,
-        date_time: newVital.dateTime,
-        blood_pressure: newVital.bloodPressure,
-        heart_rate: newVital.heartRate,
-        respiratory_rate: newVital.respiratoryRate,
-        temperature: newVital.temperature,
-        oxygen_saturation: newVital.oxygenSaturation,
-        staff_name: newVital.staffName,
-      };
-      const res = await axios.post(`${API_BASE}/monitoring/vitals/`, payload);
-      setVitals((prev) => [...prev, res.data]);
-    } catch (err: any) {
-      console.error('Error adding vital:', err.response?.data || err);
+      await monitoringService.addVital(newVital, selectedAdmission.patientId);
+      // Refresh list
+      const updatedVitals = await monitoringService.getVitals(selectedAdmission.id);
+      setVitals(updatedVitals);
+    } catch (err) {
+      console.error('Error adding vital:', err);
     }
   };
 
@@ -140,18 +127,10 @@ const Monitoring: React.FC = () => {
   const handleAddNote = async (newNote: ClinicalNote) => {
     if (!selectedAdmission) return;
     try {
-      const payload = {
-        admission: newNote.admissionId,
-        date_time: newNote.dateTime,
-        type: newNote.type,
-        subjective: newNote.subjective,
-        objective: newNote.objective,
-        assessment: newNote.assessment,
-        plan: newNote.plan,
-        provider_name: newNote.providerName,
-      };
-      const res = await axios.post(`${API_BASE}/monitoring/notes/`, payload);
-      setNotes((prev) => [...prev, res.data]);
+      await monitoringService.addNote(newNote, selectedAdmission.patientId);
+      // Refresh list
+      const updatedNotes = await monitoringService.getNotes(selectedAdmission.id);
+      setNotes(updatedNotes);
     } catch (err) {
       console.error(err);
     }
@@ -160,24 +139,10 @@ const Monitoring: React.FC = () => {
   // Update dietary order
   const handleUpdateDietary = async (order: DietaryOrder) => {
     if (!selectedAdmission) return;
-
-    const payload = {
-      admission: order.admissionId,
-      diet_type: order.dietType,
-      allergies: order.allergies,
-      npo_response: order.npoResponse,
-      activity_level: order.activityLevel,
-      ordered_by: order.orderedBy,
-    };
-
     try {
-      if (order.id) {
-        const res = await axios.put(`${API_BASE}/monitoring/dietary-orders/${order.id}/`, payload);
-        setDietary(res.data);
-      } else {
-        const res = await axios.post(`${API_BASE}/monitoring/dietary-orders/`, payload);
-        setDietary(res.data);
-      }
+      await monitoringService.saveDietary(order, selectedAdmission.patientId);
+      const updatedDietary = await monitoringService.getDietary(selectedAdmission.id);
+      setDietary(updatedDietary);
     } catch (err) {
       console.error('Error updating dietary order:', err);
     }

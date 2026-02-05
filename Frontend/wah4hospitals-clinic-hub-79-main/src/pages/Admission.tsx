@@ -65,7 +65,8 @@ const Admission: React.FC<AdmissionProps> = ({ onNavigate }) => {
       setIsAdmitModalOpen(false);
     } catch (err) {
       console.error('Error admitting patient:', err);
-      setError('Failed to admit patient');
+      // Re-throw so the modal can handle it (display error)
+      throw err;
     }
   };
 

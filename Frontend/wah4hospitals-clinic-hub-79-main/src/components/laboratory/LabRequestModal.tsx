@@ -2,10 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertCircle, X } from 'lucide-react';
+import { AlertCircle, X, Check, ChevronsUpDown } from 'lucide-react';
 import { LabTestType, LabPriority, LabRequestFormData } from '../../types/laboratory';
 import { admissionService } from '../../services/admissionService';
 import type { Admission } from '@/types/admission';
+import { cn } from "@/lib/utils";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface LabRequestModalProps {
     isOpen: boolean;
@@ -16,6 +30,7 @@ interface LabRequestModalProps {
 export const LabRequestModal: React.FC<LabRequestModalProps> = ({ isOpen, onClose, onSubmit }) => {
     const [admissions, setAdmissions] = useState<Admission[]>([]);
     const [loadingAdmissions, setLoadingAdmissions] = useState(false);
+    const [open, setOpen] = useState(false);
     const [formData, setFormData] = useState({
         admission: '',
         requesting_doctor: '',
@@ -34,8 +49,8 @@ export const LabRequestModal: React.FC<LabRequestModalProps> = ({ isOpen, onClos
         try {
             setLoadingAdmissions(true);
             const data = await admissionService.getAll();
-            // Filter only active admissions
-            const activeAdmissions = data.filter(a => a.status === 'Active');
+            // Filter only active admissions (case sensitive check or status check)
+            const activeAdmissions = data.filter(a => a.status === 'in-progress' || a.status === 'active');
             setAdmissions(activeAdmissions);
         } catch (error) {
             console.error('Error fetching admissions:', error);
@@ -51,8 +66,11 @@ export const LabRequestModal: React.FC<LabRequestModalProps> = ({ isOpen, onClos
         
         console.log('Form data before conversion:', formData);
         
-        // Convert admission to number for backend
+        // Find selected admission to get subject_id
+        const selected = admissions.find(a => a.encounter_id === parseInt(formData.admission));
+        
         const requestData = {
+            subject_id: selected?.subject_id || 0,
             admission: parseInt(formData.admission),
             requesting_doctor: parseInt(formData.requesting_doctor) || 1, // Default to 1 for MVP
             test_type: formData.test_type,
@@ -74,7 +92,7 @@ export const LabRequestModal: React.FC<LabRequestModalProps> = ({ isOpen, onClos
         });
     };
 
-    const selectedAdmission = admissions.find(a => a.id?.toString() === formData.admission);
+    const selectedAdmission = admissions.find(a => a.encounter_id?.toString() === formData.admission);
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -90,43 +108,74 @@ export const LabRequestModal: React.FC<LabRequestModalProps> = ({ isOpen, onClos
                         {loadingAdmissions ? (
                             <div className="text-sm text-gray-500">Loading admissions...</div>
                         ) : (
-                            <select
-                                className="w-full rounded-md border border-gray-300 px-3 py-2"
-                                value={formData.admission}
-                                onChange={e => setFormData({ ...formData, admission: e.target.value })}
-                                required
-                            >
-                                <option value="">-- Select an admitted patient --</option>
-                                {admissions.map(admission => (
-                                    <option key={admission.id} value={admission.id}>
-                                        {admission.patient_details 
-                                            ? `${admission.patient_details.last_name}, ${admission.patient_details.first_name} ${admission.patient_details.middle_name || ''} - ${admission.admission_id}`
-                                            : `${admission.admission_id} - Ward: ${admission.ward}, Room: ${admission.room}, Bed: ${admission.bed}`
-                                        }
-                                    </option>
-                                ))}
-                            </select>
+                            <Popover open={open} onOpenChange={setOpen}>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        role="combobox"
+                                        aria-expanded={open}
+                                        className="w-full justify-between"
+                                    >
+                                        {formData.admission
+                                            ? admissions.find((a) => a.encounter_id.toString() === formData.admission)?.patient_summary
+                                                ? `${admissions.find((a) => a.encounter_id.toString() === formData.admission)?.patient_summary?.last_name}, ${admissions.find((a) => a.encounter_id.toString() === formData.admission)?.patient_summary?.first_name} - ${admissions.find((a) => a.encounter_id.toString() === formData.admission)?.identifier}`
+                                                : "Selected Patient"
+                                            : "Select an admitted patient..."}
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[450px] p-0">
+                                    <Command>
+                                        <CommandInput placeholder="Search patient name or ID..." />
+                                        <CommandList>
+                                            <CommandEmpty>No patient found.</CommandEmpty>
+                                            <CommandGroup>
+                                                {admissions.map((admission) => (
+                                                    <CommandItem
+                                                        key={admission.encounter_id}
+                                                        value={`${admission.patient_summary?.last_name || ''} ${admission.patient_summary?.first_name || ''} ${admission.identifier}`}
+                                                        onSelect={() => {
+                                                            setFormData({ ...formData, admission: admission.encounter_id.toString() });
+                                                            setOpen(false);
+                                                        }}
+                                                    >
+                                                        <Check
+                                                            className={cn(
+                                                                "mr-2 h-4 w-4",
+                                                                formData.admission === admission.encounter_id.toString() ? "opacity-100" : "opacity-0"
+                                                            )}
+                                                        />
+                                                        {admission.patient_summary
+                                                            ? `${admission.patient_summary.last_name}, ${admission.patient_summary.first_name} ${admission.patient_summary.gender === 'M' ? '(M)' : '(F)'} - ${admission.identifier}`
+                                                            : `${admission.identifier} - ${admission.location_summary?.name || 'Unknown Location'}`}
+                                                    </CommandItem>
+                                                ))}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
+                                </PopoverContent>
+                            </Popover>
                         )}
                         {selectedAdmission && (
                             <div className="mt-2 p-3 bg-blue-50 rounded border border-blue-100">
-                                {selectedAdmission.patient_details && (
+                                {selectedAdmission.patient_summary && (
                                     <div className="mb-2 pb-2 border-b border-blue-200">
                                         <div className="font-semibold text-blue-900">
-                                            {selectedAdmission.patient_details.last_name}, {selectedAdmission.patient_details.first_name} {selectedAdmission.patient_details.middle_name || ''}
+                                            {selectedAdmission.patient_summary.last_name}, {selectedAdmission.patient_summary.first_name}
                                         </div>
                                         <div className="text-xs text-gray-600 mt-1">
-                                            <span className="font-medium">Patient ID:</span> {selectedAdmission.patient_details.patient_id} | 
-                                            <span className="font-medium ml-2">Admission ID:</span> {selectedAdmission.admission_id}
+                                            <span className="font-medium">Patient ID:</span> {selectedAdmission.patient_summary.patient_id} | 
+                                            <span className="font-medium ml-2">Admission ID:</span> {selectedAdmission.identifier}
                                         </div>
                                     </div>
                                 )}
                                 <div className="text-xs text-gray-600 space-y-1">
-                                    <div><strong>Location:</strong> Ward {selectedAdmission.ward}, Room {selectedAdmission.room}, Bed {selectedAdmission.bed}</div>
-                                    {selectedAdmission.patient_details && (
+                                    <div><strong>Location:</strong> {selectedAdmission.location_summary?.name || 'N/A'}</div>
+                                    {selectedAdmission.patient_summary && (
                                         <>
-                                            <div><strong>Sex:</strong> {selectedAdmission.patient_details.sex === 'M' ? 'Male' : 'Female'}</div>
-                                            {selectedAdmission.patient_details.date_of_birth && (
-                                                <div><strong>Date of Birth:</strong> {new Date(selectedAdmission.patient_details.date_of_birth).toLocaleDateString()}</div>
+                                            <div><strong>Gender:</strong> {selectedAdmission.patient_summary.gender}</div>
+                                            {selectedAdmission.patient_summary.birthdate && (
+                                                <div><strong>Date of Birth:</strong> {selectedAdmission.patient_summary.birthdate}</div>
                                             )}
                                         </>
                                     )}

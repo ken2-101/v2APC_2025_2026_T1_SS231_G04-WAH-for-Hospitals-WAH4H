@@ -71,5 +71,6 @@ export interface NewAdmission {
     admit_source?: string | null;
     account_id?: number | null;
     pre_admission_identifier?: string | null;
+    location_status?: string | null;
 }
 

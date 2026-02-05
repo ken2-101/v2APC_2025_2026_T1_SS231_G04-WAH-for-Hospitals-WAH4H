@@ -43,6 +43,7 @@ class EncounterInputSerializer(serializers.Serializer):
     admit_source = serializers.CharField(max_length=255, required=False, allow_null=True)
     account_id = serializers.IntegerField(required=False, allow_null=True)
     pre_admission_identifier = serializers.CharField(max_length=100, required=False, allow_null=True)
+    location_status = serializers.CharField(max_length=100, required=False, allow_null=True, help_text="Text description of location (Ward/Room/Bed)")
 
 
 class EncounterDischargeInputSerializer(serializers.Serializer):
