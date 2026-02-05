@@ -78,11 +78,14 @@ export const DispenseModal: React.FC<DispenseModalProps> = ({
 
     try {
       // Update the medication request status to 'completed' (dispensed)
+      const payload = {
+          status: 'completed', // FHIR standard for dispensed
+          quantity: quantity // Send the actual quantity being dispensed
+      };
+
       await axios.post(
         `${API_BASE}/requests/${medicationRequest.id}/update-status/`,
-        { 
-          status: 'completed' // FHIR standard for dispensed
-        }
+        payload
       );
 
       toast.success('Medication dispensed successfully');

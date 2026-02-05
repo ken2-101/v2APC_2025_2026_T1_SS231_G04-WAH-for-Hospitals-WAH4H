@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import axios from 'axios';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -9,23 +8,20 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Badge } from '@/components/ui/badge';
 import { Plus, Lock, Paperclip, FileText, Clock, User } from 'lucide-react';
 import { ClinicalNote } from '../../types/monitoring';
+import monitoringService from '../../services/monitoringService';
+import { toast } from 'sonner';
 
 interface ClinicalNotesTabProps {
     notes: ClinicalNote[];
     admissionId: string;
+    patientId: number; // Added to get subject_id for service
     onAddNote: (note: ClinicalNote) => void;
 }
-
-const API_BASE =
-    import.meta.env.BACKEND_MONITORING_8000
-        ? `${import.meta.env.BACKEND_MONITORING_8000}monitoring/notes/`
-        : import.meta.env.LOCAL_8000
-            ? `${import.meta.env.LOCAL_8000}/api/monitoring/notes/`
-            : `${import.meta.env.BACKEND_MONITORING}monitoring/notes/`;
 
 export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({
     notes,
     admissionId,
+    patientId,
     onAddNote,
 }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -43,41 +39,27 @@ export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({
     };
 
     const handleSave = async () => {
-        const payload = {
-            admission: Number(admissionId),              // 🔑 must be number
-            date_time: new Date().toISOString(),          // 🔑 REQUIRED
+        const newNote: ClinicalNote = {
+            id: '', // Will be set by backend
+            admissionId,
+            dateTime: new Date().toISOString(),
             type,
             subjective,
             objective,
             assessment,
             plan,
-            provider_name: 'Dr. Test User',               // 🔑 REQUIRED (replace later)
+            providerName: 'Dr. Test User', // TODO: Get from auth context
         };
 
         try {
-            const res = await axios.post(API_BASE, payload);
-
-            const newNote: ClinicalNote = {
-                id: String(res.data.id),
-                admissionId: String(res.data.admission),
-                dateTime: res.data.date_time,
-                type: res.data.type,
-                subjective: res.data.subjective,
-                objective: res.data.objective,
-                assessment: res.data.assessment,
-                plan: res.data.plan,
-                providerName: res.data.provider_name,
-            };
-
-            onAddNote(newNote);
+            await monitoringService.addNote(newNote, patientId);
+            onAddNote(newNote); // Update parent state
+            toast.success('Clinical note added successfully');
             setIsModalOpen(false);
             resetForm();
         } catch (err: any) {
-            console.error(
-                'Failed to save note',
-                err.response?.data || err
-            );
-            alert('Failed to save note. Check console for details.');
+            console.error('Failed to save note', err);
+            toast.error('Failed to save note. Please try again.');
         }
     };
 

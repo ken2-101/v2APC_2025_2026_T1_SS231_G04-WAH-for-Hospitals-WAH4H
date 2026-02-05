@@ -279,6 +279,56 @@ class MedicationService:
         except Exception as e:
             raise ValidationError(f"Failed to create medication request: {str(e)}")
 
+    @staticmethod
+    @transaction.atomic
+    def update_status(medication_request_id: int, status: str, note: str = None, quantity: int = None) -> MedicationRequest:
+        """
+        Update medication request status.
+        CRITICAL: Deducts inventory if status is 'completed' (dispensed).
+        
+        Args:
+            medication_request_id: ID of request
+            status: New status
+            note: Optional note
+            quantity: Optional quantity to override/deduct
+            
+        Returns:
+            MedicationRequest: Updated object
+        """
+        try:
+            medication_request = MedicationRequest.objects.get(medication_request_id=medication_request_id)
+            
+            # Use provided quantity or fallback to request quantity
+            deduct_qty = quantity if quantity is not None else int(medication_request.dispense_quantity or 0)
+
+            # If transitioning to 'completed', deduct inventory
+            if status == 'completed':
+                 # Ensure we have a valid code and quantity
+                if medication_request.medication_code and deduct_qty > 0:
+                     # Only deduct if not already completed (idempotency check)
+                    if medication_request.status != 'completed':
+                        InventoryService.update_stock(
+                            item_code=medication_request.medication_code,
+                            quantity=deduct_qty,
+                            operation='subtract'
+                        )
+                    
+                    # Update the dispensed quantity in the record if it changed
+                    if quantity is not None:
+                        medication_request.dispense_quantity = quantity
+
+            medication_request.status = status
+            if note:
+                medication_request.note = note
+            medication_request.save()
+            
+            return medication_request
+            
+        except ObjectDoesNotExist:
+            raise ValidationError(f"MedicationRequest with ID {medication_request_id} not found")
+        except Exception as e:
+            raise ValidationError(f"Failed to update medication request: {str(e)}")
+
 
 class AdministrationService:
     """

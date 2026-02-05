@@ -137,6 +137,19 @@ class MedicationRequestViewSet(viewsets.ModelViewSet):
         if self.action in ['create', 'update', 'partial_update']:
             return MedicationRequestInputSerializer
         return MedicationRequestOutputSerializer
+
+    def get_queryset(self):
+        """
+        Get queryset with optional filtering.
+        """
+        queryset = MedicationRequest.objects.prefetch_related('dosages').all().order_by('-authored_on')
+        
+        # Filter by status if provided
+        status_param = self.request.query_params.get('status')
+        if status_param:
+            queryset = queryset.filter(status=status_param)
+            
+        return queryset
     
     def create(self, request, *args, **kwargs):
         """
@@ -252,11 +265,15 @@ class MedicationRequestViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Update the status
-            medication_request.status = new_status
-            if note:
-                medication_request.note = note
-            medication_request.save()
+            quantity = request.data.get('quantity')
+            
+            # Update the status via service (handles inventory)
+            medication_request = MedicationService.update_status(
+                medication_request_id=medication_request.medication_request_id,
+                status=new_status,
+                note=note,
+                quantity=int(float(quantity)) if quantity is not None else None
+            )
             
             # Return updated data
             output_serializer = MedicationRequestOutputSerializer(medication_request)

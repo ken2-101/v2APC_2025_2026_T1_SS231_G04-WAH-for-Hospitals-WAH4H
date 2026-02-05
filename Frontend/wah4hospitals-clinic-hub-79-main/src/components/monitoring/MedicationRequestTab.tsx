@@ -4,8 +4,18 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from '@/components/ui/badge';
-import { Plus, Pill } from 'lucide-react';
+import { Plus, Pill, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { InventoryItem, MedicationRequest } from '@/types/pharmacy';
@@ -23,6 +33,9 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
   const [selectedInventoryId, setSelectedInventoryId] = useState<number | null>(null);
   const [quantity, setQuantity] = useState<number>(1);
   const [notes, setNotes] = useState<string>('');
+
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [requestToDelete, setRequestToDelete] = useState<number | null>(null);
 
   const API_BASE =
     import.meta.env.BACKEND_PHARMACY_8000 ||
@@ -107,8 +120,21 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
     }
   };
 
+  const handleDeleteConfirm = async () => {
+    if (!requestToDelete) return;
+    try {
+      await pharmacyService.deleteRequest(requestToDelete);
+      setRequests(prev => prev.filter(r => r.id !== requestToDelete));
+      toast.success('Request deleted successfully');
+    } catch (err: any) {
+      toast.error('Failed to delete request: ' + (err.message || 'Unknown error'));
+    } finally {
+      setRequestToDelete(null);
+    }
+  };
+
   const getStatusBadge = (status: MedicationRequest['status']) => {
-    if (status === 'dispensed') {
+    if (status === 'dispensed' || status === 'completed') {
       return (
         <Badge className="bg-green-100 text-green-800 border-green-200 font-semibold px-3 py-1">
           <span className="inline-block w-2 h-2 bg-green-500 rounded-full mr-2"></span>
@@ -124,7 +150,7 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
         </Badge>
       );
     }
-    if (status === 'denied') {
+    if (status === 'denied' || status === 'cancelled') {
       return (
         <Badge className="bg-red-100 text-red-800 border-red-200 font-semibold px-3 py-1">
           <span className="inline-block w-2 h-2 bg-red-500 rounded-full mr-2"></span>
@@ -140,72 +166,122 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
     );
   };
 
+  const filteredRequests = requests.filter(req => {
+    if (statusFilter === 'all') return true;
+    if (statusFilter === 'denied') return req.status === 'cancelled' || req.status === 'denied';
+    if (statusFilter === 'dispensed') return req.status === 'completed' || req.status === 'dispensed';
+    return req.status === statusFilter;
+  });
+
   return (
     <div className="space-y-6">
-      {/* Request button */}
-      <div className="flex justify-end">
-        <Button onClick={() => setIsModalOpen(true)} className="bg-purple-600 hover:bg-purple-700">
-          <Plus className="w-4 h-4 mr-2" /> Request Medication
-        </Button>
+      {/* Header and Controls */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Label className="text-sm font-medium text-gray-700">Filter Status:</Label>
+            <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="border border-gray-300 rounded-md text-sm p-2 focus:ring-2 focus:ring-purple-500 hover:border-purple-400 transition-colors"
+                style={{ minWidth: '140px' }}
+            >
+                <option value="all">All Requests</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="dispensed">Dispensed</option>
+                <option value="denied">Denied</option>
+            </select>
+          </div>
+          <Button onClick={() => setIsModalOpen(true)} className="bg-purple-600 hover:bg-purple-700 shadow-md transition-all">
+            <Plus className="w-4 h-4 mr-2" /> Request Medication
+          </Button>
       </div>
 
       {/* Empty state */}
       {requests.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-12 px-4">
-          <div className="bg-purple-50 rounded-full p-6 mb-4">
-            <Pill className="w-12 h-12 text-purple-400" />
+        <div className="flex flex-col items-center justify-center py-12 px-4 bg-gray-50 rounded-lg dashed border border-gray-200">
+          <div className="bg-purple-50 rounded-full p-4 mb-3">
+            <Pill className="w-8 h-8 text-purple-400" />
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">No Medication Requests</h3>
-          <p className="text-sm text-gray-500 text-center max-w-md">
-            No medication requests have been submitted for this patient yet. Click "Request Medication" to begin.
+          <h3 className="text-md font-semibold text-gray-900 mb-1">No Requests Found</h3>
+          <p className="text-sm text-gray-500 text-center max-w-sm">
+             Start by requesting a medication for this patient.
           </p>
         </div>
       )}
 
+      {/* Filtered Empty State */}
+      {requests.length > 0 && filteredRequests.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+              <p>No requests match the selected filter.</p>
+              <Button variant="link" onClick={() => setStatusFilter('all')}>Clear Filter</Button>
+          </div>
+      )}
+
       {/* Requests list */}
-      {requests.map((req) => (
-        <Card key={req.id} className="border-l-4 border-l-purple-600 shadow-sm hover:shadow-md transition-shadow">
-          <CardHeader className="pb-3 bg-gradient-to-r from-purple-50/50 to-transparent">
-            <div className="flex justify-between items-start">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <Pill className="w-5 h-5 text-purple-600" />
-                  <CardTitle className="text-lg font-bold text-gray-900">
-                    {req.inventory_item_detail?.generic_name || 'Unknown Medication'}
-                  </CardTitle>
+      <div className="space-y-3">
+        {filteredRequests.map((req) => (
+            <Card key={req.id} className={`shadow-sm hover:shadow-md transition-all border-l-4 ${
+                req.status === 'cancelled' || req.status === 'denied' ? 'border-l-red-500' :
+                req.status === 'completed' || req.status === 'dispensed' ? 'border-l-green-500' :
+                req.status === 'approved' ? 'border-l-blue-500' :
+                'border-l-yellow-500'
+            }`}>
+            <CardHeader className="pb-3 bg-gradient-to-r from-gray-50/50 to-transparent">
+                <div className="flex justify-between items-start">
+                <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-1">
+                    <Pill className={`w-5 h-5 ${
+                         req.status === 'cancelled' ? 'text-red-500' : 'text-purple-600'
+                    }`} />
+                    <CardTitle className="text-md font-bold text-gray-900">
+                        {req.inventory_item_detail?.generic_name || 'Unknown Medication'}
+                    </CardTitle>
+                    </div>
+                    {req.inventory_item_detail?.brand_name && (
+                    <p className="text-xs text-gray-600 ml-8 font-medium">
+                        Brand: {req.inventory_item_detail.brand_name}
+                    </p>
+                    )}
                 </div>
-                {req.inventory_item_detail?.brand_name && (
-                  <p className="text-sm text-gray-600 ml-8">
-                    Brand: {req.inventory_item_detail.brand_name}
-                  </p>
+                <div className="flex items-center gap-2">
+                    {getStatusBadge(req.status)}
+                    <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                        onClick={() => setRequestToDelete(req.id)}
+                        title="Delete Request"
+                    >
+                        <Trash2 className="w-4 h-4" />
+                    </Button>
+                </div>
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-3 pt-2">
+                <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gray-50 rounded p-2">
+                    <span className="text-[10px] text-gray-500 uppercase tracking-wide font-bold">Quantity</span>
+                    <p className="text-sm font-semibold text-gray-900">{req.quantity}</p>
+                </div>
+                <div className="bg-gray-50 rounded p-2">
+                    <span className="text-[10px] text-gray-500 uppercase tracking-wide font-bold">Request ID</span>
+                    <p className="text-sm font-mono text-gray-900">#{req.id}</p>
+                </div>
+                </div>
+                {req.notes && (
+                <div className="bg-blue-50 rounded p-3 border-l-2 border-blue-300 text-xs">
+                    <span className="font-bold text-blue-700 block mb-1">Notes:</span>
+                    <p className="text-gray-700">{req.notes}</p>
+                </div>
                 )}
-              </div>
-              {getStatusBadge(req.status)}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-gray-50 rounded-lg p-3">
-                <span className="text-xs text-gray-500 uppercase tracking-wide">Quantity</span>
-                <p className="text-lg font-semibold text-gray-900 mt-1">{req.quantity}</p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-3">
-                <span className="text-xs text-gray-500 uppercase tracking-wide">Request ID</span>
-                <p className="text-sm font-mono text-gray-900 mt-1">#{req.id}</p>
-              </div>
-            </div>
-            {req.notes && (
-              <div className="bg-blue-50 rounded-lg p-3 border-l-4 border-blue-400">
-                <span className="text-xs text-blue-700 font-semibold uppercase tracking-wide">Notes</span>
-                <p className="text-sm text-gray-700 mt-1">{req.notes}</p>
-              </div>
-            )}
-          </CardContent>
-          <CardFooter className="pt-3 border-t bg-gray-50/50 text-xs text-gray-500">
-            Request ID: #{req.id}
-          </CardFooter>
-        </Card>
-      ))}
+            </CardContent>
+            <CardFooter className="pt-2 pb-2 bg-gray-50/80 text-[10px] text-center text-gray-400">
+                Requested on {new Date(req.requested_at || '').toLocaleDateString()}
+            </CardFooter>
+            </Card>
+        ))}
+      </div>
 
       {/* Request Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
@@ -270,6 +346,24 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Alert */}
+      <AlertDialog open={!!requestToDelete} onOpenChange={(open) => !open && setRequestToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to delete?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the medication request from the system.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-red-600 hover:bg-red-700">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

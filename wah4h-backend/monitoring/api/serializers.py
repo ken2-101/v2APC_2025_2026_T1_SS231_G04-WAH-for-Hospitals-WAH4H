@@ -127,6 +127,7 @@ class ObservationInputSerializer(serializers.Serializer):
     CRITICAL: Supports nested components list for multi-component observations.
     """
     # Required Fields
+    identifier = serializers.CharField(required=True, max_length=100)
     subject_id = serializers.IntegerField(required=True)
     encounter_id = serializers.IntegerField(required=True)
     code = serializers.CharField(required=True, max_length=100)

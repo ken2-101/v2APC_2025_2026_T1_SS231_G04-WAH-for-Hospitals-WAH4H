@@ -97,6 +97,7 @@ class ObservationService:
         
         # Create Observation header
         observation = Observation.objects.create(
+            identifier=data.get('identifier'),  # Accept identifier from request
             subject_id=data['subject_id'],
             encounter_id=data['encounter_id'],
             performer_id=data.get('performer_id'),

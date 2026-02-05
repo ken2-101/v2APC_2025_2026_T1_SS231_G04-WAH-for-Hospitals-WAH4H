@@ -147,6 +147,11 @@ const Pharmacy: React.FC = () => {
   };
 
   const handleDispenseSuccess = () => {
+    // Optimistically remove the dispensed/rejected request from UI
+    if (dispenseRequest) {
+      setRequests(prev => prev.filter(req => req.id !== dispenseRequest.id));
+    }
+    // Then refresh from server to ensure consistency
     fetchRequests();
     fetchInventory();
   };

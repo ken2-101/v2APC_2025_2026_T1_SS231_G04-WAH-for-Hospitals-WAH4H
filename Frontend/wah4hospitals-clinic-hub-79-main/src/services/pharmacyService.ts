@@ -24,6 +24,7 @@ class PharmacyService {
         try {
           return {
             id: item.inventory_id,
+            item_code: item.item_code,
             generic_name: item.item_name, // Mapping item_name -> generic_name for UI
             brand_name: item.item_name,   // Redundant but required by UI type
             description: item.category,   // Using category as description
@@ -289,10 +290,28 @@ class PharmacyService {
      }
   }
 
+  /**
+   * Delete a medication request
+   */
+  async deleteRequest(id: number): Promise<void> {
+    try {
+      await api.delete(`${PHARMACY_BASE_URL}/requests/${id}/`);
+    } catch (error: any) {
+      console.error('Error deleting medication request:', error);
+       const errorMessage = error.response?.data?.error 
+         || error.response?.data?.message 
+         || error.response?.data 
+         || 'Failed to delete medication request';
+       
+       throw new Error(typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage));
+    }
+  }
+
   // Helper
   private mapToInventoryItem(item: any): InventoryItem {
       return {
           id: item.inventory_id,
+          item_code: item.item_code,
           generic_name: item.item_name,
           brand_name: item.item_name,
           description: item.category,

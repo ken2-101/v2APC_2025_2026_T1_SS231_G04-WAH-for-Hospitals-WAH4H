@@ -103,6 +103,7 @@ class MonitoringService {
      * Save Vitals by creating multiple Observation records
      */
     async addVital(vital: Omit<VitalSign, 'id'>, subjectId: number): Promise<void> {
+        const timestamp = Date.now();
         const common = {
             subject_id: subjectId,
             encounter_id: parseInt(vital.admissionId),
@@ -119,6 +120,7 @@ class MonitoringService {
             const [sys, dia] = vital.bloodPressure.split('/');
             promises.push(api.post(`${MONITORING_BASE_URL}/observations/`, {
                 ...common,
+                identifier: `VITAL-BP-${timestamp}-${Math.random().toString(36).substr(2, 9)}`,
                 code: CODES.BP,
                 components: [
                     { code: CODES.BP_SYS, value_quantity: parseFloat(sys) },
@@ -130,22 +132,34 @@ class MonitoringService {
         // Simple Vitals
         if (vital.heartRate) {
             promises.push(api.post(`${MONITORING_BASE_URL}/observations/`, {
-                ...common, code: CODES.HR, value_quantity: vital.heartRate
+                ...common,
+                identifier: `VITAL-HR-${timestamp}-${Math.random().toString(36).substr(2, 9)}`,
+                code: CODES.HR,
+                value_quantity: vital.heartRate
             }));
         }
         if (vital.respiratoryRate) {
             promises.push(api.post(`${MONITORING_BASE_URL}/observations/`, {
-                ...common, code: CODES.RR, value_quantity: vital.respiratoryRate
+                ...common,
+                identifier: `VITAL-RR-${timestamp}-${Math.random().toString(36).substr(2, 9)}`,
+                code: CODES.RR,
+                value_quantity: vital.respiratoryRate
             }));
         }
         if (vital.temperature) {
             promises.push(api.post(`${MONITORING_BASE_URL}/observations/`, {
-                ...common, code: CODES.TEMP, value_quantity: vital.temperature
+                ...common,
+                identifier: `VITAL-TEMP-${timestamp}-${Math.random().toString(36).substr(2, 9)}`,
+                code: CODES.TEMP,
+                value_quantity: vital.temperature
             }));
         }
         if (vital.oxygenSaturation) {
             promises.push(api.post(`${MONITORING_BASE_URL}/observations/`, {
-                ...common, code: CODES.O2, value_quantity: vital.oxygenSaturation
+                ...common,
+                identifier: `VITAL-O2-${timestamp}-${Math.random().toString(36).substr(2, 9)}`,
+                code: CODES.O2,
+                value_quantity: vital.oxygenSaturation
             }));
         }
 
@@ -177,7 +191,7 @@ class MonitoringService {
                 id: obs.observation_id?.toString() || '',
                 admissionId: obs.encounter_id.toString(),
                 dateTime: obs.effective_datetime || '',
-                type: 'SOAP', 
+                type: (obs.value_string as 'SOAP' | 'Progress') || 'SOAP', // Read from value_string
                 subjective: content.subjective,
                 objective: content.objective,
                 assessment: content.assessment,
@@ -198,15 +212,31 @@ class MonitoringService {
             plan: note.plan
         });
 
-        await api.post(`${MONITORING_BASE_URL}/observations/`, {
+        // Generate unique identifier for this observation
+        const identifier = `NOTE-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+        const payload = {
+            identifier, // Required unique field
             subject_id: subjectId,
             encounter_id: parseInt(note.admissionId),
             code: CODES.NOTE,
             status: 'final',
             category: 'clinical-note',
             effective_datetime: note.dateTime,
+            value_string: note.type, // Required by backend: Observation must have a value
             note: noteContent
-        });
+        };
+
+        console.log('Adding clinical note with payload:', payload);
+
+        try {
+            await api.post(`${MONITORING_BASE_URL}/observations/`, payload);
+        } catch (error: any) {
+            console.error('Error adding clinical note:', error);
+            console.error('Error response:', error.response?.data);
+            console.error('Error status:', error.response?.status);
+            throw new Error(JSON.stringify(error.response?.data) || 'Failed to add clinical note');
+        }
     }
 
     /**
@@ -252,7 +282,11 @@ class MonitoringService {
             activityLevel: order.activityLevel
          });
 
-         await api.post(`${MONITORING_BASE_URL}/observations/`, {
+         // Generate unique identifier
+         const identifier = `DIET-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+         const payload = {
+            identifier, // Required unique field
             subject_id: subjectId,
             encounter_id: parseInt(order.admissionId),
             code: CODES.DIET,
@@ -261,7 +295,18 @@ class MonitoringService {
             value_string: order.dietType,
             note: content,
             effective_datetime: new Date().toISOString()
-         });
+         };
+
+        console.log('Saving dietary order with payload:', payload);
+
+        try {
+            await api.post(`${MONITORING_BASE_URL}/observations/`, payload);
+        } catch (error: any) {
+            console.error('Error saving dietary order:', error);
+            console.error('Error response:', error.response?.data);
+            console.error('Error status:', error.response?.status);
+            throw new Error(JSON.stringify(error.response?.data) || 'Failed to save dietary order');
+        }
     }
 }
 

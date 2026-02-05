@@ -76,8 +76,15 @@ class EncounterService:
             if not LocationACL.validate_location_exists(location_id):
                 raise ValidationError(f"Location with ID {location_id} does not exist")
         
+        if not data.get('identifier'):
+            import random
+            # Generate 11 random digits
+            random_digits = ''.join([str(random.randint(0, 9)) for _ in range(11)])
+            data['identifier'] = f"ENC-{random_digits}"
+
         # Create encounter with status 'in-progress'
         encounter = Encounter.objects.create(
+            identifier=data.get('identifier'),
             subject_id=subject_id,
             status='in-progress',
             class_field=data.get('class_field', 'inpatient'),
