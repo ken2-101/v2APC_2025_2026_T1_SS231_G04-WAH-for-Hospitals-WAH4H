@@ -470,3 +470,81 @@ class PaymentOutputSerializer(serializers.Serializer):
     total_amount = serializers.FloatField()
     created_at = serializers.CharField(allow_null=True)
     updated_at = serializers.CharField(allow_null=True)
+
+
+# ============================================================================
+# BILLING RECORD SERIALIZERS (Frontend Facade)
+# ============================================================================
+
+class BillingRecordMedicineSerializer(serializers.Serializer):
+    id = serializers.IntegerField(required=False)
+    name = serializers.CharField()
+    dosage = serializers.CharField(required=False, allow_blank=True)
+    quantity = serializers.IntegerField()
+    unitPrice = serializers.DecimalField(max_digits=10, decimal_places=2)
+
+class BillingRecordDiagnosticSerializer(serializers.Serializer):
+    id = serializers.IntegerField(required=False)
+    name = serializers.CharField()
+    cost = serializers.DecimalField(max_digits=10, decimal_places=2)
+
+class BillingRecordPaymentSerializer(serializers.Serializer):
+    id = serializers.IntegerField(required=False)
+    or_number = serializers.CharField()
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+
+class BillingRecordInputSerializer(serializers.Serializer):
+    """
+    Serializer for the frontend 'BillingRecord' structure.
+    Acts as an adapter to the domain Invoice model.
+    """
+    id = serializers.IntegerField(required=False)
+    patient = serializers.IntegerField(source='patientId')
+    patient_name = serializers.CharField(source='patientName', required=False)
+    hospital_id = serializers.CharField(source='hospitalId', required=False)
+    admission_date = serializers.CharField(source='admissionDate', required=False)
+    discharge_date = serializers.CharField(source='dischargeDate', required=False)
+    room_ward = serializers.CharField(source='roomWard', required=False)
+    room_type = serializers.CharField(source='roomType', required=False)
+    number_of_days = serializers.IntegerField(source='numberOfDays', required=False)
+    rate_per_day = serializers.DecimalField(source='ratePerDay', max_digits=10, decimal_places=2, required=False)
+    
+    attending_physician_fee = serializers.DecimalField(source='attendingPhysicianFee', max_digits=10, decimal_places=2, required=False)
+    specialist_fee = serializers.DecimalField(source='specialistFee', max_digits=10, decimal_places=2, required=False)
+    surgeon_fee = serializers.DecimalField(source='surgeonFee', max_digits=10, decimal_places=2, required=False)
+    other_professional_fees = serializers.DecimalField(source='otherProfessionalFees', max_digits=10, decimal_places=2, required=False)
+    
+    diet_type = serializers.CharField(source='dietType', required=False)
+    meals_per_day = serializers.IntegerField(source='mealsPerDay', required=False)
+    diet_duration = serializers.IntegerField(source='dietDuration', required=False)
+    cost_per_meal = serializers.DecimalField(source='costPerMeal', max_digits=10, decimal_places=2, required=False)
+    
+    supplies_charge = serializers.DecimalField(source='suppliesCharge', max_digits=10, decimal_places=2, required=False)
+    procedure_charge = serializers.DecimalField(source='procedureCharge', max_digits=10, decimal_places=2, required=False)
+    nursing_charge = serializers.DecimalField(source='nursingCharge', max_digits=10, decimal_places=2, required=False)
+    miscellaneous_charge = serializers.DecimalField(source='miscellaneousCharge', max_digits=10, decimal_places=2, required=False)
+    
+    discount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+    philhealth_coverage = serializers.DecimalField(source='philhealthCoverage', max_digits=10, decimal_places=2, required=False)
+    
+    is_senior = serializers.BooleanField(required=False)
+    is_pwd = serializers.BooleanField(required=False)
+    is_philhealth_member = serializers.BooleanField(required=False)
+    
+    medicines = BillingRecordMedicineSerializer(many=True, required=False)
+    diagnostics = BillingRecordDiagnosticSerializer(many=True, required=False)
+    payments = BillingRecordPaymentSerializer(many=True, required=False)
+
+class BillingRecordOutputSerializer(BillingRecordInputSerializer):
+    is_finalized = serializers.BooleanField(required=False)
+    finalized_date = serializers.CharField(required=False, allow_null=True)
+    payment_status = serializers.CharField(source='paymentStatus', required=False)
+
+class BillingDashboardItemSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    patientName = serializers.CharField()
+    encounterId = serializers.CharField()
+    runningBalance = serializers.DecimalField(max_digits=10, decimal_places=2)
+    paymentStatus = serializers.CharField()
+    lastORDate = serializers.CharField(allow_null=True)
+    room = serializers.CharField()

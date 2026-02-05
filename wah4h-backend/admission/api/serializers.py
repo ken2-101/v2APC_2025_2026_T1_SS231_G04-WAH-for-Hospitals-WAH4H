@@ -97,7 +97,10 @@ class EncounterListOutputSerializer(serializers.Serializer):
     patient_summary = serializers.DictField(allow_null=True)
     period_start = serializers.CharField(allow_null=True)
     period_end = serializers.CharField(allow_null=True)
+    reason_code = serializers.CharField(allow_null=True)
     location_id = serializers.IntegerField(allow_null=True)
+    location_summary = serializers.DictField(allow_null=True)
+    practitioner_summary = serializers.DictField(allow_null=True)
 
 
 # ============================================================================

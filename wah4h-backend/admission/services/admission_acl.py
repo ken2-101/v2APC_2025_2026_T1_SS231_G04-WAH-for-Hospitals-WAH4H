@@ -215,6 +215,18 @@ class EncounterACL:
         patient_summary = None
         if encounter.subject_id:
             patient_summary = get_patient_summary(encounter.subject_id)
+
+        # Enrich with location data via ACL
+        location_summary = None
+        if encounter.location_id:
+            location_summary = LocationACL.get_location_summary(encounter.location_id)
+        
+        # Enrich with practitioner data via ACL
+        practitioner_summary = None
+        if encounter.participant_individual_id:
+            practitioner_summary = PractitionerACL.get_practitioner_summary(
+                encounter.participant_individual_id
+            )
         
         return {
             'encounter_id': encounter.encounter_id,
@@ -226,7 +238,10 @@ class EncounterACL:
             'patient_summary': patient_summary,
             'period_start': encounter.period_start.isoformat() if encounter.period_start else None,
             'period_end': encounter.period_end.isoformat() if encounter.period_end else None,
+            'reason_code': encounter.reason_code,
             'location_id': encounter.location_id,
+            'location_summary': location_summary,
+            'practitioner_summary': practitioner_summary,
         }
 
 

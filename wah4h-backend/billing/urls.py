@@ -19,6 +19,7 @@ from billing.api.views import (
     InvoiceViewSet,
     ClaimViewSet,
     PaymentReconciliationViewSet,
+    BillingRecordViewSet,
 )
 
 # Initialize router
@@ -29,6 +30,7 @@ router.register(r'accounts', AccountViewSet, basename='account')
 router.register(r'invoices', InvoiceViewSet, basename='invoice')
 router.register(r'claims', ClaimViewSet, basename='claim')
 router.register(r'payments', PaymentReconciliationViewSet, basename='payment')
+router.register(r'billing-records', BillingRecordViewSet, basename='billing-record')
 
 # URL patterns
 urlpatterns = [
