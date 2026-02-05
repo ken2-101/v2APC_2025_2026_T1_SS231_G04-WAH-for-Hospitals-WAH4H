@@ -77,19 +77,15 @@ export const DispenseModal: React.FC<DispenseModalProps> = ({
     }
 
     try {
-      // Step 1: Approve the medication request first
+      // Update the medication request status to 'completed' (dispensed)
       await axios.post(
-        `${API_BASE}/medication-requests/${medicationRequest.id}/update-status/`,
-        { status: 'approved' }
+        `${API_BASE}/requests/${medicationRequest.id}/update-status/`,
+        { 
+          status: 'completed' // FHIR standard for dispensed
+        }
       );
 
-      // Step 2: Dispense the medication (backend requires status="approved")
-      await axios.post(
-        `${API_BASE}/medication-requests/${medicationRequest.id}/dispense/`,
-        { quantity }
-      );
-
-      toast.success('Medication approved and dispensed successfully');
+      toast.success('Medication dispensed successfully');
       onDispenseSuccess(); // refresh parent state
       onClose();
     } catch (err: any) {
@@ -106,11 +102,12 @@ export const DispenseModal: React.FC<DispenseModalProps> = ({
     }
 
     try {
+      // Update the medication request status to 'cancelled' (rejected)
       await axios.post(
-        `${API_BASE}/medication-requests/${medicationRequest.id}/update-status/`,
+        `${API_BASE}/requests/${medicationRequest.id}/update-status/`,
         { 
-          status: 'denied',
-          reason: rejectionReason
+          status: 'cancelled', // FHIR standard for denied/rejected
+          note: rejectionReason
         }
       );
 

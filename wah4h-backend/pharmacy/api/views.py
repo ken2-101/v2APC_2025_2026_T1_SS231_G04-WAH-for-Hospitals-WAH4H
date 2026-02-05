@@ -231,6 +231,42 @@ class MedicationRequestViewSet(viewsets.ModelViewSet):
         
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'], url_path='update-status')
+    def update_status(self, request, medication_request_id=None):
+        """
+        Update the status of a medication request.
+        
+        Body:
+            status (str): New status value
+            note (str, optional): Additional note
+        """
+        try:
+            medication_request = self.get_object()
+            new_status = request.data.get('status')
+            note = request.data.get('note')
+            
+            if not new_status:
+                return Response(
+                    {'error': 'status field is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Update the status
+            medication_request.status = new_status
+            if note:
+                medication_request.note = note
+            medication_request.save()
+            
+            # Return updated data
+            output_serializer = MedicationRequestOutputSerializer(medication_request)
+            return Response(output_serializer.data)
+            
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 
 class MedicationAdministrationViewSet(viewsets.ModelViewSet):
