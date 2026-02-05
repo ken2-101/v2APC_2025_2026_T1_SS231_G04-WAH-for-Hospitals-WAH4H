@@ -2,54 +2,74 @@
 
 /**
  * Matches EncounterOutputSerializer in backend
+ * Represents a read-only View/DTO of an admission.
  */
 export interface Admission {
-    encounter_id: number; // primary key
-    identifier: string; // generated ID (e.g. ENC-123)
+    encounter_id: number;
+    identifier: string;
     status: string;
-    class_field: string; // 'inpatient', 'outpatient', etc.
-    type?: string;
-    service_type?: string;
-    priority?: string;
+    class_field: string;
+    type?: string | null;
+    service_type?: string | null;
+    priority?: string | null;
     
-    subject_id: number; // Patient ID
-    patient_summary?: Record<string, any>; // Flattened patient info
+    subject_id: number;
+    patient_summary?: {
+        id?: number;
+        patient_id?: string;
+        full_name?: string;
+        first_name?: string;
+        last_name?: string;
+        gender?: string;
+        birthdate?: string;
+        [key: string]: any;
+    } | null;
     
-    period_start?: string; // Admission date
-    period_end?: string; // Discharge date
+    period_start?: string | null;
+    period_end?: string | null;
     
-    reason_code?: string;
-    admit_source?: string;
-    discharge_disposition?: string;
+    reason_code?: string | null;
+    admit_source?: string | null;
+    discharge_disposition?: string | null;
     
-    location_id?: number;
-    location_summary?: Record<string, any>; // Flattened location info
+    location_id?: number | null;
+    location_summary?: {
+        id?: number;
+        name?: string;
+        [key: string]: any;
+    } | null;
     
-    participant_individual_id?: number; // Practitioner ID
-    practitioner_summary?: Record<string, any>; // Flattened practitioner info
+    participant_individual_id?: number | null;
+    practitioner_summary?: {
+        id?: number;
+        full_name?: string;
+        name?: string;
+        [key: string]: any;
+    } | null;
     
-    created_at?: string;
-    updated_at?: string;
+    created_at?: string | null;
+    updated_at?: string | null;
 }
 
 /**
  * Matches EncounterInputSerializer in backend
+ * Payload for creating a new admission.
  */
 export interface NewAdmission {
     subject_id: number;
-    class_field?: string; // default: 'inpatient'
-    type?: string;
-    service_type?: string;
-    priority?: string;
-    reason_code?: string;
+    class_field?: string;
+    type?: string | null;
+    service_type?: string | null;
+    priority?: string | null;
+    reason_code?: string | null;
     
-    period_start?: string;
-    location_id?: number;
-    participant_individual_id?: number;
-    participant_type?: string;
+    period_start?: string | null;
+    location_id?: number | null;
+    participant_individual_id?: number | null;
+    participant_type?: string | null;
     
-    admit_source?: string;
-    account_id?: number;
-    pre_admission_identifier?: string;
+    admit_source?: string | null;
+    account_id?: number | null;
+    pre_admission_identifier?: string | null;
 }
 

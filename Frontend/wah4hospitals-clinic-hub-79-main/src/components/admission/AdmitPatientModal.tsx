@@ -8,10 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Search } from 'lucide-react';
 
+import type { NewAdmission } from '@/types/admission';
+
 interface AdmitPatientModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdmit: (data: AdmissionFormData) => void;
+  onAdmit: (data: NewAdmission) => void;
   onNavigate?: (tabId: string) => void;
 }
 
@@ -81,12 +83,10 @@ export const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({
 
     setIsSearching(true);
     try {
-      const API_URL =
-        import.meta.env.BACKEND_PATIENTS_8000 ||
-        (import.meta.env.LOCAL_8000 ? `${import.meta.env.LOCAL_8000}/api/patients/` : import.meta.env.BACKEND_PATIENTS);
-
+      // Correct search endpoint: /api/patients/search/?q=...
+      const BASE_URL = 'http://127.0.0.1:8000'; // Or use env logic if reliable
       const response = await axios.get(
-        `${API_URL}?search=${encodeURIComponent(query)}`
+        `${BASE_URL}/api/patients/search/?q=${encodeURIComponent(query)}`
       );
       if (Array.isArray(response.data)) {
         setSearchResults(response.data);
@@ -113,7 +113,25 @@ export const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({
 
   const handleSubmit = () => {
     if (!formData.patientId) return;
-    onAdmit(formData);
+
+    // Map form data to backend payload
+    const payload: NewAdmission = {
+      subject_id: parseInt(formData.patientId, 10),
+      class_field: 'inpatient',
+      // Backend expects proper Date (YYYY-MM-DD), slice the datetime-local value
+      period_start: formData.admissionDate.split('T')[0], 
+      reason_code: formData.reasonForAdmission,
+      admit_source: `${formData.modeOfArrival} - ${formData.admissionCategory}`,
+      // We don't have real IDs for these yet, sending null as per serializer
+      location_id: null,
+      participant_individual_id: null,
+      service_type: formData.admittingDiagnosis, // Using service_type for diagnosis temporarily or mapped elsewhere
+      priority: formData.admissionCategory === 'Emergency' ? 'ASAP' : 'Routine',
+    };
+
+    onAdmit(payload);
+
+    // Reset form
     onClose();
     setStep(1);
     setFormData({

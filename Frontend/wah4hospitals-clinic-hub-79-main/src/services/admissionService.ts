@@ -7,8 +7,16 @@ export const admissionService = {
    * List all encounters (admissions)
    */
   getAll: async (): Promise<Admission[]> => {
-    const { data } = await api.get<Admission[]>("/api/admission/encounters/");
-    return data;
+    const { data } = await api.get<any>("/api/admission/encounters/");
+    // Handle DRF pagination
+    if (data && typeof data === 'object' && 'results' in data && Array.isArray(data.results)) {
+      return data.results;
+    }
+    // Handle non-paginated list
+    if (Array.isArray(data)) {
+      return data;
+    }
+    return [];
   },
 
   /**
