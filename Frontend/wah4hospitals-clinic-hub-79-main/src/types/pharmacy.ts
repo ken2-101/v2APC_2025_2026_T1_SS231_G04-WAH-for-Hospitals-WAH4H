@@ -1,6 +1,7 @@
 export interface InventoryItem {
   id: number;
   generic_name: string;
+  item_code?: string;
   brand_name: string;
   description?: string;
   quantity: number;

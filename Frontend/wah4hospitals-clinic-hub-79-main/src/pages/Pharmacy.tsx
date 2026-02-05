@@ -18,6 +18,8 @@ import EditInventoryModal from '@/components/pharmacy/EditInventoryModal';
 import DeleteConfirmationModal from '@/components/pharmacy/DeleteConfirmationModal';
 import { DispenseModal } from '@/components/pharmacy/DispenseModal';
 import { InventoryItem, MedicationRequest } from '@/types/pharmacy';
+import pharmacyService from '@/services/pharmacyService';
+import { sortMedicationRequests, filterMedicationRequests, filterByStatus, type RequestSortOption } from '@/utils/medicationFilters';
 
 const API_BASE = (
   import.meta.env.BACKEND_PHARMACY_8000 ||
@@ -38,6 +40,10 @@ const Pharmacy: React.FC = () => {
 
   // Medication Requests State
   const [requests, setRequests] = useState<MedicationRequest[]>([]);
+  const [filteredRequests, setFilteredRequests] = useState<MedicationRequest[]>([]);
+  const [requestSearchQuery, setRequestSearchQuery] = useState('');
+  const [requestSortBy, setRequestSortBy] = useState<RequestSortOption>('filo');
+  const [requestStatusFilter, setRequestStatusFilter] = useState('all');
   const [loadingRequests, setLoadingRequests] = useState(true);
 
   // Modal State
@@ -50,15 +56,12 @@ const Pharmacy: React.FC = () => {
   const fetchInventory = async () => {
     try {
       setLoadingInventory(true);
-      const params = new URLSearchParams();
-      if (showExpired) params.append('show_expired', 'true');
-      if (showInactive) params.append('show_inactive', 'true');
-
-      const res = await axios.get<InventoryItem[]>(
-        `${API_BASE}/inventory/?${params.toString()}`
-      );
-      setInventory(Array.isArray(res.data) ? res.data : []);
-      setFilteredInventory(Array.isArray(res.data) ? res.data : []);
+      const data = await pharmacyService.getInventory({ 
+          show_expired: showExpired, 
+          show_inactive: showInactive 
+      });
+      setInventory(data);
+      setFilteredInventory(data);
     } catch (err) {
       console.error(err);
       toast.error('Failed to load inventory');
@@ -73,10 +76,8 @@ const Pharmacy: React.FC = () => {
   const fetchRequests = async () => {
     try {
       setLoadingRequests(true);
-      const res = await axios.get<MedicationRequest[]>(
-        `${API_BASE}/medication-requests/?status=pending`
-      );
-      setRequests(Array.isArray(res.data) ? res.data : []);
+      const data = await pharmacyService.getRequests('pending');
+      setRequests(data);
     } catch (err) {
       console.error(err);
       toast.error('Failed to load pending requests');
@@ -91,6 +92,22 @@ const Pharmacy: React.FC = () => {
     fetchRequests();
   }, [showExpired, showInactive]);
 
+  // ==================== Filter and Sort Requests ====================
+  useEffect(() => {
+    let result = [...requests];
+    
+    // Apply status filter
+    result = filterByStatus(result, requestStatusFilter);
+    
+    // Apply search filter
+    result = filterMedicationRequests(result, requestSearchQuery);
+    
+    // Apply sorting
+    result = sortMedicationRequests(result, requestSortBy);
+    
+    setFilteredRequests(result);
+  }, [requests, requestSearchQuery, requestSortBy, requestStatusFilter]);
+
   // ==================== Search Filter ====================
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -104,7 +121,7 @@ const Pharmacy: React.FC = () => {
         item.generic_name.toLowerCase().includes(query) ||
         item.brand_name?.toLowerCase().includes(query) ||
         item.batch_number.toLowerCase().includes(query) ||
-        item.manufacturer?.toLowerCase().includes(query)
+        (item.manufacturer && item.manufacturer.toLowerCase().includes(query))
     );
     setFilteredInventory(filtered);
   }, [searchQuery, inventory]);
@@ -112,16 +129,21 @@ const Pharmacy: React.FC = () => {
   // ==================== Handlers ====================
   const handleInventoryAdd = (item: InventoryItem) => {
     setInventory((prev) => [item, ...prev]);
+    // Also update filtered list if it matches
+    setFilteredInventory((prev) => [item, ...prev]);
   };
 
   const handleInventoryUpdate = (updatedItem: InventoryItem) => {
-    setInventory((prev) =>
-      prev.map((item) => (item.id === updatedItem.id ? updatedItem : item))
-    );
+    const updateList = (list: InventoryItem[]) => 
+        list.map((item) => (item.id === updatedItem.id ? updatedItem : item));
+    setInventory(updateList);
+    setFilteredInventory(updateList);
   };
 
   const handleInventoryDelete = (itemId: number) => {
-    setInventory((prev) => prev.filter((item) => item.id !== itemId));
+    const filterList = (list: InventoryItem[]) => list.filter((item) => item.id !== itemId);
+    setInventory(filterList);
+    setFilteredInventory(filterList);
   };
 
   const handleDispenseSuccess = () => {
@@ -394,10 +416,57 @@ const Pharmacy: React.FC = () => {
       {activeTab === 'requests' && (
         <div className="bg-white rounded-lg shadow-lg p-6">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-semibold text-gray-900">Pending Medication Requests</h2>
+            <h2 className="text-xl font-semibold text-gray-900">Medication Requests</h2>
             <Button variant="outline" size="sm" onClick={fetchRequests}>
               <RefreshCw className="w-4 h-4" />
             </Button>
+          </div>
+
+          {/* Filter Controls */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Input
+                type="text"
+                placeholder="Search by medication, patient, or notes..."
+                value={requestSearchQuery}
+                onChange={(e) => setRequestSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
+            {/* Sort By */}
+            <select
+              value={requestSortBy}
+              onChange={(e) => setRequestSortBy(e.target.value as RequestSortOption)}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="filo">Newest First (FILO)</option>
+              <option value="fifo">Oldest First (FIFO)</option>
+              <option value="patient-name">Patient Name (A-Z)</option>
+              <option value="medication-name">Medication Name (A-Z)</option>
+              <option value="quantity-high">Quantity (High to Low)</option>
+              <option value="quantity-low">Quantity (Low to High)</option>
+            </select>
+
+            {/* Status Filter */}
+            <select
+              value={requestStatusFilter}
+              onChange={(e) => setRequestStatusFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="dispensed">Dispensed</option>
+              <option value="denied">Denied</option>
+            </select>
+          </div>
+
+          {/* Results Count */}
+          <div className="mb-4 text-sm text-gray-600">
+            Showing {filteredRequests.length} of {requests.length} requests
           </div>
 
           {loadingRequests ? (
@@ -405,9 +474,9 @@ const Pharmacy: React.FC = () => {
               <RefreshCw className="w-8 h-8 animate-spin mx-auto text-gray-400 mb-2" />
               <p className="text-gray-600">Loading requests...</p>
             </div>
-          ) : requests.length > 0 ? (
+          ) : filteredRequests.length > 0 ? (
             <div className="space-y-3">
-              {requests.map((req) => (
+              {filteredRequests.map((req) => (
                 <div
                   key={req.id}
                   className="border rounded-lg p-4 hover:shadow-md transition-shadow"

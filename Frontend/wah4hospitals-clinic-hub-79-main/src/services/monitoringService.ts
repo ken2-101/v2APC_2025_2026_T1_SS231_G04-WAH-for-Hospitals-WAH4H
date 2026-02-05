@@ -40,7 +40,7 @@ const CODES = {
     DIET: 'diet-order' // Custom/Placeholder
 };
 
-const MONITORING_BASE_URL = '/monitoring'; // Uses router in backend: /api/monitoring/
+const MONITORING_BASE_URL = '/api/monitoring'; // Uses router in backend: /api/monitoring/
 
 class MonitoringService {
     

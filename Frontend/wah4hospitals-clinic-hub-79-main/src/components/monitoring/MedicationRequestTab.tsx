@@ -9,12 +9,14 @@ import { Plus, Pill } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { InventoryItem, MedicationRequest } from '@/types/pharmacy';
+import pharmacyService from '@/services/pharmacyService';
 
 interface MedicationRequestTabProps {
   admissionId: string;
+  patientId: string;
 }
 
-export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admissionId }) => {
+export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admissionId, patientId }) => {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [requests, setRequests] = useState<MedicationRequest[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -34,8 +36,8 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
   // Fetch inventory
   const fetchInventory = async () => {
     try {
-      const res = await axios.get<InventoryItem[]>(PHARMACY_API);
-      setInventory(Array.isArray(res.data) ? res.data : []);
+      const data = await pharmacyService.getInventory();
+      setInventory(data);
     } catch (err) {
       console.error(err);
       toast.error('Failed to fetch inventory');
@@ -45,11 +47,12 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
   // Fetch requests filtered by admission
   const fetchRequests = async () => {
     try {
-      const res = await axios.get<MedicationRequest[]>(`${REQUEST_API}?admission=${admissionId}`);
-      setRequests(Array.isArray(res.data) ? res.data : []);
+      if (!admissionId) return;
+      const data = await pharmacyService.getRequestsByAdmission(Number(admissionId));
+      setRequests(data);
     } catch (err) {
       console.error(err);
-      toast.error('Failed to fetch medication requests');
+      // toast.error('Failed to fetch medication requests'); // Suppress error for now if admission not found
     }
   };
 
@@ -65,24 +68,42 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
     }
 
     try {
+      const selectedItem = inventory.find(i => i.id === selectedInventoryId);
+
+      // TODO: Get requester_id from current user context/auth
+      const requesterId = 1; // Hardcoded for now
+
       const payload = {
         admission: Number(admissionId),
+        subject_id: Number(patientId),
+        requester_id: requesterId,
         inventory_item: selectedInventoryId,
+        inventory_item_detail: selectedItem, // Pass full inventory details
         quantity,
         notes,
+        // Helper data for service to construct payload
+        medication_code: selectedItem?.item_code || 'MED-UNKNOWN',
+        medication_display: selectedItem?.generic_name
       };
 
-      const res = await axios.post<MedicationRequest>(REQUEST_API, payload);
-      setRequests((prev) => [...prev, res.data]);
+      console.log('Submitting medication request:');
+      console.log('- Admission ID:', admissionId);
+      console.log('- Patient ID:', patientId);
+      console.log('- Selected Item:', selectedItem);
+      console.log('- Complete Payload:', payload);
+
+      const newReq = await pharmacyService.createRequest(payload);
+      setRequests((prev) => [...prev, newReq]);
       toast.success('Request submitted');
 
       setSelectedInventoryId(null);
       setQuantity(1);
       setNotes('');
       setIsModalOpen(false);
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to submit request');
+    } catch (err: any) {
+      console.error('Failed to submit medication request:', err);
+      const errorMessage = err.message || 'Failed to submit request';
+      toast.error(`Error: ${errorMessage}`);
     }
   };
 
