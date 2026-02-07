@@ -4,8 +4,11 @@ Django settings for wah4h project.
 
 from pathlib import Path
 from datetime import timedelta
+import os
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / '.env')
 
 # SECURITY
 SECRET_KEY = "django-insecure-rz74s8wlt7x+-10!5ky61@n4%7v*_o!$)fxe$e5@@8vh0kxo53"
@@ -34,6 +37,7 @@ INSTALLED_APPS = [
     "pharmacy",
     "laboratory", # added here
     "billing", # added billing
+    "core",
 
     # Third-party
     "rest_framework",
@@ -130,4 +134,50 @@ SIMPLE_JWT = {
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
+
+# ============================================================================
+# EMAIL CONFIGURATION (Console Backend for Development)
+# ============================================================================
+# Console backend prints emails to terminal instead of sending them
+# Change to SMTP backend in production
+#EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+#DEFAULT_FROM_EMAIL = 'noreply@wah4h.ph'
+#EMAIL_HOST_USER = 'noreply@wah4h.ph'
+
+# For Production SMTP (uncomment and configure):
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
+
+# ============================================================================
+# CACHE CONFIGURATION (In-Memory Cache for OTP Storage)
+# ============================================================================
+# Uses LocMemCache for development - fast, simple, but not persistent
+# Change to Redis/Memcached in production for multi-server deployments
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'wah4h-otp-cache',
+        'OPTIONS': {
+            'MAX_ENTRIES': 10000
+        }
+    }
+}
+
+# For Production Redis (uncomment and configure):
+# CACHES = {
+#     'default': {
+#         'BACKEND': 'django_redis.cache.RedisCache',
+#         'LOCATION': 'redis://127.0.0.1:6379/1',
+#         'OPTIONS': {
+#             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+#         }
+#     }
+# }
+
+# Default primary key field type
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
         
