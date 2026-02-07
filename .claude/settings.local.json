@@ -4,7 +4,10 @@
       "Bash(python manage.py runserver:*)",
       "Bash(npm run dev:*)",
       "Bash(python3 manage.py runserver:*)",
-      "Bash(py --version)"
+      "Bash(py --version)",
+      "Bash(ls:*)",
+      "Bash(npx tsc:*)",
+      "Bash(timeout:*)"
     ]
   }
 }

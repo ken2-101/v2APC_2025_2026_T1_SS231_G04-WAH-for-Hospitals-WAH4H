@@ -7,11 +7,15 @@ Writes (POST/PUT): Validate -> Delegate to PatientRegistrationService
 Reads (GET): Delegate to PatientACL -> Format with OutputSerializer
 """
 
+import os
+
 from rest_framework import viewsets, status
 from rest_framework.response import Response
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
+
+from patients.wah4pc import request_patient, fhir_to_dict
 
 from patients.api.serializers import (
     PatientInputSerializer,
@@ -567,3 +571,30 @@ class ImmunizationViewSet(viewsets.ModelViewSet):
             output_serializer.data,
             status=status.HTTP_201_CREATED
         )
+
+
+# ============================================================================
+# WAH4PC INTEGRATION
+# ============================================================================
+
+@api_view(['POST'])
+def fetch_wah4pc(request):
+    """Fetch patient data from WAH4PC gateway."""
+    result = request_patient(
+        request.data['targetProviderId'],
+        request.data['philHealthId'],
+    )
+    return Response(result)
+
+
+@api_view(['POST'])
+def webhook_receive(request):
+    """Receive webhook from WAH4PC gateway."""
+    if request.headers.get('X-Gateway-Auth') != os.getenv('GATEWAY_AUTH_KEY'):
+        return Response({'error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    if request.data.get('status') == 'SUCCESS':
+        patient_data = fhir_to_dict(request.data['data'])
+        request.session[f"wah4pc_{request.data['transactionId']}"] = patient_data
+
+    return Response({'message': 'Received'})

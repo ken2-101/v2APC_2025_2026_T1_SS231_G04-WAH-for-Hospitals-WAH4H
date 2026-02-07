@@ -3,7 +3,7 @@ import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { UserPlus, Search } from 'lucide-react';
+import { UserPlus, Search, Download } from 'lucide-react';
 import { PatientDetailsModal } from '@/components/patients/PatientDetailsModal';
 import { PatientRegistrationModal } from '@/components/patients/PatientRegistrationModal';
 import { PatientTable } from '@/components/patients/PatientTable';
@@ -61,6 +61,27 @@ export const PatientRegistration: React.FC = () => {
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
+  // WAH4PC integration state
+  const [philHealthId, setPhilHealthId] = useState('');
+  const [targetProvider, setTargetProvider] = useState('');
+  const [wah4pcLoading, setWah4pcLoading] = useState(false);
+
+  const fetchFromWAH4PC = async () => {
+    setWah4pcLoading(true);
+    try {
+      await axios.post(`${API_URL}wah4pc/fetch`, {
+        targetProviderId: targetProvider,
+        philHealthId,
+      });
+      alert('Request sent to WAH4PC. You will receive the data via webhook.');
+    } catch (err) {
+      console.error('WAH4PC fetch error:', err);
+      alert('Failed to send WAH4PC request.');
+    } finally {
+      setWah4pcLoading(false);
+    }
+  };
+
   const [activeFilters, setActiveFilters] = useState({
     status: [] as string[],
     gender: [] as string[],
@@ -162,6 +183,31 @@ export const PatientRegistration: React.FC = () => {
             </div>
             <Button onClick={() => setShowRegistrationModal(true)} className="flex items-center gap-2">
               <UserPlus /> Register Patient
+            </Button>
+          </div>
+
+          {/* WAH4PC Fetch Section */}
+          <div className="flex flex-col md:flex-row gap-2 mb-4 p-3 border rounded-lg bg-gray-50">
+            <Input
+              value={philHealthId}
+              onChange={e => setPhilHealthId(e.target.value)}
+              placeholder="PhilHealth ID"
+              className="max-w-xs"
+            />
+            <Input
+              value={targetProvider}
+              onChange={e => setTargetProvider(e.target.value)}
+              placeholder="Target Provider ID"
+              className="max-w-xs"
+            />
+            <Button
+              onClick={fetchFromWAH4PC}
+              disabled={wah4pcLoading || !philHealthId || !targetProvider}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              {wah4pcLoading ? 'Fetching...' : 'Fetch from WAH4PC'}
             </Button>
           </div>
 

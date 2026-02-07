@@ -19,6 +19,8 @@ from patients.api.views import (
     ConditionViewSet,
     AllergyViewSet,
     ImmunizationViewSet,
+    fetch_wah4pc,
+    webhook_receive,
 )
 
 # Initialize router
@@ -32,5 +34,7 @@ router.register(r'immunizations', ImmunizationViewSet, basename='immunization')
 
 # URL patterns
 urlpatterns = [
+    path('wah4pc/fetch', fetch_wah4pc),
+    path('webhooks/receive', webhook_receive),
     path('', include(router.urls)),
 ]
