@@ -1,101 +1,225 @@
-import React from 'react';
+/**
+ * Patient Registration Modal - 4-Step Wizard
+ * Uses React Hook Form + Zod for validation
+ */
+import React, { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ChevronRight, ChevronLeft } from 'lucide-react';
 import type { PatientFormData } from '../../types/patient';
+import {
+  patientStep1Schema,
+  patientStep2Schema,
+  patientStep3Schema,
+  patientStep4Schema,
+  patientFormDataSchema,
+  type PatientStep1FormData,
+  type PatientStep2FormData,
+  type PatientStep3FormData,
+  type PatientStep4FormData,
+} from '../../schemas/patientSchema';
+import {
+  GENDER_OPTIONS,
+  BLOOD_TYPE_OPTIONS,
+  MARITAL_STATUS_OPTIONS,
+  PWD_TYPE_OPTIONS,
+  NATIONALITY_OPTIONS,
+  RELIGION_OPTIONS,
+  CONTACT_RELATIONSHIP_OPTIONS,
+  REGISTRATION_STEPS,
+} from '../../constants/patientConstants';
 import addressData from '../../data/addressData.json';
 
 interface PatientRegistrationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  formData: PatientFormData;
-  handleFormChange: (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) => void;
-  handleRegisterPatient: (e: React.FormEvent) => void;
-  formLoading: boolean;
-  success: string;
-  formError: string;
+  onSuccess?: (patient: any) => void;
+  isLoading?: boolean;
+  error?: string;
 }
 
 export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> = ({
   isOpen,
   onClose,
-  formData,
-  handleFormChange,
-  handleRegisterPatient,
-  formLoading,
-  success,
-  formError
+  onSuccess,
+  isLoading = false,
+  error,
 }) => {
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
+  const [allStepsData, setAllStepsData] = useState<Partial<PatientFormData>>({});
+
+  // Step 1: Personal Information
+  const step1Form = useForm<PatientStep1FormData>({
+    resolver: zodResolver(patientStep1Schema),
+    mode: 'onChange',
+  });
+
+  // Step 2: Contact & Address
+  const step2Form = useForm<PatientStep2FormData>({
+    resolver: zodResolver(patientStep2Schema),
+    mode: 'onChange',
+  });
+
+  // Step 3: Health Information
+  const step3Form = useForm<PatientStep3FormData>({
+    resolver: zodResolver(patientStep3Schema),
+    mode: 'onChange',
+  });
+
+  // Step 4: Additional Information
+  const step4Form = useForm<PatientStep4FormData>({
+    resolver: zodResolver(patientStep4Schema),
+    mode: 'onChange',
+  });
+
+  const handleNextStep = async () => {
+    if (currentStep === 1) {
+      const isValid = await step1Form.trigger();
+      if (!isValid) return;
+      setAllStepsData(prev => ({
+        ...prev,
+        ...step1Form.getValues(),
+      }));
+      setCurrentStep(2);
+    } else if (currentStep === 2) {
+      const isValid = await step2Form.trigger();
+      if (!isValid) return;
+      setAllStepsData(prev => ({
+        ...prev,
+        ...step2Form.getValues(),
+      }));
+      setCurrentStep(3);
+    } else if (currentStep === 3) {
+      const isValid = await step3Form.trigger();
+      if (!isValid) return;
+      setAllStepsData(prev => ({
+        ...prev,
+        ...step3Form.getValues(),
+      }));
+      setCurrentStep(4);
+    }
+  };
+
+  const handlePreviousStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep((prev) => (prev - 1) as 1 | 2 | 3 | 4);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validate step 4
+    const isValid = await step4Form.trigger();
+    if (!isValid) return;
+
+    const finalData: PatientFormData = {
+      ...allStepsData,
+      ...step4Form.getValues(),
+    } as PatientFormData;
+
+    // Validate complete form
+    try {
+      const validatedData = patientFormDataSchema.parse(finalData);
+      if (onSuccess) {
+        onSuccess(validatedData);
+      }
+      handleClose();
+    } catch (err) {
+      console.error('Validation error:', err);
+    }
+  };
+
+  const handleClose = () => {
+    setCurrentStep(1);
+    setAllStepsData({});
+    step1Form.reset();
+    step2Form.reset();
+    step3Form.reset();
+    step4Form.reset();
+    onClose();
+  };
+
+  const getStepProgress = () => {
+    return Math.round(((currentStep - 1) / 4) * 100);
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold text-gray-900">Register New Patient</DialogTitle>
+          <DialogTitle>Register New Patient - Step {currentStep} of 4</DialogTitle>
         </DialogHeader>
 
-        {success && <div className="mb-4 p-3 bg-green-100 text-green-700 rounded-md">{success}</div>}
-        {formError && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">{formError}</div>}
-
-        <form onSubmit={handleRegisterPatient} className="space-y-6">
-          {/* Patient ID */}
-          <div>
-            <label htmlFor="patient_id" className="block text-sm font-medium text-gray-700 mb-1">Patient ID</label>
-            <Input
-              type="text"
-              id="patient_id"
-              name="patient_id"
-              value={formData.patient_id || 'PXXXX'}
-              disabled
-              className="bg-gray-100 cursor-not-allowed"
+        {/* Progress Bar */}
+        <div className="space-y-2">
+          <div className="flex justify-between text-sm text-gray-600">
+            <span>{REGISTRATION_STEPS[currentStep - 1].title}</span>
+            <span>{getStepProgress()}%</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div
+              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${getStepProgress()}%` }}
             />
           </div>
+          <p className="text-xs text-gray-500">{REGISTRATION_STEPS[currentStep - 1].description}</p>
+        </div>
 
-          {/* Identity & Personal Info */}
-          <div>
-            <h4 className="text-lg font-semibold mb-3 border-b pb-2">Identity & Personal Information</h4>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <InputField label="Last Name *" name="last_name" value={formData.last_name} onChange={handleFormChange} required />
-              <InputField label="First Name *" name="first_name" value={formData.first_name} onChange={handleFormChange} required />
-              <InputField label="Mobile Number *" name="mobile_number" value={formData.mobile_number} onChange={handleFormChange} required placeholder="09123456789" />
-              <InputField label="Middle Name" name="middle_name" value={formData.middle_name} onChange={handleFormChange} />
-              <InputField label="Suffix" name="suffix_name" value={formData.suffix_name} onChange={handleFormChange} placeholder="e.g., Jr, III" />
-            </div>
+        {/* Error Message */}
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
-              <SelectField label="Sex *" name="gender" value={formData.gender} onChange={handleFormChange} required options={[
-                { value: '', label: 'Select' },
-                { value: 'M', label: 'Male' },
-                { value: 'F', label: 'Female' }
-              ]} />
-              <InputField label="Date of Birth *" type="date" name="birthdate" value={formData.birthdate} onChange={handleFormChange} required />
-              <SelectField label="Civil Status *" name="civil_status" value={formData.civil_status} onChange={handleFormChange} required options={[
-                { value: '', label: 'Select' },
-                { value: 'Single', label: 'Single' },
-                { value: 'Married', label: 'Married' },
-                { value: 'Divorced', label: 'Divorced' },
-                { value: 'Widowed', label: 'Widowed' },
-                { value: 'Separated', label: 'Separated' }
-              ]} />
-              <InputField label="Nationality *" name="nationality" value={formData.nationality} onChange={handleFormChange} required />
-            </div>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* STEP 1: Personal Information */}
+          {currentStep === 1 && <Step1Form form={step1Form} />}
 
-            {/* Occupation */}
-            <div className="mt-4">
-              <InputField label="Occupation" name="occupation" value={formData.occupation} onChange={handleFormChange} placeholder="e.g., Teacher, Engineer" />
-            </div>
-          </div>
+          {/* STEP 2: Contact & Address */}
+          {currentStep === 2 && <Step2Form form={step2Form} />}
 
-          {/* Address */}
-          <AddressFields formData={formData} handleFormChange={handleFormChange} />
+          {/* STEP 3: Health Information */}
+          {currentStep === 3 && <Step3Form form={step3Form} />}
 
-          {/* Buttons */}
-          <div className="flex justify-end gap-2 pt-4">
-            <Button type="button" variant="outline" onClick={onClose} disabled={formLoading}>Cancel</Button>
-            <Button type="submit" disabled={formLoading} className="bg-blue-600 hover:bg-blue-700">
-              {formLoading ? 'Creating Patient...' : 'Register Patient'}
+          {/* STEP 4: Additional Information */}
+          {currentStep === 4 && <Step4Form form={step4Form} />}
+
+          {/* Action Buttons */}
+          <div className="flex justify-between gap-2 pt-4 border-t">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={currentStep === 1 ? handleClose : handlePreviousStep}
+              disabled={isLoading}
+            >
+              {currentStep === 1 ? 'Cancel' : <ChevronLeft className="w-4 h-4 mr-2" />}
+              {currentStep === 1 ? 'Cancel' : 'Previous'}
             </Button>
+
+            {currentStep < 4 ? (
+              <Button
+                type="button"
+                onClick={handleNextStep}
+                disabled={isLoading}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                Next <ChevronRight className="w-4 h-4 ml-2" />
+              </Button>
+            ) : (
+              <Button
+                type="submit"
+                disabled={isLoading}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                {isLoading ? 'Creating Patient...' : 'Register Patient'}
+              </Button>
+            )}
           </div>
         </form>
       </DialogContent>
@@ -103,67 +227,365 @@ export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> =
   );
 };
 
-// --------------------------
-// Reusable Input Components
-// --------------------------
-const InputField: React.FC<any> = ({ label, ...props }) => (
-  <div>
-    <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-    <Input {...props} />
-  </div>
-);
+// ============================================================================
+// STEP 1: PERSONAL INFORMATION
+// ============================================================================
+const Step1Form = ({ form }: { form: any }) => {
+  const { register, formState: { errors } } = form;
 
-const SelectField: React.FC<any> = ({ label, options, ...props }) => (
-  <div>
-    <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-    <select {...props} className="w-full rounded-md border border-gray-300 px-3 py-2">
-      {options.map((opt: any) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-    </select>
-  </div>
-);
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <FormField
+          label="Last Name *"
+          error={errors.last_name}
+          {...register('last_name')}
+          placeholder="e.g., Dela Cruz"
+        />
+        <FormField
+          label="First Name *"
+          error={errors.first_name}
+          {...register('first_name')}
+          placeholder="e.g., Juan"
+        />
+        <FormField
+          label="Middle Name"
+          error={errors.middle_name}
+          {...register('middle_name')}
+          placeholder="e.g., Santos"
+        />
+        <FormField
+          label="Suffix"
+          error={errors.suffix_name}
+          {...register('suffix_name')}
+          placeholder="e.g., Jr, III"
+        />
+      </div>
 
-// --------------------------
-// Address Fields
-// --------------------------
-const AddressFields: React.FC<{ formData: PatientFormData, handleFormChange: any }> = ({ formData, handleFormChange }) => (
-  <div>
-    <h4 className="text-lg font-semibold mb-3 border-b pb-2">Address (PSGC)</h4>
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <SelectField
-        label="Region *"
-        name="address_state" 
-        value={formData.address_state}
-        onChange={handleFormChange}
-        required
-        options={[{ value: '', label: 'Select Region' }, ...addressData.regions.map((r: any) => ({ value: r.code, label: r.name }))]}
-      />
-      <SelectField
-        label="Province *"
-        name="address_district" 
-        value={formData.address_district}
-        onChange={handleFormChange}
-        required
-        disabled={!formData.address_state}
-        options={[{ value: '', label: 'Select Province' }, ...(formData.address_state ? addressData.provinces[formData.address_state]?.map((p: any) => ({ value: p.code, label: p.name })) || [] : [])]}
-      />
-      <SelectField
-        label="City/Municipality *"
-        name="address_city"
-        value={formData.address_city}
-        onChange={handleFormChange}
-        required
-        disabled={!formData.address_district}
-        options={[{ value: '', label: 'Select City/Municipality' }, ...(formData.address_district ? addressData.cities[formData.address_district]?.map((c: any) => ({ value: c.code, label: c.name })) || [] : [])]}
-      />
-      <SelectField
-        label="Barangay *"
-        name="address_line" // Mapping barangay to address_line for now as per simple schema
-        value={formData.address_line}
-        onChange={handleFormChange}
-        required
-        disabled={!formData.address_city}
-        options={[{ value: '', label: 'Select Barangay' }, ...(formData.address_city ? addressData.barangays[formData.address_city] || [] : []).map((b: any) => ({ value: b, label: b }))]}
-      />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <SelectField
+          label="Gender *"
+          error={errors.gender}
+          {...register('gender')}
+          options={[{ value: '', label: 'Select Gender' }, ...GENDER_OPTIONS]}
+        />
+        <FormField
+          label="Date of Birth *"
+          type="date"
+          error={errors.birthdate}
+          {...register('birthdate')}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <FormField
+          label="Nationality"
+          error={errors.nationality}
+          {...register('nationality')}
+          placeholder="e.g., Filipino"
+        />
+        <SelectField
+          label="Civil Status"
+          error={errors.civil_status}
+          {...register('civil_status')}
+          options={[{ value: '', label: 'Select Status' }, ...MARITAL_STATUS_OPTIONS]}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <SelectField
+          label="Religion"
+          error={errors.religion}
+          {...register('religion')}
+          options={[{ value: '', label: 'Select Religion' }, ...RELIGION_OPTIONS]}
+        />
+        <FormField
+          label="Race"
+          error={errors.race}
+          {...register('race')}
+          placeholder="e.g., Tagalog"
+        />
+      </div>
     </div>
+  );
+};
+
+// ============================================================================
+// STEP 2: CONTACT & ADDRESS
+// ============================================================================
+const Step2Form = ({ form }: { form: any }) => {
+  const { register, formState: { errors }, watch } = form;
+  const selectedRegion = watch('address_state');
+  const selectedProvince = watch('address_district');
+  const selectedCity = watch('address_city');
+
+  return (
+    <div className="space-y-4">
+      <FormField
+        label="Mobile Number *"
+        error={errors.mobile_number}
+        {...register('mobile_number')}
+        placeholder="e.g., 09123456789"
+      />
+
+      <div className="pt-4 border-t">
+        <h4 className="text-sm font-semibold mb-4">Address (PSGC)</h4>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <SelectField
+            label="Region *"
+            error={errors.address_state}
+            {...register('address_state')}
+            options={[
+              { value: '', label: 'Select Region' },
+              ...Object.entries(addressData.regions || {}).map(([code, name]: any) => ({
+                value: code,
+                label: typeof name === 'object' ? name.name : name,
+              })),
+            ]}
+          />
+          <SelectField
+            label="Province *"
+            error={errors.address_district}
+            {...register('address_district')}
+            disabled={!selectedRegion}
+            options={[
+              { value: '', label: 'Select Province' },
+              ...(selectedRegion && addressData.provinces?.[selectedRegion]
+                ? addressData.provinces[selectedRegion].map((p: any) => ({
+                    value: p.code,
+                    label: p.name,
+                  }))
+                : []),
+            ]}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <SelectField
+            label="City/Municipality *"
+            error={errors.address_city}
+            {...register('address_city')}
+            disabled={!selectedProvince}
+            options={[
+              { value: '', label: 'Select City/Municipality' },
+              ...(selectedProvince && addressData.cities?.[selectedProvince]
+                ? addressData.cities[selectedProvince].map((c: any) => ({
+                    value: c.code,
+                    label: c.name,
+                  }))
+                : []),
+            ]}
+          />
+          <SelectField
+            label="Barangay *"
+            error={errors.address_line}
+            {...register('address_line')}
+            disabled={!selectedCity}
+            options={[
+              { value: '', label: 'Select Barangay' },
+              ...(selectedCity && addressData.barangays?.[selectedCity]
+                ? addressData.barangays[selectedCity].map((b: any) => ({
+                    value: b,
+                    label: b,
+                  }))
+                : []),
+            ]}
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <FormField
+          label="Postal Code"
+          error={errors.address_postal_code}
+          {...register('address_postal_code')}
+          placeholder="e.g., 1234"
+        />
+        <FormField
+          label="Country"
+          error={errors.address_country}
+          {...register('address_country')}
+          placeholder="e.g., Philippines"
+        />
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// STEP 3: HEALTH INFORMATION
+// ============================================================================
+const Step3Form = ({ form }: { form: any }) => {
+  const { register, formState: { errors } } = form;
+
+  return (
+    <div className="space-y-4">
+      <FormField
+        label="PhilHealth ID"
+        error={errors.philhealth_id}
+        {...register('philhealth_id')}
+        placeholder="e.g., PH-123456-789"
+      />
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <SelectField
+          label="Blood Type"
+          error={errors.blood_type}
+          {...register('blood_type')}
+          options={[{ value: '', label: 'Select Blood Type' }, ...BLOOD_TYPE_OPTIONS]}
+        />
+        <SelectField
+          label="PWD Type"
+          error={errors.pwd_type}
+          {...register('pwd_type')}
+          options={[{ value: '', label: 'Select PWD Type' }, ...PWD_TYPE_OPTIONS]}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <FormField
+          label="Occupation"
+          error={errors.occupation}
+          {...register('occupation')}
+          placeholder="e.g., Teacher, Engineer"
+        />
+        <FormField
+          label="Education"
+          error={errors.education}
+          {...register('education')}
+          placeholder="e.g., Bachelor's Degree"
+        />
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// STEP 4: ADDITIONAL INFORMATION
+// ============================================================================
+const Step4Form = ({ form }: { form: any }) => {
+  const { register, formState: { errors } } = form;
+
+  return (
+    <div className="space-y-4">
+      <div className="border-b pb-4">
+        <h4 className="text-sm font-semibold mb-3">Emergency Contact</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            label="Contact First Name"
+            error={errors.contact_first_name}
+            {...register('contact_first_name')}
+            placeholder="e.g., Maria"
+          />
+          <FormField
+            label="Contact Last Name"
+            error={errors.contact_last_name}
+            {...register('contact_last_name')}
+            placeholder="e.g., Dela Cruz"
+          />
+          <FormField
+            label="Contact Mobile Number"
+            error={errors.contact_mobile_number}
+            {...register('contact_mobile_number')}
+            placeholder="e.g., 09123456789"
+          />
+          <SelectField
+            label="Relationship"
+            error={errors.contact_relationship}
+            {...register('contact_relationship')}
+            options={[{ value: '', label: 'Select Relationship' }, ...CONTACT_RELATIONSHIP_OPTIONS]}
+          />
+        </div>
+      </div>
+
+      <div className="border-b pb-4">
+        <h4 className="text-sm font-semibold mb-3">Special Requirements</h4>
+        <div className="space-y-3">
+          <CheckboxField
+            label="Indigenous Person"
+            {...register('indigenous_flag')}
+          />
+          <FormField
+            label="Indigenous Group"
+            error={errors.indigenous_group}
+            {...register('indigenous_group')}
+            placeholder="e.g., Ilocano, Bicolano"
+          />
+        </div>
+      </div>
+
+      <div>
+        <CheckboxField
+          label="Consent to Data Processing *"
+          {...register('consent_flag')}
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          I consent to the processing and storage of my personal health information
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// REUSABLE FORM FIELDS
+// ============================================================================
+const FormField = React.forwardRef<
+  HTMLInputElement,
+  React.InputHTMLAttributes<HTMLInputElement> & { label: string; error?: any }
+>(({ label, error, className, ...props }, ref) => (
+  <div className="space-y-1">
+    <label className="block text-sm font-medium text-gray-700">{label}</label>
+    <Input
+      ref={ref}
+      className={error ? 'border-red-500' : ''}
+      {...props}
+    />
+    {error && <p className="text-xs text-red-500">{error.message}</p>}
   </div>
-);
+));
+FormField.displayName = 'FormField';
+
+const SelectField = React.forwardRef<
+  HTMLSelectElement,
+  React.SelectHTMLAttributes<HTMLSelectElement> & {
+    label: string;
+    error?: any;
+    options: Array<{ value: string; label: string }>;
+  }
+>(({ label, error, options, className, ...props }, ref) => (
+  <div className="space-y-1">
+    <label className="block text-sm font-medium text-gray-700">{label}</label>
+    <select
+      ref={ref}
+      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+        error ? 'border-red-500' : 'border-gray-300'
+      }`}
+      {...props}
+    >
+      {options.map(opt => (
+        <option key={opt.value} value={opt.value}>{opt.label}</option>
+      ))}
+    </select>
+    {error && <p className="text-xs text-red-500">{error.message}</p>}
+  </div>
+));
+SelectField.displayName = 'SelectField';
+
+const CheckboxField = React.forwardRef<
+  HTMLInputElement,
+  React.InputHTMLAttributes<HTMLInputElement> & { label: string; error?: any }
+>(({ label, error, ...props }, ref) => (
+  <div className="flex items-center space-x-2">
+    <input
+      ref={ref}
+      type="checkbox"
+      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+      {...props}
+    />
+    <label className="text-sm font-medium text-gray-700">{label}</label>
+    {error && <p className="text-xs text-red-500">{error.message}</p>}
+  </div>
+));
+CheckboxField.displayName = 'CheckboxField';
