@@ -37,12 +37,13 @@ class PatientInputSerializer(serializers.ModelSerializer):
             'gender', 'birthdate', 'civil_status', 'nationality', 'religion',
             'philhealth_id', 'blood_type', 'pwd_type',
             'occupation', 'education', 'mobile_number',
-            'address_line', 'address_city', 'address_district', 
+            'address_line', 'address_city', 'address_district',
             'address_state', 'address_postal_code', 'address_country',
-            'contact_first_name', 'contact_last_name', 
+            'contact_first_name', 'contact_last_name',
             'contact_mobile_number', 'contact_relationship',
             'indigenous_flag', 'indigenous_group',
-            'consent_flag', 'image_url'
+            'consent_flag', 'image_url',
+            'active', 'race',  # FHIR fields
         ]
         extra_kwargs = {
             'patient_id': {'required': False},
@@ -50,28 +51,69 @@ class PatientInputSerializer(serializers.ModelSerializer):
             'last_name': {'required': True},
             'birthdate': {'required': True},
             'gender': {'required': True},
+            'mobile_number': {'required': True},
+            'active': {'required': False, 'default': True},
         }
     
-    def validate_birthdate(self, value):
+    def validate_philhealth_id(self, value):
         """
-        Validate birthdate is not in the future.
-        """
-        if value > date.today():
-            raise serializers.ValidationError("Birthdate cannot be in the future.")
-        return value
-    
-    def validate_mobile_number(self, value):
-        """
-        Validate mobile number format (if provided).
+        Validate PhilHealth ID format: XX-XXXXXXXXX-X
+        First 2 digits should be valid region code (01-17)
         """
         if value:
-            # Remove common separators
-            cleaned = value.replace('-', '').replace(' ', '').replace('+', '')
-            if not cleaned.isdigit():
-                raise serializers.ValidationError("Mobile number must contain only digits and optional separators.")
-            if len(cleaned) < 10 or len(cleaned) > 15:
-                raise serializers.ValidationError("Mobile number must be between 10 and 15 digits.")
+            import re
+            pattern = r'^\d{2}-\d{9}-\d{1}$'
+            if not re.match(pattern, value):
+                raise serializers.ValidationError(
+                    "PhilHealth ID must follow format: XX-XXXXXXXXX-X (e.g., 12-345678901-2)"
+                )
+            # Validate region code (first 2 digits: 01-17 are valid PH regions)
+            region_code = int(value[:2])
+            if region_code < 1 or region_code > 17:
+                raise serializers.ValidationError(
+                    "Invalid PhilHealth region code. Must be 01-17."
+                )
         return value
+
+    def validate_birthdate(self, value):
+        """
+        Validate birthdate is in valid range
+        """
+        if value:
+            if value > date.today():
+                raise serializers.ValidationError("Birthdate cannot be in the future.")
+            age = (date.today() - value).days // 365
+            if age > 150:
+                raise serializers.ValidationError("Invalid birthdate: age exceeds 150 years.")
+        return value
+
+    def validate_mobile_number(self, value):
+        """
+        Validate Philippine mobile number format.
+        Accepts: +639XXXXXXXXX, 639XXXXXXXXX, 09XXXXXXXXX
+        """
+        if value:
+            import re
+            # Clean the number first
+            cleaned = value.replace('-', '').replace(' ', '')
+
+            # Philippine mobile pattern: +639 or 09 followed by 9 digits
+            pattern = r'^(\+639|639|09)\d{9}$'
+            if not re.match(pattern, cleaned):
+                raise serializers.ValidationError(
+                    "Mobile number must be a valid Philippine mobile number "
+                    "(e.g., +639123456789, 09123456789)"
+                )
+        return value
+
+    def validate(self, data):
+        """Cross-field validation"""
+        # If indigenous_flag is True, indigenous_group should be provided
+        if data.get('indigenous_flag') and not data.get('indigenous_group'):
+            raise serializers.ValidationError({
+                'indigenous_group': 'Indigenous group must be specified when indigenous flag is true.'
+            })
+        return data
 
 
 class PatientOutputSerializer(serializers.Serializer):
@@ -106,6 +148,7 @@ class PatientOutputSerializer(serializers.Serializer):
     civil_status = serializers.CharField(required=False, allow_null=True)
     nationality = serializers.CharField(required=False, allow_null=True)
     religion = serializers.CharField(required=False, allow_null=True)
+    race = serializers.CharField(required=False, allow_null=True)
     
     # Health Identifiers
     philhealth_id = serializers.CharField(required=False, allow_null=True)
@@ -141,7 +184,10 @@ class PatientOutputSerializer(serializers.Serializer):
     # Consent and Media
     consent_flag = serializers.BooleanField(required=False, allow_null=True)
     image_url = serializers.URLField(required=False, allow_null=True)
-    
+
+    # FHIR standard field
+    active = serializers.BooleanField(required=False)
+
     # Timestamps
     created_at = serializers.DateTimeField(required=False)
     updated_at = serializers.DateTimeField(required=False)

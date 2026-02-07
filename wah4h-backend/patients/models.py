@@ -2,6 +2,48 @@ from django.db import models
 from core.models import TimeStampedModel, FHIRResourceModel
 
 
+# FHIR Administrative Gender (http://hl7.org/fhir/ValueSet/administrative-gender)
+GENDER_CHOICES = [
+    ('male', 'Male'),
+    ('female', 'Female'),
+    ('other', 'Other'),
+    ('unknown', 'Unknown'),
+]
+
+# Blood Type ABO/Rh
+BLOOD_TYPE_CHOICES = [
+    ('A+', 'A Positive'),
+    ('A-', 'A Negative'),
+    ('B+', 'B Positive'),
+    ('B-', 'B Negative'),
+    ('AB+', 'AB Positive'),
+    ('AB-', 'AB Negative'),
+    ('O+', 'O Positive'),
+    ('O-', 'O Negative'),
+]
+
+# FHIR Marital Status (http://terminology.hl7.org/CodeSystem/v3-MaritalStatus)
+MARITAL_STATUS_CHOICES = [
+    ('S', 'Never Married'),  # Single
+    ('M', 'Married'),
+    ('D', 'Divorced'),
+    ('W', 'Widowed'),
+    ('L', 'Legally Separated'),
+]
+
+# PWD Type choices (Philippine-specific)
+PWD_TYPE_CHOICES = [
+    ('visual', 'Visual Disability'),
+    ('hearing', 'Hearing Disability'),
+    ('mobility', 'Mobility Disability'),
+    ('mental', 'Mental/Psychosocial Disability'),
+    ('intellectual', 'Intellectual Disability'),
+    ('speech', 'Speech and Language Disability'),
+    ('multiple', 'Multiple Disabilities'),
+    ('other', 'Other'),
+]
+
+
 class Patient(TimeStampedModel):
     """
     PHCORE Standard Patient Model
@@ -17,16 +59,41 @@ class Patient(TimeStampedModel):
     suffix_name = models.CharField(max_length=255, null=True, blank=True)
     
     # Demographics
-    gender = models.CharField(max_length=100, null=True, blank=True)
+    gender = models.CharField(
+        max_length=20,
+        choices=GENDER_CHOICES,
+        null=True,
+        blank=True,
+        help_text="FHIR administrative gender"
+    )
     birthdate = models.DateField(null=True, blank=True)
-    civil_status = models.CharField(max_length=255, null=True, blank=True)
+    civil_status = models.CharField(
+        max_length=50,
+        choices=MARITAL_STATUS_CHOICES,
+        null=True,
+        blank=True,
+        help_text="FHIR marital status code"
+    )
     nationality = models.CharField(max_length=255, null=True, blank=True)
     religion = models.CharField(max_length=255, null=True, blank=True)
-    
+    race = models.CharField(max_length=100, null=True, blank=True, help_text="Patient's race (PH Core extension)")
+
     # Health identifiers
     philhealth_id = models.CharField(max_length=255, null=True, blank=True)
-    blood_type = models.CharField(max_length=100, null=True, blank=True)
-    pwd_type = models.CharField(max_length=100, null=True, blank=True)
+    blood_type = models.CharField(
+        max_length=10,
+        choices=BLOOD_TYPE_CHOICES,
+        null=True,
+        blank=True,
+        help_text="ABO and Rh blood type"
+    )
+    pwd_type = models.CharField(
+        max_length=100,
+        choices=PWD_TYPE_CHOICES,
+        null=True,
+        blank=True,
+        help_text="Type of disability for PWD classification"
+    )
     
     # Occupation and Education
     occupation = models.CharField(max_length=255, null=True, blank=True)
@@ -56,13 +123,17 @@ class Patient(TimeStampedModel):
     # Consent and media
     consent_flag = models.BooleanField(null=True, blank=True)
     image_url = models.URLField(max_length=255, null=True, blank=True)
-    
+
+    # FHIR standard field
+    active = models.BooleanField(default=True, null=True, blank=True, help_text="Whether this patient record is active")
+
     class Meta:
         db_table = 'patient'
         indexes = [
             models.Index(fields=['patient_id']),
             models.Index(fields=['last_name', 'first_name']),
             models.Index(fields=['philhealth_id']),
+            models.Index(fields=['active', 'last_name', 'first_name']),  # Composite for active patient lists
         ]
 
     def __str__(self):

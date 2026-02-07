@@ -1,39 +1,68 @@
+// ============================================================================
+// GENDER TYPES
+// ============================================================================
+export type Gender = 'male' | 'female' | 'other' | 'unknown';
+
+// ============================================================================
+// BLOOD TYPES
+// ============================================================================
+export type BloodType = 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-';
+
+// ============================================================================
+// CIVIL STATUS / MARITAL STATUS
+// ============================================================================
+export type MaritalStatus = 'S' | 'M' | 'D' | 'W' | 'L';
+
+// ============================================================================
+// PWD TYPES
+// ============================================================================
+export type PWDType =
+  | 'visual'
+  | 'hearing'
+  | 'mobility'
+  | 'mental'
+  | 'intellectual'
+  | 'speech'
+  | 'multiple'
+  | 'other';
+
+// ============================================================================
+// PATIENT
+// ============================================================================
 export type Patient = {
   /** Django primary key */
   id: number;
-  
+
   /** Hospital-generated ID */
   patient_id?: string;
 
-  /** Name */
+  /** Name fields */
   first_name: string;
-  middle_name?: string;
   last_name: string;
+  middle_name?: string;
   suffix_name?: string;
-  full_name?: string;
 
   /** Demographics */
-  gender: 'M' | 'F';
-  birthdate: string; // YYYY-MM-DD
+  gender?: Gender;
+  birthdate?: string; // YYYY-MM-DD
   age?: number;
-  civil_status?: string;
+  civil_status?: MaritalStatus;
   nationality?: string;
   religion?: string;
+  race?: string;
 
   /** Health Identifiers */
   philhealth_id?: string;
-  blood_type?: string;
-  pwd_type?: string;
+  blood_type?: BloodType;
+  pwd_type?: PWDType;
 
   /** Socio-economic */
   occupation?: string;
   education?: string;
-  indigenous_flag?: boolean;
-  indigenous_group?: string;
 
   /** Contact */
-  mobile_number: string;
-  
+  mobile_number?: string;
+
   /** Address */
   address_line?: string;
   address_city?: string;
@@ -41,7 +70,6 @@ export type Patient = {
   address_state?: string;
   address_country?: string;
   address_postal_code?: string;
-  full_address?: string;
 
   /** Emergency Contact */
   contact_first_name?: string;
@@ -49,54 +77,69 @@ export type Patient = {
   contact_mobile_number?: string;
   contact_relationship?: string;
 
-  /** System */
-  status?: string;
+  /** PWD & Indigenous */
+  indigenous_flag?: boolean;
+  indigenous_group?: string;
+
+  /** Consent & Media */
   consent_flag?: boolean;
   image_url?: string;
+
+  /** System */
+  active?: boolean;
   created_at?: string;
   updated_at?: string;
 };
 
 export type PatientFormData = {
-  // Optional for creation, required for updates (sometimes handled separately)
-  patient_id?: string; 
-  
+  /** Optional for creation, required for updates */
+  patient_id?: string;
+
+  /** Name fields */
   first_name: string;
-  middle_name?: string;
   last_name: string;
+  middle_name?: string;
   suffix_name?: string;
 
-  gender: 'M' | 'F';
-  birthdate: string;
-  
-  civil_status?: string;
+  /** Demographics */
+  gender?: Gender;
+  birthdate?: string;
+  civil_status?: MaritalStatus;
   nationality?: string;
   religion?: string;
+  race?: string;
 
+  /** Health Identifiers */
   philhealth_id?: string;
-  blood_type?: string;
-  pwd_type?: string;
+  blood_type?: BloodType;
+  pwd_type?: PWDType;
 
+  /** Socio-economic */
   occupation?: string;
   education?: string;
 
-  mobile_number: string;
+  /** Contact */
+  mobile_number?: string;
 
+  /** Address */
   address_line?: string;
   address_city?: string;
   address_district?: string;
   address_state?: string;
   address_country?: string;
   address_postal_code?: string;
-  
+
+  /** Emergency Contact */
   contact_first_name?: string;
   contact_last_name?: string;
   contact_mobile_number?: string;
   contact_relationship?: string;
 
+  /** PWD & Indigenous */
   indigenous_flag?: boolean;
   indigenous_group?: string;
-  
+
+  /** Consent & Media */
   consent_flag?: boolean;
 };
 
