@@ -148,6 +148,74 @@ class PatientOutputSerializer(serializers.Serializer):
 
 
 # ============================================================================
+# MOBILE APP SERIALIZER (OPTIMIZED PAYLOAD)
+# ============================================================================
+
+class PatientMobileSerializer(serializers.ModelSerializer):
+    """
+    Patient Mobile App Serializer
+    
+    Optimized for external webhook / mobile app consumption.
+    Includes filtering fields and nested clinical summaries.
+    """
+    
+    # Nested clinical data
+    conditions = serializers.SerializerMethodField()
+    allergies = serializers.SerializerMethodField()
+    immunizations = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Patient
+        fields = [
+            # Identity
+            'patient_id', 'first_name', 'last_name', 'middle_name', 'suffix_name',
+            'birthdate', 'gender', 'image_url', 
+            
+            # Contact
+            'mobile_number', 'address_line', 'address_city',
+            'address_district', 'address_state',
+            
+            # Health
+            'blood_type', 'philhealth_id', 'pwd_type', 'civil_status',
+            
+            # Emergency
+            'contact_first_name', 'contact_last_name', 
+            'contact_mobile_number', 'contact_relationship',
+            
+            # Medical Records
+            'conditions', 'allergies', 'immunizations'
+        ]
+
+    def get_conditions(self, obj):
+        # Fetch active conditions
+        conditions = obj.conditions.filter(clinical_status='active').order_by('-onset_datetime')
+        return [{
+            'code': c.code,
+            'clinical_status': c.clinical_status,
+            'onset': c.onset_datetime,
+            'severity': c.severity
+        } for c in conditions]
+
+    def get_allergies(self, obj):
+        # Fetch all allergies
+        allergies = obj.allergies.all()
+        return [{
+            'code': a.code,
+            'criticality': a.criticality,
+            'reaction': a.reaction_description
+        } for a in allergies]
+
+    def get_immunizations(self, obj):
+        # Fetch completed immunizations
+        imm = obj.immunizations.filter(status='completed')
+        return [{
+            'vaccine': a.vaccine_display or a.vaccine_code,
+            'date': a.occurrence_datetime,
+            'status': a.status
+        } for a in imm]
+
+
+# ============================================================================
 # CONDITION SERIALIZERS
 # ============================================================================
 
