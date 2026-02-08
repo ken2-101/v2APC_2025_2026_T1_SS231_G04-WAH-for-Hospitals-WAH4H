@@ -87,7 +87,7 @@ const Login = () => {
   };
 
   const handleForgotPassword = () => {
-    alert('Demo credentials:\nEmail: demo@hospital.com\nPassword: demo123');
+    navigate('/reset-password');
   };
 
   const handleBackToCredentials = () => {

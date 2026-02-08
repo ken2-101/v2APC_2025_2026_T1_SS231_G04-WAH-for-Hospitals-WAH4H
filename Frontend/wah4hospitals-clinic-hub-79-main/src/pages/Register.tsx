@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -119,37 +120,37 @@ const ROLE_CARDS = [
     value: 'doctor' as UserRole,
     label: 'Doctor',
     description: 'Medical practitioner with prescribing authority',
-    icon: '🩺',
+    icon: 'DR',
   },
   {
     value: 'nurse' as UserRole,
     label: 'Nurse',
     description: 'Registered healthcare professional providing patient care',
-    icon: '💉',
+    icon: 'RN',
   },
   {
     value: 'pharmacist' as UserRole,
     label: 'Pharmacist',
     description: 'Medication expert managing pharmacy operations',
-    icon: '💊',
+    icon: 'PH',
   },
   {
     value: 'lab-tech' as UserRole,
     label: 'Lab Technician',
     description: 'Laboratory specialist conducting diagnostic tests',
-    icon: '🔬',
+    icon: 'LT',
   },
   {
     value: 'admin' as UserRole,
     label: 'Admin',
     description: 'Administrative staff managing hospital operations',
-    icon: '👔',
+    icon: 'AD',
   },
   {
     value: 'billing-staff' as UserRole,
     label: 'Billing Staff',
     description: 'Financial staff handling billing and payments',
-    icon: '💰',
+    icon: 'BL',
   },
 ];
 
@@ -168,6 +169,9 @@ const Register = () => {
   const [otpCode, setOtpCode] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [orgsLoaded, setOrgsLoaded] = useState(false);
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [privacyError, setPrivacyError] = useState('');
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
   const navigate = useNavigate();
   const { registerInitiate, registerVerify, isLoading } = useAuth();
@@ -233,7 +237,7 @@ const Register = () => {
       // We assume the endpoint is at /accounts/organizations/ based on your .env BACKEND_ACCOUNTS_8000
       const url = `${apiBase}/accounts/organizations/`;
 
-      console.log('🏥 Fetching hospitals from:', url);
+      console.log('Fetching hospitals from:', url);
 
       const response = await fetch(url, {
         headers: {
@@ -458,6 +462,10 @@ const Register = () => {
 
     if (currentStep === 1) {
       isValid = validateStep1();
+      if (!privacyAccepted) {
+        setPrivacyError('You must acknowledge the Privacy Statement to create an account.');
+        return;
+      }
     } else if (currentStep === 2) {
       isValid = validateStep2();
     }
@@ -541,17 +549,17 @@ const Register = () => {
   // ============================================================================
 
   const renderStepIndicator = () => (
-    <div className="flex items-center justify-center mb-8">
+    <div className="flex items-center justify-center mb-10">
       {[1, 2, 3].map((step) => (
-        <React.Fragment key={step}>
+        <div key={step} className="flex items-center">
           <div
             className={cn(
-              'flex items-center justify-center w-10 h-10 rounded-full font-semibold transition-colors',
+              'flex items-center justify-center w-9 h-9 rounded-full text-sm font-semibold transition-colors',
               currentStep === step
-                ? 'bg-blue-600 text-white'
+                ? 'bg-blue-600 text-white shadow-sm'
                 : currentStep > step
                 ? 'bg-green-600 text-white'
-                : 'bg-gray-200 text-gray-600'
+                : 'bg-slate-200 text-slate-600'
             )}
           >
             {currentStep > step ? <Check className="w-5 h-5" /> : step}
@@ -559,12 +567,12 @@ const Register = () => {
           {step < 3 && (
             <div
               className={cn(
-                'w-16 h-1 mx-2 transition-colors',
-                currentStep > step ? 'bg-green-600' : 'bg-gray-200'
+                'w-16 h-1 mx-2 rounded-full transition-colors',
+                currentStep > step ? 'bg-green-600' : 'bg-slate-200'
               )}
             />
           )}
-        </React.Fragment>
+        </div>
       ))}
     </div>
   );
@@ -573,7 +581,7 @@ const Register = () => {
     <div className="space-y-6">
       {/* Personal Identity Section */}
       <div>
-        <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
+        <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2 mb-4">
           <User className="w-5 h-5" />
           Personal Identity
         </h3>
@@ -754,7 +762,7 @@ const Register = () => {
 
       {/* Account Security Section */}
       <div>
-        <h3 className="text-lg font-semibold mb-4">Account Security</h3>
+        <h3 className="text-base font-semibold text-slate-900 mb-4">Account Security</h3>
 
         <div className="space-y-4">
           {/* Role Selection - Grid of Cards */}
@@ -762,24 +770,26 @@ const Register = () => {
             <Label>
               Select Your Role <span className="text-red-500">*</span>
             </Label>
-            <div className="grid grid-cols-2 gap-3 mt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
               {ROLE_CARDS.map((roleCard) => (
                 <button
                   key={roleCard.value}
                   type="button"
                   onClick={() => handleInputChange('role', roleCard.value)}
                   className={cn(
-                    'p-4 border-2 rounded-lg text-left transition-all hover:shadow-md',
+                    'p-4 border rounded-xl text-left transition-all bg-white hover:shadow-md',
                     formData.role === roleCard.value
-                      ? 'border-blue-600 bg-blue-50'
-                      : 'border-gray-200 hover:border-gray-300'
+                      ? 'border-blue-600 ring-2 ring-blue-100 bg-blue-50/60'
+                      : 'border-slate-200 hover:border-slate-300'
                   )}
                 >
                   <div className="flex items-start gap-3">
-                    <span className="text-2xl">{roleCard.icon}</span>
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700">
+                      {roleCard.icon}
+                    </span>
                     <div>
-                      <div className="font-semibold">{roleCard.label}</div>
-                      <div className="text-xs text-gray-600 mt-1">
+                      <div className="font-semibold text-slate-900">{roleCard.label}</div>
+                      <div className="text-xs text-slate-600 mt-1">
                         {roleCard.description}
                       </div>
                     </div>
@@ -803,12 +813,15 @@ const Register = () => {
                 type={showPassword ? 'text' : 'password'}
                 value={formData.password}
                 onChange={(e) => handleInputChange('password', e.target.value)}
-                className={errors.password ? 'border-red-500' : ''}
+                className={cn(
+                  'pr-10 [appearance:textfield] [&::-ms-reveal]:hidden [&::-ms-clear]:hidden [&::-webkit-credentials-auto-fill-button]:hidden',
+                  errors.password ? 'border-red-500' : ''
+                )}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -816,8 +829,8 @@ const Register = () => {
             {errors.password && (
               <p className="text-sm text-red-500 mt-1">{errors.password}</p>
             )}
-            <p className="text-xs text-gray-500 mt-1">
-              Must contain 1 uppercase, 1 lowercase, 1 number, min 8 characters
+            <p className="text-xs text-slate-500 mt-1">
+              Must be at least 12 characters and contain 1 special character.
             </p>
           </div>
 
@@ -831,12 +844,15 @@ const Register = () => {
                 type={showConfirmPassword ? 'text' : 'password'}
                 value={formData.confirmPassword}
                 onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                className={errors.confirmPassword ? 'border-red-500' : ''}
+                className={cn(
+                  'pr-10 [appearance:textfield] [&::-ms-reveal]:hidden [&::-ms-clear]:hidden [&::-webkit-credentials-auto-fill-button]:hidden',
+                  errors.confirmPassword ? 'border-red-500' : ''
+                )}
               />
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500"
               >
                 {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -852,7 +868,7 @@ const Register = () => {
 
   const renderStep2 = () => (
     <div className="space-y-6">
-      <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
+      <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2 mb-4">
         <MapPin className="w-5 h-5" />
         Address Information
       </h3>
@@ -955,7 +971,7 @@ const Register = () => {
 
   const renderStep3 = () => (
     <div className="space-y-6">
-      <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
+      <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2 mb-4">
         <Briefcase className="w-5 h-5" />
         Professional Qualifications
       </h3>
@@ -1075,7 +1091,7 @@ const Register = () => {
       </div>
 
       <div className="border-t pt-6">
-        <h3 className="text-lg font-semibold mb-4">Hospital Assignment</h3>
+        <h3 className="text-base font-semibold text-slate-900 mb-4">Hospital Assignment</h3>
 
         <div className="space-y-4">
           {/* Organization */}
@@ -1162,80 +1178,199 @@ const Register = () => {
   // ============================================================================
 
   return (
-    <>
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <Card className="w-full max-w-4xl">
-          <CardHeader className="text-center">
-            <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg mx-auto mb-4 flex items-center justify-center">
-              <UserPlus className="text-white w-8 h-8" />
-            </div>
-            <CardTitle className="text-2xl">Create Professional Account</CardTitle>
-            <p className="text-gray-600">Join WAH4H Healthcare System</p>
-          </CardHeader>
+    <div
+      data-lov-id="register-shell"
+      className="min-h-screen bg-gradient-to-br from-blue-50 via-slate-50 to-indigo-100 flex items-center justify-center p-6 sm:p-8"
+    >
+      <Card className="w-full max-w-4xl border border-slate-200/80 shadow-xl rounded-2xl overflow-hidden">
+        <CardHeader className="text-center px-8 pt-8 pb-6 bg-white/70">
+          <div className="w-14 h-14 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl mx-auto mb-4 flex items-center justify-center shadow-sm">
+            <UserPlus className="text-white w-7 h-7" />
+          </div>
+          <CardTitle className="text-2xl font-semibold text-slate-900">
+            Create Professional Account
+          </CardTitle>
+          <p className="text-sm text-slate-600">Join WAH4H Healthcare System</p>
+        </CardHeader>
 
-          <CardContent>
-            {renderStepIndicator()}
+        <CardContent className="px-8 pb-8">
+          {renderStepIndicator()}
 
-            <form onSubmit={handleSubmit}>
-              {currentStep === 1 && renderStep1()}
-              {currentStep === 2 && renderStep2()}
-              {currentStep === 3 && renderStep3()}
+          <form onSubmit={handleSubmit}>
+            {currentStep === 1 && renderStep1()}
+            {currentStep === 2 && renderStep2()}
+            {currentStep === 3 && renderStep3()}
 
-              {/* Navigation Buttons */}
-              <div className="flex justify-between mt-8 pt-6 border-t">
-                {currentStep > 1 ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handlePrevious}
-                    disabled={isLoading}
-                  >
-                    <ChevronLeft className="w-4 h-4 mr-2" />
-                    Previous
-                  </Button>
-                ) : (
-                  <div />
-                )}
-
-                {currentStep < 3 ? (
-                  <Button
-                    type="button"
-                    onClick={handleNext}
-                    className="bg-blue-600 hover:bg-blue-700"
-                  >
-                    Next
-                    <ChevronRight className="w-4 h-4 ml-2" />
-                  </Button>
-                ) : (
-                  <Button
-                    type="submit"
-                    className="bg-green-600 hover:bg-green-700"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Sending verification code...
-                      </>
-                    ) : (
-                      <>
-                        <Check className="w-4 h-4 mr-2" />
-                        Complete Registration
-                      </>
-                    )}
-                  </Button>
+            {currentStep === 1 && (
+              <div className="mt-6 rounded-xl border border-slate-200 bg-white/70 px-4 py-3">
+                <div className="flex items-start gap-3">
+                  <Checkbox
+                    id="privacyAccepted"
+                    checked={privacyAccepted}
+                    onCheckedChange={(checked) => {
+                      setPrivacyAccepted(Boolean(checked));
+                      setPrivacyError('');
+                    }}
+                  />
+                  <Label htmlFor="privacyAccepted" className="text-sm font-normal text-slate-700">
+                    I acknowledge the{' '}
+                    <button
+                      type="button"
+                      className="text-blue-600 hover:text-blue-700 underline underline-offset-4"
+                      onClick={() => setShowPrivacyModal(true)}
+                    >
+                      Privacy Statement
+                    </button>
+                    .
+                  </Label>
+                </div>
+                {privacyError && (
+                  <p className="text-sm text-red-600 mt-2">{privacyError}</p>
                 )}
               </div>
-            </form>
+            )}
 
-            <div className="text-center mt-6">
-              <Button variant="link" onClick={() => navigate('/login')}>
-                Already have an account? Sign in
+            {/* Navigation Buttons */}
+
+            <div className="flex justify-between mt-8 pt-6 border-t">
+              {currentStep > 1 ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handlePrevious}
+                  disabled={isLoading}
+                  className="rounded-lg"
+                >
+                  <ChevronLeft className="w-4 h-4 mr-2" />
+                  Previous
+                </Button>
+              ) : (
+                <div />
+              )}
+
+              {currentStep < 3 ? (
+                <Button
+                  type="button"
+                  onClick={handleNext}
+                  className="bg-blue-600 hover:bg-blue-700 rounded-lg"
+                >
+                  Next
+                  <ChevronRight className="w-4 h-4 ml-2" />
+                </Button>
+              ) : (
+                <Button
+                  type="submit"
+                  className="bg-green-600 hover:bg-green-700 rounded-lg"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending verification code...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4 mr-2" />
+                      Complete Registration
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+          </form>
+
+          <div className="text-center mt-6">
+            <Button variant="link" onClick={() => navigate('/login')}>
+              Already have an account? Sign in
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {showPrivacyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-6">
+          <div className="flex flex-col w-full max-w-3xl max-h-[90vh] rounded-2xl bg-white shadow-2xl">
+            <div className="flex-none flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 px-6 py-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Policy</p>
+                <h2 className="text-lg font-bold text-slate-900">
+                  Privacy Statement
+                </h2>
+                <p className="text-sm text-slate-600">Effective Date: February 8, 2026</p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-full"
+                onClick={() => setShowPrivacyModal(false)}
+              >
+                Close
               </Button>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+            <div className="flex-1 overflow-y-auto px-6 py-5 text-sm text-slate-700">
+              <div className="space-y-4">
+                <section className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-4">
+                  <h3 className="font-bold text-slate-900 text-base">1. Introduction</h3>
+                  <p className="mt-2">
+                    Wireless Access for Health (WAH) provides the WAH4H Hospital Management System. By using
+                    WAH4H, you agree to the collection and use of information in accordance with this policy.
+                  </p>
+                </section>
+                <section className="rounded-xl border border-slate-200/80 bg-white p-4">
+                  <h3 className="font-bold text-slate-900 text-base">2. Data We Collect</h3>
+                  <p className="mt-2">We collect only the information necessary to validate your identity and role:</p>
+                  <ul className="list-disc pl-5 mt-2 space-y-1">
+                    <li>Full Name & Contact Details</li>
+                    <li>PRC License Number (for practitioners)</li>
+                    <li>Organizational Role & Employment Details</li>
+                    <li>System Usage Logs</li>
+                  </ul>
+                </section>
+                <section className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-4">
+                  <h3 className="font-bold text-slate-900 text-base">3. Purpose of Collection</h3>
+                  <p className="mt-2">Your data is used strictly for:</p>
+                  <ul className="list-disc pl-5 mt-2 space-y-1">
+                    <li>Authentication: Verifying your identity as a healthcare provider.</li>
+                    <li>Security: Preventing unauthorized access via 2-Factor Authentication.</li>
+                    <li>Compliance: Meeting DOH and LGU reporting requirements.</li>
+                  </ul>
+                </section>
+                <section className="rounded-xl border border-slate-200/80 bg-white p-4">
+                  <h3 className="font-bold text-slate-900 text-base">4. Retention & Disposal</h3>
+                  <ul className="list-disc pl-5 mt-2 space-y-1">
+                    <li>Active Accounts: Retained indefinitely while active.</li>
+                    <li>Inactive Accounts: Deleted after 15 years of inactivity (per Health Information Exchange Guidelines).</li>
+                  </ul>
+                </section>
+                <section className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-4">
+                  <h3 className="font-bold text-slate-900 text-base">5. Information Sharing</h3>
+                  <p className="mt-2">We do not sell your data. We share only when:</p>
+                  <ul className="list-disc pl-5 mt-2 space-y-1">
+                    <li>Legally required by court order or subpoena.</li>
+                    <li>Necessary for system operations (e.g., SMS Gateways, Cloud Hosting).</li>
+                    <li>Required for anonymized public health reporting (DOH).</li>
+                  </ul>
+                </section>
+                <section className="rounded-xl border border-slate-200/80 bg-white p-4">
+                  <h3 className="font-bold text-slate-900 text-base">6. Security Measures</h3>
+                  <p className="mt-2">
+                    We employ Role-Based Access Control (RBAC), Encryption (at rest and in transit), and OTP
+                    verification. Note: Users are responsible for keeping their credentials confidential.
+                  </p>
+                </section>
+                <section className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-4">
+                  <h3 className="font-bold text-slate-900 text-base">7. Contact Us</h3>
+                  <ul className="list-disc pl-5 mt-2 space-y-1">
+                    <li>Project Leader: Jhon Lloyd Nicolas (Pseudoers)</li>
+                    <li>Email: wah4h@gmail.com</li>
+                    <li>Address: 3 Humabon Place, Magallanes, Makati City (Asia Pacific College)</li>
+                  </ul>
+                </section>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* OTP Verification Modal */}
       {showOTPModal && (
@@ -1333,7 +1468,7 @@ const Register = () => {
           </Card>
         </div>
       )}
-    </>
+    </div>
   );
 };
 
