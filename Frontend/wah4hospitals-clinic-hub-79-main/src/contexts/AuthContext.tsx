@@ -60,6 +60,7 @@ interface AuthContextType {
   loginVerify: (email: string, otp: string) => Promise<AuthResult>;
   passwordResetInitiate: (email: string) => Promise<AuthResult>;
   passwordResetConfirm: (email: string, otp: string, newPassword: string, confirmPassword: string) => Promise<AuthResult>;
+  changePassword: (currentPassword: string, newPassword: string, confirmPassword: string) => Promise<AuthResult>;
   register: (data: RegisterData) => Promise<AuthResult>;
   registerInitiate: (data: RegisterData) => Promise<AuthResult>;
   registerVerify: (email: string, otp: string) => Promise<AuthResult>;
@@ -126,12 +127,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             // Retry the original request with new token
             originalRequest.headers.Authorization = `Bearer ${access}`;
             return axiosInstance(originalRequest);
-          } catch (refreshError) {
-            // Token refresh failed - logout user
-            console.error('Token refresh failed:', refreshError);
-            logout();
+          } catch (refreshError: any) {
+            // Token refresh failed - clear stale tokens and logout
+            console.error('Token refresh failed - clearing stale tokens:', refreshError);
+            
+            // Clear all tokens (they might be stale/invalid)
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+            localStorage.removeItem('currentUser');
+            localStorage.removeItem('userRole');
+            localStorage.removeItem('adminMode');
+            
+            setUser(null);
+            
+            // Only show toast if not already on login page
+            if (!window.location.pathname.includes('/login')) {
+              toast({
+                title: 'Session expired',
+                description: 'Please log in again.',
+                variant: 'destructive',
+              });
+            }
+            
             return Promise.reject(refreshError);
           }
+        } else {
+          // No refresh token - clear everything
+          logout();
         }
       }
 
@@ -282,6 +304,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toast({
         title: 'Reset failed',
         description: errorData?.message || errorData?.detail || 'Unable to reset password. Please try again.',
+        variant: 'destructive',
+      });
+      return { ok: false, error: errorData };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Change Password - Authenticated users change their password
+   */
+  const changePassword = async (
+    currentPassword: string,
+    newPassword: string,
+    confirmPassword: string
+  ): Promise<AuthResult> => {
+    setIsLoading(true);
+    try {
+      await axiosInstance.post('/accounts/change-password/', {
+        current_password: currentPassword,
+        new_password: newPassword,
+        confirm_password: confirmPassword,
+      });
+
+      toast({
+        title: 'Password changed',
+        description: 'Your password has been changed successfully.',
+      });
+
+      return { ok: true };
+    } catch (err: any) {
+      const errorData = getErrorData(err);
+      console.error('Change password error:', errorData);
+
+      toast({
+        title: 'Change failed',
+        description: errorData?.message || errorData?.detail || 'Unable to change password. Please try again.',
         variant: 'destructive',
       });
       return { ok: false, error: errorData };
@@ -452,6 +511,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loginVerify,
         passwordResetInitiate,
         passwordResetConfirm,
+        changePassword,
         register,
         registerInitiate,
         registerVerify, 

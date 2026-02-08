@@ -173,6 +173,15 @@ const Register = () => {
   const [privacyError, setPrivacyError] = useState('');
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
+  // Password strength requirements state
+  const [passwordRequirements, setPasswordRequirements] = useState({
+    minLength: false,
+    hasUppercase: false,
+    hasLowercase: false,
+    hasNumber: false,
+    hasSpecialChar: false,
+  });
+
   const navigate = useNavigate();
   const { registerInitiate, registerVerify, isLoading } = useAuth();
 
@@ -293,14 +302,20 @@ const Register = () => {
     return /^\d{7}$/.test(license);
   };
 
+  // OWASP-Compliant Password Validation (No External Libraries)
+  const checkPasswordRequirements = (password: string) => {
+    return {
+      minLength: password.length >= 12,
+      hasUppercase: /[A-Z]/.test(password),
+      hasLowercase: /[a-z]/.test(password),
+      hasNumber: /[0-9]/.test(password),
+      hasSpecialChar: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password),
+    };
+  };
+
   const validatePassword = (password: string): boolean => {
-    // At least 1 uppercase, 1 lowercase, 1 number, min 8 characters
-    return (
-      password.length >= 8 &&
-      /[A-Z]/.test(password) &&
-      /[a-z]/.test(password) &&
-      /[0-9]/.test(password)
-    );
+    const requirements = checkPasswordRequirements(password);
+    return Object.values(requirements).every((req) => req === true);
   };
 
   const validateStep1 = (): boolean => {
@@ -341,11 +356,11 @@ const Register = () => {
     // Role validation
     if (!formData.role) newErrors.role = 'Please select your role';
 
-    // Password validation
+    // Password validation - OWASP Compliant
     if (!formData.password) {
       newErrors.password = 'Password is required';
     } else if (!validatePassword(formData.password)) {
-      newErrors.password = 'Password must contain at least 1 uppercase, 1 lowercase, 1 number, and be 8+ characters';
+      newErrors.password = 'Password must meet all security requirements below';
     }
 
     // Confirm password validation
@@ -426,6 +441,12 @@ const Register = () => {
 
   const handleInputChange = (field: keyof RegistrationFormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+    
+    // Real-time password strength checking
+    if (field === 'password') {
+      setPasswordRequirements(checkPasswordRequirements(value));
+    }
+    
     // Clear error for this field
     if (errors[field]) {
       setErrors((prev) => {
@@ -829,9 +850,83 @@ const Register = () => {
             {errors.password && (
               <p className="text-sm text-red-500 mt-1">{errors.password}</p>
             )}
-            <p className="text-xs text-slate-500 mt-1">
-              Must be at least 12 characters and contain 1 special character.
-            </p>
+            
+            {/* Password Strength Requirements Checklist */}
+            <div className="mt-3 space-y-2 p-3 rounded-lg bg-slate-50 border border-slate-200">
+              <p className="text-xs font-semibold text-slate-700 mb-2">Password Requirements:</p>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <div className={cn(
+                    "w-4 h-4 rounded-full flex items-center justify-center",
+                    passwordRequirements.minLength ? "bg-green-500" : "bg-slate-300"
+                  )}>
+                    {passwordRequirements.minLength && <Check className="w-3 h-3 text-white" />}
+                  </div>
+                  <span className={cn(
+                    "text-xs",
+                    passwordRequirements.minLength ? "text-green-700 font-medium" : "text-slate-600"
+                  )}>
+                    At least 12 characters
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className={cn(
+                    "w-4 h-4 rounded-full flex items-center justify-center",
+                    passwordRequirements.hasUppercase ? "bg-green-500" : "bg-slate-300"
+                  )}>
+                    {passwordRequirements.hasUppercase && <Check className="w-3 h-3 text-white" />}
+                  </div>
+                  <span className={cn(
+                    "text-xs",
+                    passwordRequirements.hasUppercase ? "text-green-700 font-medium" : "text-slate-600"
+                  )}>
+                    At least 1 uppercase letter (A-Z)
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className={cn(
+                    "w-4 h-4 rounded-full flex items-center justify-center",
+                    passwordRequirements.hasLowercase ? "bg-green-500" : "bg-slate-300"
+                  )}>
+                    {passwordRequirements.hasLowercase && <Check className="w-3 h-3 text-white" />}
+                  </div>
+                  <span className={cn(
+                    "text-xs",
+                    passwordRequirements.hasLowercase ? "text-green-700 font-medium" : "text-slate-600"
+                  )}>
+                    At least 1 lowercase letter (a-z)
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className={cn(
+                    "w-4 h-4 rounded-full flex items-center justify-center",
+                    passwordRequirements.hasNumber ? "bg-green-500" : "bg-slate-300"
+                  )}>
+                    {passwordRequirements.hasNumber && <Check className="w-3 h-3 text-white" />}
+                  </div>
+                  <span className={cn(
+                    "text-xs",
+                    passwordRequirements.hasNumber ? "text-green-700 font-medium" : "text-slate-600"
+                  )}>
+                    At least 1 number (0-9)
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className={cn(
+                    "w-4 h-4 rounded-full flex items-center justify-center",
+                    passwordRequirements.hasSpecialChar ? "bg-green-500" : "bg-slate-300"
+                  )}>
+                    {passwordRequirements.hasSpecialChar && <Check className="w-3 h-3 text-white" />}
+                  </div>
+                  <span className={cn(
+                    "text-xs",
+                    passwordRequirements.hasSpecialChar ? "text-green-700 font-medium" : "text-slate-600"
+                  )}>
+                    At least 1 special character (!@#$%^&*)
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div>

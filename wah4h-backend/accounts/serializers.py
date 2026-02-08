@@ -361,12 +361,71 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         user = self.validated_data['user']
         new_password = self.validated_data['new_password']
         
+        # Validate new password is not the same as current password
+        if user.check_password(new_password):
+            raise serializers.ValidationError({"new_password": "New password must be different from your current password."})
+        
         # Set new password (uses Django's set_password for hashing)
         user.set_password(new_password)
-        user.save()
+        user.save(update_fields=['password'])
+        
+        # Update the related Practitioner's updated_at timestamp
+        if hasattr(user, 'practitioner'):
+            user.practitioner.save(update_fields=['updated_at'])
         
         # Delete OTP
         cache_key = f"otp_reset_{user.email}"
         cache.delete(cache_key)
+        
+        return user
+
+
+# ============================================================================
+# CHANGE PASSWORD (AUTHENTICATED USERS)
+# ============================================================================
+
+class ChangePasswordSerializer(serializers.Serializer):
+    """
+    Change password for authenticated users.
+    Requires current password verification.
+    """
+    current_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True, min_length=8)
+    confirm_password = serializers.CharField(write_only=True, min_length=8)
+    
+    def validate(self, attrs):
+        """Validate passwords."""
+        user = self.context.get('user')
+        
+        if not user:
+            raise serializers.ValidationError({"detail": "User not authenticated."})
+        
+        # Verify current password
+        if not user.check_password(attrs['current_password']):
+            raise serializers.ValidationError({"current_password": "Current password is incorrect."})
+        
+        # Check new passwords match
+        if attrs['new_password'] != attrs['confirm_password']:
+            raise serializers.ValidationError({"confirm_password": "Passwords do not match."})
+        
+        # Ensure new password is different from current password
+        if user.check_password(attrs['new_password']):
+            raise serializers.ValidationError({"new_password": "New password must be different from your current password."})
+        
+        return attrs
+    
+    @transaction.atomic
+    def save(self):
+        """Update password for authenticated user."""
+        user = self.context.get('user')
+        new_password = self.validated_data['new_password']
+        
+        # Set new password (uses Django's set_password for hashing)
+        user.set_password(new_password)
+        user.save(update_fields=['password'])
+        
+        # Update the related Practitioner's updated_at timestamp
+        if hasattr(user, 'practitioner'):
+            user.practitioner.save(update_fields=['updated_at'])
         
         return user

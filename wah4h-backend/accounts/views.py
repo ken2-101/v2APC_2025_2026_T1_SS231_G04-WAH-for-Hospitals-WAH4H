@@ -21,7 +21,7 @@ Response Format:
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, generics
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.core.mail import send_mail
 from django.core.cache import cache
@@ -39,6 +39,7 @@ from .serializers import (
     LoginStepTwoSerializer,
     PasswordResetInitiateSerializer,
     PasswordResetConfirmSerializer,
+    ChangePasswordSerializer,
     generate_otp
 )
 
@@ -542,5 +543,60 @@ class PasswordResetConfirmAPIView(APIView):
         except Exception as e:
             return error_response(
                 message='Password reset confirmation failed.',
+                errors=serializer.errors if hasattr(serializer, 'errors') else {'detail': str(e)}
+            )
+
+
+# ============================================================================
+# CHANGE PASSWORD (AUTHENTICATED USERS)
+# ============================================================================
+
+class ChangePasswordAPIView(APIView):
+    """
+    POST /api/accounts/change-password/
+    
+    Change password for authenticated users.
+    Requires current password verification.
+    
+    Request Body:
+    {
+        "current_password": "OldPassword123",
+        "new_password": "NewSecurePass456",
+        "confirm_password": "NewSecurePass456"
+    }
+    
+    Response:
+    {
+        "status": "success",
+        "message": "Password changed successfully.",
+        "data": {
+            "email": "juan@example.com",
+            "password_changed": true
+        }
+    }
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        serializer = ChangePasswordSerializer(
+            data=request.data,
+            context={'user': request.user}
+        )
+        
+        try:
+            serializer.is_valid(raise_exception=True)
+            user = serializer.save()
+            
+            return success_response(
+                message='Password changed successfully.',
+                data={
+                    'email': user.email,
+                    'password_changed': True
+                }
+            )
+        
+        except Exception as e:
+            return error_response(
+                message='Password change failed.',
                 errors=serializer.errors if hasattr(serializer, 'errors') else {'detail': str(e)}
             )
