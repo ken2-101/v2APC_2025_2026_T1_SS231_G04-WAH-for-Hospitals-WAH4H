@@ -23,12 +23,13 @@ from rest_framework.response import Response
 from rest_framework import status, generics
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
-from django.core.mail import send_mail
 from django.core.cache import cache
 from django.conf import settings
 from django.db import transaction
 import json
 from datetime import date
+
+from .emails import send_otp_email
 
 from .models import Organization
 from .serializers import (
@@ -65,42 +66,6 @@ def get_jwt_tokens(user):
         'access': str(refresh.access_token),
         'refresh': str(refresh)
     }
-
-
-def send_otp_email(email, otp, purpose='verification'):
-    """
-    Send OTP via email (Console Backend for development).
-    
-    Args:
-        email: Recipient email
-        otp: 6-digit OTP code
-        purpose: 'verification', 'login', or 'reset'
-    """
-    subject_map = {
-        'verification': 'WAH4H - Verify Your Account',
-        'login': 'WAH4H - Login Verification Code',
-        'reset': 'WAH4H - Password Reset Code'
-    }
-    
-    message = f"""
-    Your WAH4H verification code is: {otp}
-    
-    This code will expire in 5 minutes.
-    
-    If you did not request this code, please ignore this email.
-    
-    ---
-    WAH4H - Wireless Access for Health
-    Philippine LGU Hospital Management System
-    """
-    
-    send_mail(
-        subject=subject_map.get(purpose, 'WAH4H - Verification Code'),
-        message=message,
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[email],
-        fail_silently=False
-    )
 
 
 def success_response(message, data=None, http_status=status.HTTP_200_OK):
@@ -170,8 +135,12 @@ class RegisterInitiateAPIView(APIView):
             cache_key = f"registration_{cache_data['email']}"
             cache.set(cache_key, cache_data, timeout=900)
             
-            # Send OTP via email
-            send_otp_email(cache_data['email'], otp, purpose='verification')
+            # Send OTP via email using spam-proof HTML template
+            send_otp_email(
+                user_email=cache_data['email'],
+                user_firstname=cache_data.get('first_name', 'User'),
+                otp_code=otp
+            )
             
             return success_response(
                 message='Registration initiated. Please check your email for the verification code.',
@@ -351,8 +320,12 @@ class LoginInitiateAPIView(APIView):
             serializer.is_valid(raise_exception=True)
             user = serializer.save()
             
-            # Send OTP via email
-            send_otp_email(user.email, user.otp, purpose='login')
+            # Send OTP via email using spam-proof HTML template
+            send_otp_email(
+                user_email=user.email,
+                user_firstname=user.first_name,
+                otp_code=user.otp
+            )
             
             return success_response(
                 message='Credentials verified. Please check your email for the login code.',
@@ -480,8 +453,12 @@ class PasswordResetInitiateAPIView(APIView):
             serializer.is_valid(raise_exception=True)
             user = serializer.save()
             
-            # Send OTP via email
-            send_otp_email(user.email, user.otp, purpose='reset')
+            # Send OTP via email using spam-proof HTML template
+            send_otp_email(
+                user_email=user.email,
+                user_firstname=user.first_name,
+                otp_code=user.otp
+            )
             
             return success_response(
                 message='Password reset code sent to your email.',
