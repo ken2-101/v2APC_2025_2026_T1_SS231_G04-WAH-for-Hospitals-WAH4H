@@ -35,15 +35,23 @@ class EncounterInputSerializer(serializers.Serializer):
     type = serializers.CharField(max_length=100, required=False, allow_null=True)
     service_type = serializers.CharField(max_length=100, required=False, allow_null=True)
     priority = serializers.CharField(max_length=255, required=False, allow_null=True)
-    reason_code = serializers.CharField(max_length=100, required=False, allow_null=True)
-    period_start = serializers.DateField(required=False, allow_null=True)
+    reason_code = serializers.CharField(max_length=100, required=False, allow_null=True, allow_blank=True)
+    period_start = serializers.DateTimeField(required=False, allow_null=True)
     location_id = serializers.IntegerField(required=False, allow_null=True)
     participant_individual_id = serializers.IntegerField(required=False, allow_null=True, help_text="Admitting practitioner ID")
     participant_type = serializers.CharField(max_length=100, required=False, allow_null=True)
     admit_source = serializers.CharField(max_length=255, required=False, allow_null=True)
     account_id = serializers.IntegerField(required=False, allow_null=True)
-    pre_admission_identifier = serializers.CharField(max_length=100, required=False, allow_null=True)
+    pre_admission_identifier = serializers.CharField(max_length=100, required=False, allow_null=True, allow_blank=True)
     location_status = serializers.CharField(max_length=100, required=False, allow_null=True, help_text="Text description of location (Ward/Room/Bed)")
+    diet_preference = serializers.CharField(max_length=255, required=False, allow_null=True, allow_blank=True)
+    special_courtesy = serializers.CharField(max_length=255, required=False, allow_null=True, allow_blank=True)
+    special_arrangement = serializers.CharField(max_length=255, required=False, allow_null=True, allow_blank=True)
+    location_ids = serializers.JSONField(required=False, allow_null=True)
+    re_admission = serializers.BooleanField(required=False, allow_null=True)
+    ward = serializers.CharField(max_length=100, required=False, allow_null=True)
+    room = serializers.CharField(max_length=100, required=False, allow_null=True)
+    bed = serializers.CharField(max_length=100, required=False, allow_null=True)
 
 
 class EncounterDischargeInputSerializer(serializers.Serializer):
@@ -74,6 +82,7 @@ class EncounterOutputSerializer(serializers.Serializer):
     period_end = serializers.CharField(allow_null=True)
     reason_code = serializers.CharField(allow_null=True)
     location_id = serializers.IntegerField(allow_null=True)
+    location_ids = serializers.JSONField(allow_null=True)
     location_summary = serializers.DictField(allow_null=True)
     participant_individual_id = serializers.IntegerField(allow_null=True)
     practitioner_summary = serializers.DictField(allow_null=True)
@@ -81,6 +90,15 @@ class EncounterOutputSerializer(serializers.Serializer):
     discharge_disposition = serializers.CharField(allow_null=True)
     created_at = serializers.CharField(allow_null=True)
     updated_at = serializers.CharField(allow_null=True)
+    diet_preference = serializers.CharField(allow_null=True)
+    special_courtesy = serializers.CharField(allow_null=True)
+    special_arrangement = serializers.CharField(allow_null=True)
+    pre_admission_identifier = serializers.CharField(allow_null=True)
+    location_status = serializers.CharField(allow_null=True)
+    re_admission = serializers.BooleanField(allow_null=True)
+    ward = serializers.CharField(allow_null=True)
+    room = serializers.CharField(allow_null=True)
+    bed = serializers.CharField(allow_null=True)
 
 
 class EncounterListOutputSerializer(serializers.Serializer):
@@ -99,7 +117,12 @@ class EncounterListOutputSerializer(serializers.Serializer):
     period_end = serializers.CharField(allow_null=True)
     reason_code = serializers.CharField(allow_null=True)
     location_id = serializers.IntegerField(allow_null=True)
+    location_ids = serializers.JSONField(allow_null=True)
     location_summary = serializers.DictField(allow_null=True)
+    location_status = serializers.CharField(allow_null=True)
+    ward = serializers.CharField(allow_null=True)
+    room = serializers.CharField(allow_null=True)
+    bed = serializers.CharField(allow_null=True)
     practitioner_summary = serializers.DictField(allow_null=True)
 
 

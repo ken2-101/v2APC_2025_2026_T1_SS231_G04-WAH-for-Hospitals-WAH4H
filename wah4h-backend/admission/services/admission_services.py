@@ -82,6 +82,11 @@ class EncounterService:
             random_digits = ''.join([str(random.randint(0, 9)) for _ in range(11)])
             data['identifier'] = f"ENC-{random_digits}"
 
+        # Prepare location status if not provided directly but components are
+        loc_status = data.get('location_status')
+        if not loc_status and (data.get('ward') or data.get('room') or data.get('bed')):
+            loc_status = f"{data.get('ward','')}|{data.get('room','')}|{data.get('bed','')}"
+
         # Create encounter with status 'in-progress'
         encounter = Encounter.objects.create(
             identifier=data.get('identifier'),
@@ -96,10 +101,15 @@ class EncounterService:
             participant_individual_id=participant_id,
             participant_type=data.get('participant_type'),
             location_id=location_id,
-            location_status=data.get('location_status'),
+            location_ids=data.get('location_ids'),
+            location_status=loc_status,
             admit_source=data.get('admit_source'),
             account_id=data.get('account_id'),
-            pre_admission_identifier=data.get('pre_admission_identifier')
+            pre_admission_identifier=data.get('pre_admission_identifier'),
+            re_admission=data.get('re_admission'),
+            diet_preference=data.get('diet_preference'),
+            special_courtesy=data.get('special_courtesy'),
+            special_arrangement=data.get('special_arrangement')
         )
         
         return encounter
@@ -174,9 +184,10 @@ class EncounterService:
         # Update allowed fields
         allowed_fields = [
             'class_field', 'type', 'service_type', 'priority', 
-            'reason_code', 'location_id', 'participant_individual_id',
+            'reason_code', 'location_id', 'location_ids', 'participant_individual_id',
             'admit_source', 'diet_preference', 'special_courtesy',
-            'special_arrangement'
+            'special_arrangement', 'location_status', 're_admission',
+            'pre_admission_identifier'
         ]
         
         for field in allowed_fields:
@@ -192,6 +203,17 @@ class EncounterService:
                         raise ValidationError(f"Practitioner with ID {data[field]} does not exist")
                 
                 setattr(encounter, field, data[field])
+        
+        # Sync location_status if components are updated
+        if any(f in data for f in ['ward', 'room', 'bed']):
+            current_status = (encounter.location_status or "||").split('|')
+            while len(current_status) < 3: current_status.append('')
+            
+            w = data.get('ward', current_status[0])
+            r = data.get('room', current_status[1])
+            b = data.get('bed', current_status[2])
+            
+            encounter.location_status = f"{w}|{r}|{b}"
         
         encounter.save()
         return encounter

@@ -74,7 +74,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   axiosInstance.interceptors.request.use(
     (config) => {
       const token = localStorage.getItem('accessToken');
-      if (token) {
+      // Avoid attaching token for auth endpoints to prevent 401s on expired tokens
+      const isAuthEndpoint = config.url?.includes('/login/') || config.url?.includes('/register/');
+
+      if (token && !isAuthEndpoint) {
         config.headers.Authorization = `Bearer ${token}`;
       }
       return config;

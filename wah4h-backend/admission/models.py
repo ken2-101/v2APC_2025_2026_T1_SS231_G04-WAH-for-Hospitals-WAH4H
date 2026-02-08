@@ -31,7 +31,17 @@ class Encounter(FHIRResourceModel):
     participant_individual_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to Practitioner
     reason_reference_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to Condition
     diagnosis_condition_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to Condition
-    location_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to Location
+    # Location information - Fortress Pattern
+    # Use location_ids to store the hierarchy path: [BuildingID, WingID, WardID, RoomID, BedID]
+    # This allows O(1) searches for all patients in a specific ward without joins.
+    location_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Primary specific location (e.g. Bed)
+    location_ids = models.JSONField(
+        null=True, 
+        blank=True, 
+        help_text="Hierarchical location path IDs [Building, Ward, Room, Bed]"
+    )
+    
+    # External References - Fortress Pattern (Restored)
     discharge_destination_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to Location
     service_provider_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to Organization
     account_id = models.BigIntegerField(null=True, blank=True, db_index=True)  # Ref to Account (billing)
@@ -53,11 +63,10 @@ class Encounter(FHIRResourceModel):
     diagnosis_rank = models.CharField(max_length=255, null=True, blank=True)
     diagnosis_use = models.CharField(max_length=255, null=True, blank=True)
     
-    # Location information
-    location_status = models.CharField(max_length=100, null=True, blank=True)
-    location_period_start = models.DateField(null=True, blank=True)
-    location_period_end = models.DateField(null=True, blank=True)
-    location_physical_type = models.CharField(max_length=100, null=True, blank=True)
+    # Location status information
+    location_status = models.CharField(max_length=255, null=True, blank=True)
+    location_period_start = models.DateTimeField(null=True, blank=True)
+    location_period_end = models.DateTimeField(null=True, blank=True)
     
     # Hospitalization details
     admit_source = models.CharField(max_length=255, null=True, blank=True)

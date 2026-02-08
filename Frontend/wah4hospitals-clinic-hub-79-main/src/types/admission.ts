@@ -1,76 +1,87 @@
 // src/types/admission.ts
 
-/**
- * Matches EncounterOutputSerializer in backend
- * Represents a read-only View/DTO of an admission.
- */
 export interface Admission {
-    encounter_id: number;
-    identifier: string;
+    id: number | string;
+    encounter_id?: number; 
+    identifier?: string;   
+    admissionNo: string;   
     status: string;
-    class_field: string;
-    type?: string | null;
-    service_type?: string | null;
-    priority?: string | null;
+    priority: 'routine' | 'urgent' | 'emergency';
+    patientId: string;
+    patientName: string;
+    location: {
+        building: string;
+        ward: string;
+        room: string;
+        bed: string;
+    };
+    location_ids?: (string | number)[];
+    physician: string;
+    serviceType: string;
+    admissionDate: string;
+    admissionTime?: string;
+    dischargeDate?: string | null;
     
-    subject_id: number;
-    patient_summary?: {
-        id?: number;
-        patient_id?: string;
-        full_name?: string;
-        first_name?: string;
-        last_name?: string;
-        gender?: string;
-        birthdate?: string;
-        [key: string]: any;
-    } | null;
+    // UI Aligned Fields
+    encounterType: 'IMP' | 'EMER' | 'AMB' | 'HH';
+    diagnosis: string;
+    reasonForAdmission: string;
+    admitSource: string;
+    preAdmissionIdentifier?: string;
+    isReadmission: boolean;
+    dietPreference: string[];
+    specialArrangements: string[];
+    specialCourtesy: string[];
     
-    period_start?: string | null;
-    period_end?: string | null;
-    
-    reason_code?: string | null;
-    admit_source?: string | null;
-    discharge_disposition?: string | null;
-    
-    location_id?: number | null;
-    location_summary?: {
-        id?: number;
-        name?: string;
-        [key: string]: any;
-    } | null;
-    
-    participant_individual_id?: number | null;
-    practitioner_summary?: {
-        id?: number;
-        full_name?: string;
-        name?: string;
-        [key: string]: any;
-    } | null;
-    
-    created_at?: string | null;
-    updated_at?: string | null;
+    // Backend Raw fields (optional)
+    class_field?: string;
+    type?: string;
+    reason_code?: string;
+    admit_source?: string;
+    discharge_disposition?: string;
+    period_start?: string;
+    period_end?: string;
+    diet_preference?: string;
+    special_courtesy?: string;
+    special_arrangement?: string;
+    re_admission?: boolean;
+    procedures?: any[]; 
+
+    subject_id?: number;
+    patient_summary?: any;
+    location_summary?: any;
+    practitioner_summary?: any;
 }
 
-/**
- * Matches EncounterInputSerializer in backend
- * Payload for creating a new admission.
- */
 export interface NewAdmission {
-    subject_id: number;
-    class_field?: string;
-    type?: string | null;
-    service_type?: string | null;
-    priority?: string | null;
-    reason_code?: string | null;
+    patientId: string; // Internal Patient ID or Subject ID
+    patientName: string;
+    admissionDate: string;
+    physician: string; // Name or ID
+    serviceType: string;
+    diagnosis: string;
+    priority: 'routine' | 'urgent' | 'emergency';
+    location: {
+        building: string;
+        ward: string;
+        room: string;
+        bed: string;
+    };
+    location_ids?: (string | number)[];
+    admitSource: string;
+    dietPreference: string[];
+    specialArrangements: string[];
+    specialCourtesy: string[];
     
-    period_start?: string | null;
-    location_id?: number | null;
-    participant_individual_id?: number | null;
-    participant_type?: string | null;
-    
-    admit_source?: string | null;
-    account_id?: number | null;
-    pre_admission_identifier?: string | null;
-    location_status?: string | null;
+    // Expanded fields for UI match
+    encounterType: 'IMP' | 'EMER' | 'AMB' | 'HH';
+    admissionTime: string;
+    preAdmissionIdentifier?: string;
+    isReadmission: boolean;
+    reasonForAdmission?: string;
+
+    // Backend mapping fields
+    subject_id?: number;
+    participant_individual_id?: number;
 }
 
