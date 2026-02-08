@@ -163,6 +163,8 @@ class VerifyAccountSerializer(serializers.Serializer):
             is_active=True,   # User can login immediately
             practitioner=practitioner
         )
+        # Note: created_at and updated_at are automatically set by TimeStampedModel
+        # on object creation via auto_now_add and auto_now
         
         return user
 
@@ -367,9 +369,10 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         
         # Set new password (uses Django's set_password for hashing)
         user.set_password(new_password)
-        user.save(update_fields=['password'])
+        # Save with both password and updated_at for proper audit trail
+        user.save(update_fields=['password', 'updated_at'])
         
-        # Update the related Practitioner's updated_at timestamp
+        # Update the related Practitioner's updated_at timestamp for audit trail
         if hasattr(user, 'practitioner'):
             user.practitioner.save(update_fields=['updated_at'])
         
@@ -422,9 +425,10 @@ class ChangePasswordSerializer(serializers.Serializer):
         
         # Set new password (uses Django's set_password for hashing)
         user.set_password(new_password)
-        user.save(update_fields=['password'])
+        # Save with both password and updated_at for proper audit trail
+        user.save(update_fields=['password', 'updated_at'])
         
-        # Update the related Practitioner's updated_at timestamp
+        # Update the related Practitioner's updated_at timestamp for audit trail
         if hasattr(user, 'practitioner'):
             user.practitioner.save(update_fields=['updated_at'])
         
