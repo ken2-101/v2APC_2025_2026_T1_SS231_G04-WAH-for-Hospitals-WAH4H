@@ -25,6 +25,7 @@ import Billing from "./pages/Billing";
 import AccountSettings from "./pages/AccountSettings";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import {
   LayoutDashboard,
@@ -169,6 +170,7 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/register" element={<Register />} />
               <Route path="/" element={<AppContent />} />
               <Route path="/dashboard" element={<AppContent />} />

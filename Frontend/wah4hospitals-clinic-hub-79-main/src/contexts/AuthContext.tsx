@@ -58,6 +58,8 @@ interface AuthContextType {
   user: User | null;
   loginInitiate: (email: string, password: string) => Promise<AuthResult>;
   loginVerify: (email: string, otp: string) => Promise<AuthResult>;
+  passwordResetInitiate: (email: string) => Promise<AuthResult>;
+  passwordResetConfirm: (email: string, otp: string, newPassword: string, confirmPassword: string) => Promise<AuthResult>;
   register: (data: RegisterData) => Promise<AuthResult>;
   registerInitiate: (data: RegisterData) => Promise<AuthResult>;
   registerVerify: (email: string, otp: string) => Promise<AuthResult>;
@@ -210,6 +212,76 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toast({
         title: 'Verification failed',
         description: errorData?.message || errorData?.detail || 'Invalid or expired OTP. Please try again.',
+        variant: 'destructive',
+      });
+      return { ok: false, error: errorData };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Password Reset Initiate - Step 1: Validate email and send OTP
+   */
+  const passwordResetInitiate = async (email: string): Promise<AuthResult> => {
+    setIsLoading(true);
+    try {
+      await axiosInstance.post('/accounts/password-reset/initiate/', {
+        email,
+      });
+
+      toast({
+        title: 'Reset code sent',
+        description: 'Please check your email for the reset code.',
+      });
+
+      return { ok: true };
+    } catch (err: any) {
+      const errorData = getErrorData(err);
+      console.error('Password reset initiate error:', errorData);
+
+      toast({
+        title: 'Reset failed',
+        description: errorData?.message || errorData?.detail || 'Unable to send reset code. Please try again.',
+        variant: 'destructive',
+      });
+      return { ok: false, error: errorData };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Password Reset Confirm - Step 2: Verify OTP and set new password
+   */
+  const passwordResetConfirm = async (
+    email: string,
+    otp: string,
+    newPassword: string,
+    confirmPassword: string
+  ): Promise<AuthResult> => {
+    setIsLoading(true);
+    try {
+      await axiosInstance.post('/accounts/password-reset/confirm/', {
+        email,
+        otp,
+        new_password: newPassword,
+        confirm_password: confirmPassword,
+      });
+
+      toast({
+        title: 'Password updated',
+        description: 'You can now sign in with your new password.',
+      });
+
+      return { ok: true };
+    } catch (err: any) {
+      const errorData = getErrorData(err);
+      console.error('Password reset confirm error:', errorData);
+
+      toast({
+        title: 'Reset failed',
+        description: errorData?.message || errorData?.detail || 'Unable to reset password. Please try again.',
         variant: 'destructive',
       });
       return { ok: false, error: errorData };
@@ -378,6 +450,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user, 
         loginInitiate,
         loginVerify,
+        passwordResetInitiate,
+        passwordResetConfirm,
         register,
         registerInitiate,
         registerVerify, 
