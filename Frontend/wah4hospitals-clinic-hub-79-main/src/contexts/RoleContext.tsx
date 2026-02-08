@@ -6,7 +6,6 @@ import { useAuth } from './AuthContext';
  * Source: wah4h-backend/accounts/models.py
  */
 export type UserRole =
-  | 'admin'           // System Administrator - Full system access
   | 'doctor'          // Doctor - Clinical care and medical decisions
   | 'nurse'           // Nurse - Patient care and monitoring
   | 'lab_technician'  // Lab Technician - Laboratory tests and results
@@ -17,22 +16,18 @@ export type UserRole =
  * Role hierarchy levels for permission management
  */
 export enum RoleLevel {
-  ADMIN = 4,        // Full system access
   CLINICAL = 3,     // Clinical staff (doctors, nurses)
   TECHNICAL = 2,    // Technical staff (lab, pharmacy)
   SUPPORT = 1,      // Support staff (billing)
 }
 
 export interface RoleContextType {
-  isAdminMode: boolean;
   currentRole: UserRole;
   availableTabs: string[];
   roleLevel: RoleLevel;
-  setAdminMode: (enabled: boolean) => void;
   setCurrentRole: (role: UserRole) => void;
   hasAccess: (module: string) => boolean;
   canModify: (resourceType: string) => boolean;
-  isAdmin: () => boolean;
 }
 
 const RoleContext = createContext<RoleContextType | undefined>(undefined);
@@ -47,7 +42,6 @@ export const useRole = () => {
  * Role hierarchy mapping for permission levels
  */
 const roleHierarchy: Record<UserRole, RoleLevel> = {
-  admin: RoleLevel.ADMIN,
   doctor: RoleLevel.CLINICAL,
   nurse: RoleLevel.CLINICAL,
   lab_technician: RoleLevel.TECHNICAL,
@@ -76,25 +70,6 @@ const roleHierarchy: Record<UserRole, RoleLevel> = {
  * Settings: User preferences and system configuration
  */
 const roleAccessConfig: Record<UserRole, string[]> = {
-  // ========== ADMIN: Full system access ==========
-  admin: [
-    'dashboard',
-    'patients',
-    'admission',
-    'laboratory',
-    'monitoring',
-    'discharge',
-    'pharmacy',
-    'inventory',
-    'appointments',
-    'billing',
-    'philhealth',
-    'compliance',
-    'erp',
-    'statistics',
-    'settings',
-  ],
-
   // ========== DOCTOR: Clinical care and medical decisions ==========
   // Doctors need access to patient care, diagnostics, treatment, and discharge
   doctor: [
@@ -162,8 +137,7 @@ const roleAccessConfig: Record<UserRole, string[]> = {
  * Defines what types of data each role can create, edit, or delete
  */
 const modificationPermissions: Record<UserRole, string[]> = {
-  admin: ['all'],  // Admins can modify everything
-  
+
   doctor: [
     'patient-records',
     'diagnoses',
@@ -210,11 +184,6 @@ interface RoleProviderProps {
 export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
   const { user } = useAuth();
 
-  const [isAdminMode, setIsAdminMode] = useState<boolean>(() => {
-    const saved = localStorage.getItem('adminMode');
-    return saved ? JSON.parse(saved) : false;
-  });
-
   const [currentRole, setCurrentRoleState] = useState<UserRole>(() => {
     const savedRole = localStorage.getItem('userRole') as UserRole | null;
     return (savedRole || (user?.role as UserRole) || 'billing_clerk');
@@ -234,19 +203,13 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
       // Reset to minimal access when no authenticated user
       setCurrentRoleState('billing_clerk');
       setRoleLevel(RoleLevel.SUPPORT);
-      setIsAdminMode(false);
-      localStorage.setItem('adminMode', JSON.stringify(false));
     }
   }, [user]);
 
-  // Update available tabs based on role and admin mode
+  // Update available tabs based on role
   useEffect(() => {
-    if (isAdminMode && currentRole === 'admin') {
-      setAvailableTabs(roleAccessConfig.admin);
-    } else {
-      setAvailableTabs(roleAccessConfig[currentRole] || []);
-    }
-  }, [isAdminMode, currentRole]);
+    setAvailableTabs(roleAccessConfig[currentRole] || []);
+  }, [currentRole]);
 
   /**
    * Check if current role has access to a specific module
@@ -260,26 +223,7 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
    */
   const canModify = (resourceType: string): boolean => {
     const permissions = modificationPermissions[currentRole] || [];
-    return permissions.includes('all') || permissions.includes(resourceType);
-  };
-
-  /**
-   * Check if current user is an administrator
-   */
-  const isAdmin = (): boolean => {
-    return currentRole === 'admin';
-  };
-
-  /**
-   * Enable/disable admin mode (restricted to admin role only)
-   */
-  const setAdminMode = (enabled: boolean) => {
-    if (enabled && currentRole !== 'admin') {
-      console.warn('Only administrators can enable admin mode');
-      return;
-    }
-    setIsAdminMode(enabled);
-    localStorage.setItem('adminMode', JSON.stringify(enabled));
+    return permissions.includes(resourceType);
   };
 
   /**
@@ -299,15 +243,12 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
   return (
     <RoleContext.Provider
       value={{
-        isAdminMode,
         currentRole,
         availableTabs,
         roleLevel,
-        setAdminMode,
         setCurrentRole,
         hasAccess,
         canModify,
-        isAdmin,
       }}
     >
       {children}

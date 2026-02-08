@@ -21,12 +21,6 @@ export interface RoleDisplayInfo {
  */
 export const ROLE_OPTIONS: RoleDisplayInfo[] = [
   {
-    value: 'admin',
-    label: 'System Administrator',
-    description: 'Full system access and user management',
-    category: 'Administrative',
-  },
-  {
     value: 'doctor',
     label: 'Doctor',
     description: 'Clinical care, diagnoses, and treatment decisions',

@@ -98,7 +98,6 @@ const QUALIFICATION_OPTIONS = [
   { value: 'RN', label: 'Registered Nurse (RN)' },
   { value: 'RMT', label: 'Registered Medical Technologist (RMT)' },
   { value: 'RPh', label: 'Registered Pharmacist (RPh)' },
-  { value: 'Admin', label: 'Administrative Staff' },
   { value: 'Staff', label: 'Support Staff' },
 ];
 
@@ -135,19 +134,13 @@ const ROLE_CARDS = [
     icon: 'PH',
   },
   {
-    value: 'lab-tech' as UserRole,
+    value: 'lab_technician' as UserRole,
     label: 'Lab Technician',
     description: 'Laboratory specialist conducting diagnostic tests',
     icon: 'LT',
   },
   {
-    value: 'admin' as UserRole,
-    label: 'Admin',
-    description: 'Administrative staff managing hospital operations',
-    icon: 'AD',
-  },
-  {
-    value: 'billing-staff' as UserRole,
+    value: 'billing_clerk' as UserRole,
     label: 'Billing Staff',
     description: 'Financial staff handling billing and payments',
     icon: 'BL',

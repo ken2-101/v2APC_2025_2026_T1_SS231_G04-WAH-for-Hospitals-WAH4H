@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { RoleProvider } from "@/contexts/RoleContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import SessionTimeout from "@/components/auth/SessionTimeout";
 import ModernLayout from "@/components/layout/ModernLayout";
 import ModernDashboard from "@/pages/ModernDashboard";
 import { PatientRegistration } from './pages/PatientRegistration';
@@ -168,36 +169,38 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/" element={<AppContent />} />
-              <Route path="/dashboard" element={<AppContent />} />
-              <Route path="/patients" element={<AppContent />} />
-              <Route path="/patient-registration" element={<AppContent />} />
-              <Route path="/admission" element={<AppContent />} />
-              <Route path="/philhealth" element={<AppContent />} />
-              <Route path="/philhealth-claims" element={<AppContent />} />
-              <Route path="/pharmacy" element={<AppContent />} />
-              <Route path="/laboratory" element={<AppContent />} />
-              <Route path="/appointments" element={<AppContent />} />
-              <Route path="/monitoring" element={<AppContent />} />
-              <Route path="/discharge" element={<AppContent />} />
-              <Route path="/inventory" element={<AppContent />} />
-              <Route path="/compliance" element={<AppContent />} />
-              <Route path="/statistics" element={<AppContent />} />
-              <Route path="/erp" element={<AppContent />} />
-              <Route path="/billing" element={<AppContent />} />
-              <Route path="/settings" element={<AppContent />} />
-              <Route path="/control-panel" element={<AppContent />} />
-              <Route path="/account-settings" element={
-                <ProtectedRoute>
-                  <AccountSettings />
-                </ProtectedRoute>
-              } />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <SessionTimeout>
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/" element={<AppContent />} />
+                <Route path="/dashboard" element={<AppContent />} />
+                <Route path="/patients" element={<AppContent />} />
+                <Route path="/patient-registration" element={<AppContent />} />
+                <Route path="/admission" element={<AppContent />} />
+                <Route path="/philhealth" element={<AppContent />} />
+                <Route path="/philhealth-claims" element={<AppContent />} />
+                <Route path="/pharmacy" element={<AppContent />} />
+                <Route path="/laboratory" element={<AppContent />} />
+                <Route path="/appointments" element={<AppContent />} />
+                <Route path="/monitoring" element={<AppContent />} />
+                <Route path="/discharge" element={<AppContent />} />
+                <Route path="/inventory" element={<AppContent />} />
+                <Route path="/compliance" element={<AppContent />} />
+                <Route path="/statistics" element={<AppContent />} />
+                <Route path="/erp" element={<AppContent />} />
+                <Route path="/billing" element={<AppContent />} />
+                <Route path="/settings" element={<AppContent />} />
+                <Route path="/control-panel" element={<AppContent />} />
+                <Route path="/account-settings" element={
+                  <ProtectedRoute>
+                    <AccountSettings />
+                  </ProtectedRoute>
+                } />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </SessionTimeout>
           </BrowserRouter>
         </RoleProvider>
       </AuthProvider>

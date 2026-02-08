@@ -138,7 +138,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             localStorage.removeItem('refreshToken');
             localStorage.removeItem('currentUser');
             localStorage.removeItem('userRole');
-            localStorage.removeItem('adminMode');
             
             setUser(null);
             
@@ -563,7 +562,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('currentUser');
     localStorage.removeItem('userRole');
-    localStorage.removeItem('adminMode');
 
     toast({
       title: 'Logged out',
