@@ -56,7 +56,8 @@ type AuthResult = {
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<AuthResult>;
+  loginInitiate: (email: string, password: string) => Promise<AuthResult>;
+  loginVerify: (email: string, otp: string) => Promise<AuthResult>;
   register: (data: RegisterData) => Promise<AuthResult>;
   registerInitiate: (data: RegisterData) => Promise<AuthResult>;
   registerVerify: (email: string, otp: string) => Promise<AuthResult>;
@@ -137,18 +138,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 
   /**
-   * Login user with email and password
-   * Validates credentials and stores authentication tokens
+   * Login Initiate - Step 1: Validate credentials and send OTP
    */
-  const login = async (email: string, password: string): Promise<AuthResult> => {
+  const loginInitiate = async (email: string, password: string): Promise<AuthResult> => {
     setIsLoading(true);
     try {
-      const res = await axiosInstance.post('/accounts/login/', {
+      await axiosInstance.post('/accounts/login/initiate/', {
         email,
         password,
       });
 
-      const { tokens, user: rawUser } = res.data;
+      toast({
+        title: 'Verification code sent',
+        description: 'Please check your email for the login code.',
+      });
+
+      return { ok: true };
+    } catch (err: any) {
+      const errorData = getErrorData(err);
+      console.error('Login initiate error:', errorData);
+
+      toast({
+        title: 'Login failed',
+        description: errorData?.message || errorData?.detail || 'Invalid email or password. Please try again.',
+        variant: 'destructive',
+      });
+      return { ok: false, error: errorData };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Login Verify - Step 2: Verify OTP and store authentication tokens
+   */
+  const loginVerify = async (email: string, otp: string): Promise<AuthResult> => {
+    setIsLoading(true);
+    try {
+      const res = await axiosInstance.post('/accounts/login/verify/', {
+        email,
+        otp,
+      });
+
+      const { tokens, user: rawUser } = res.data.data;
 
       // Store authentication tokens
       localStorage.setItem('accessToken', tokens.access);
@@ -173,11 +205,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { ok: true };
     } catch (err: any) {
       const errorData = getErrorData(err);
-      console.error('Login error:', errorData);
+      console.error('Login verify error:', errorData);
 
       toast({
-        title: 'Login failed',
-        description: errorData?.message || errorData?.detail || 'Invalid email or password. Please try again.',
+        title: 'Verification failed',
+        description: errorData?.message || errorData?.detail || 'Invalid or expired OTP. Please try again.',
         variant: 'destructive',
       });
       return { ok: false, error: errorData };
@@ -344,7 +376,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider 
       value={{ 
         user, 
-        login, 
+        loginInitiate,
+        loginVerify,
         register,
         registerInitiate,
         registerVerify, 
