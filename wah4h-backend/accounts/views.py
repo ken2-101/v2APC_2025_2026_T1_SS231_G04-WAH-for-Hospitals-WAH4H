@@ -41,6 +41,8 @@ from .serializers import (
     PasswordResetInitiateSerializer,
     PasswordResetConfirmSerializer,
     ChangePasswordSerializer,
+    ChangePasswordInitiateSerializer,
+    ChangePasswordVerifySerializer,
     generate_otp
 )
 
@@ -532,8 +534,8 @@ class ChangePasswordAPIView(APIView):
     """
     POST /api/accounts/change-password/
     
-    Change password for authenticated users.
-    Requires current password verification.
+    Change password for authenticated users WITHOUT OTP.
+    Kept for backward compatibility.
     
     Request Body:
     {
@@ -575,5 +577,115 @@ class ChangePasswordAPIView(APIView):
         except Exception as e:
             return error_response(
                 message='Password change failed.',
+                errors=serializer.errors if hasattr(serializer, 'errors') else {'detail': str(e)}
+            )
+
+
+class ChangePasswordInitiateAPIView(APIView):
+    """
+    POST /api/accounts/change-password/initiate/
+    
+    Step 1: Validate current password and send OTP.
+    Requires authentication.
+    
+    Request Body:
+    {
+        "current_password": "CurrentPassword123",
+        "new_password": "NewSecurePass456",
+        "confirm_password": "NewSecurePass456"
+    }
+    
+    Response:
+    {
+        "status": "success",
+        "message": "OTP sent to your email. Please verify to complete password change.",
+        "data": {
+            "email": "juan@example.com",
+            "otp_sent": true,
+            "expires_in": "5 minutes"
+        }
+    }
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        serializer = ChangePasswordInitiateSerializer(
+            data=request.data,
+            context={'user': request.user}
+        )
+        
+        try:
+            serializer.is_valid(raise_exception=True)
+            user = serializer.save()
+            
+            # Send OTP via email using spam-proof HTML template
+            send_otp_email(
+                user_email=user.email,
+                user_firstname=user.first_name,
+                otp_code=user.otp
+            )
+            
+            return success_response(
+                message='OTP sent to your email. Please verify to complete password change.',
+                data={
+                    'email': user.email,
+                    'otp_sent': True,
+                    'expires_in': '5 minutes'
+                }
+            )
+        
+        except Exception as e:
+            return error_response(
+                message='Password change initiation failed.',
+                errors=serializer.errors if hasattr(serializer, 'errors') else {'detail': str(e)}
+            )
+
+
+class ChangePasswordVerifyAPIView(APIView):
+    """
+    POST /api/accounts/change-password/verify/
+    
+    Step 2: Verify OTP and complete password change.
+    Requires authentication.
+    
+    Request Body:
+    {
+        "otp": "123456"
+    }
+    
+    Response:
+    {
+        "status": "success",
+        "message": "Password changed successfully. Please login with your new password.",
+        "data": {
+            "email": "juan@example.com",
+            "password_changed": true
+        }
+    }
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        serializer = ChangePasswordVerifySerializer(
+            data=request.data,
+            context={'user': request.user}
+        )
+        
+        try:
+            serializer.is_valid(raise_exception=True)
+            user = serializer.save()
+            
+            return success_response(
+                message='Password changed successfully. Please login with your new password.',
+                data={
+                    'email': user.email,
+                    'password_changed': True
+                },
+                http_status=status.HTTP_200_OK
+            )
+        
+        except Exception as e:
+            return error_response(
+                message='Password change verification failed.',
                 errors=serializer.errors if hasattr(serializer, 'errors') else {'detail': str(e)}
             )

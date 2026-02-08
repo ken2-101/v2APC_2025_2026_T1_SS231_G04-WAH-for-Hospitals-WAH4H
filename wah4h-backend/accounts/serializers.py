@@ -433,3 +433,108 @@ class ChangePasswordSerializer(serializers.Serializer):
             user.practitioner.save(update_fields=['updated_at'])
         
         return user
+
+
+class ChangePasswordInitiateSerializer(serializers.Serializer):
+    """
+    Step 1: Validate current password and initiate OTP-based password change.
+    Caches password data and sends OTP to user's email.
+    """
+    current_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True, min_length=8)
+    confirm_password = serializers.CharField(write_only=True, min_length=8)
+    
+    def validate(self, attrs):
+        """Validate passwords before sending OTP."""
+        user = self.context.get('user')
+        
+        if not user:
+            raise serializers.ValidationError({"detail": "User not authenticated."})
+        
+        # Verify current password
+        if not user.check_password(attrs['current_password']):
+            raise serializers.ValidationError({"current_password": "Current password is incorrect."})
+        
+        # Check new passwords match
+        if attrs['new_password'] != attrs['confirm_password']:
+            raise serializers.ValidationError({"confirm_password": "Passwords do not match."})
+        
+        # Ensure new password is different from current password
+        if user.check_password(attrs['new_password']):
+            raise serializers.ValidationError({"new_password": "New password must be different from your current password."})
+        
+        return attrs
+    
+    def save(self):
+        """Generate OTP and cache password change data."""
+        user = self.context.get('user')
+        otp = generate_otp()
+        
+        # Cache the password change data (5 minutes)
+        cache_key = f"change_password_{user.email}"
+        cache_data = {
+            'user_id': user.pk,
+            'new_password': self.validated_data['new_password'],
+            'otp': otp
+        }
+        cache.set(cache_key, cache_data, timeout=300)
+        
+        # Attach OTP to user object for email sending
+        user.otp = otp
+        return user
+
+
+class ChangePasswordVerifySerializer(serializers.Serializer):
+    """
+    Step 2: Verify OTP and complete password change.
+    Retrieves cached data and updates password.
+    """
+    otp = serializers.CharField(max_length=6, min_length=6)
+    
+    def validate(self, attrs):
+        """Validate OTP against cached data."""
+        user = self.context.get('user')
+        
+        if not user:
+            raise serializers.ValidationError({"detail": "User not authenticated."})
+        
+        # Retrieve cached password change data
+        cache_key = f"change_password_{user.email}"
+        cached_data = cache.get(cache_key)
+        
+        if not cached_data:
+            raise serializers.ValidationError({"otp": "OTP expired or invalid. Please request a new one."})
+        
+        # Verify OTP
+        if cached_data.get('otp') != attrs['otp']:
+            raise serializers.ValidationError({"otp": "Invalid OTP. Please try again."})
+        
+        # Verify user identity
+        if cached_data.get('user_id') != user.pk:
+            raise serializers.ValidationError({"detail": "User mismatch. Please try again."})
+        
+        # Attach cached password to attrs for saving
+        attrs['new_password'] = cached_data['new_password']
+        attrs['cache_key'] = cache_key
+        
+        return attrs
+    
+    @transaction.atomic
+    def save(self):
+        """Update password after OTP verification."""
+        user = self.context.get('user')
+        new_password = self.validated_data['new_password']
+        cache_key = self.validated_data['cache_key']
+        
+        # Set new password
+        user.set_password(new_password)
+        user.save(update_fields=['password', 'updated_at'])
+        
+        # Update practitioner audit trail
+        if hasattr(user, 'practitioner'):
+            user.practitioner.save(update_fields=['updated_at'])
+        
+        # Delete cache after successful password change
+        cache.delete(cache_key)
+        
+        return user

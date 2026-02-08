@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 
 const AccountSettings = () => {
-  const { user, changePassword } = useAuth();
+  const { user, changePasswordInitiate, changePasswordVerify } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -22,6 +22,10 @@ const AccountSettings = () => {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  
+  // OTP State
+  const [showOtpInput, setShowOtpInput] = useState(false);
+  const [otp, setOtp] = useState('');
 
   // Password strength requirements state
   const [passwordRequirements, setPasswordRequirements] = useState({
@@ -113,7 +117,57 @@ const AccountSettings = () => {
   };
 
   const handleChangePassword = async () => {
-    // Validation
+    // If OTP input is showing, verify OTP
+    if (showOtpInput) {
+      if (!otp || otp.length !== 6) {
+        toast({
+          title: 'Validation error',
+          description: 'Please enter a valid 6-digit OTP code.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      try {
+        const result = await changePasswordVerify(otp);
+        
+        if (result.ok) {
+          // Clear all fields on success
+          setCurrentPassword('');
+          setNewPassword('');
+          setConfirmPassword('');
+          setOtp('');
+          setShowOtpInput(false);
+          setPasswordRequirements({
+            minLength: false,
+            hasUppercase: false,
+            hasLowercase: false,
+            hasNumber: false,
+            hasSpecialChar: false,
+          });
+          
+          toast({
+            title: 'Success',
+            description: 'Your password has been changed successfully.',
+          });
+        } else {
+          // Display specific error messages from backend
+          const errors = result.error?.errors;
+          if (errors?.otp) {
+            toast({
+              title: 'Verification error',
+              description: errors.otp,
+              variant: 'destructive',
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Password verify error:', error);
+      }
+      return;
+    }
+
+    // Initial validation for password change initiate
     if (!currentPassword || !newPassword || !confirmPassword) {
       toast({
         title: 'Validation error',
@@ -142,19 +196,14 @@ const AccountSettings = () => {
     }
 
     try {
-      const result = await changePassword(currentPassword, newPassword, confirmPassword);
+      const result = await changePasswordInitiate(currentPassword, newPassword, confirmPassword);
       
       if (result.ok) {
-        // Clear password fields on success
-        setCurrentPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
-        setPasswordRequirements({
-          minLength: false,
-          hasUppercase: false,
-          hasLowercase: false,
-          hasNumber: false,
-          hasSpecialChar: false,
+        // Show OTP input field
+        setShowOtpInput(true);
+        toast({
+          title: 'OTP Sent',
+          description: 'Please check your email for the verification code.',
         });
       } else {
         // Display specific error messages from backend
@@ -371,7 +420,8 @@ const AccountSettings = () => {
                 placeholder="Enter current password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                className="bg-white border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                disabled={showOtpInput}
+                className="bg-white border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:bg-slate-50 disabled:cursor-not-allowed"
               />
             </div>
 
@@ -389,7 +439,8 @@ const AccountSettings = () => {
                   setNewPassword(e.target.value);
                   setPasswordRequirements(checkPasswordRequirements(e.target.value));
                 }}
-                className="bg-white border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                disabled={showOtpInput}
+                className="bg-white border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:bg-slate-50 disabled:cursor-not-allowed"
               />
               
               {/* Password Strength Requirements Checklist */}
@@ -481,15 +532,37 @@ const AccountSettings = () => {
                 placeholder="Re-enter new password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="bg-white border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                disabled={showOtpInput}
+                className="bg-white border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:bg-slate-50 disabled:cursor-not-allowed"
               />
             </div>
+
+            {/* OTP Input - Only shown after password validation */}
+            {showOtpInput && (
+              <div className="space-y-2 animate-in slide-in-from-bottom-4">
+                <Label htmlFor="otp" className="text-sm font-medium text-gray-900">
+                  Verification Code
+                </Label>
+                <Input
+                  id="otp"
+                  type="text"
+                  placeholder="Enter 6-digit code"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  maxLength={6}
+                  className="bg-white border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 font-mono text-lg tracking-widest text-center"
+                />
+                <p className="text-xs text-blue-600">
+                  📧 We sent a verification code to <strong>{user?.email}</strong>. Check your inbox.
+                </p>
+              </div>
+            )}
 
             <Button 
               onClick={handleChangePassword} 
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium"
             >
-              Change Password
+              {showOtpInput ? 'Verify OTP & Change Password' : 'Change Password'}
             </Button>
           </CardContent>
         </Card>

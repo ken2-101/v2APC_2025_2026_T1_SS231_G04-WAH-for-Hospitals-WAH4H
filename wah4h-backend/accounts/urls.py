@@ -21,6 +21,8 @@ from .views import (
     PasswordResetInitiateAPIView,
     PasswordResetConfirmAPIView,
     ChangePasswordAPIView,
+    ChangePasswordInitiateAPIView,
+    ChangePasswordVerifyAPIView,
     OrganizationListAPIView
 )
 
@@ -74,6 +76,16 @@ urlpatterns = [
         'change-password/',
         ChangePasswordAPIView.as_view(),
         name='change-password'
+    ),
+    path(
+        'change-password/initiate/',
+        ChangePasswordInitiateAPIView.as_view(),
+        name='change-password-initiate'
+    ),
+    path(
+        'change-password/verify/',
+        ChangePasswordVerifyAPIView.as_view(),
+        name='change-password-verify'
     ),
     
     # ========================================================================

@@ -61,6 +61,8 @@ interface AuthContextType {
   passwordResetInitiate: (email: string) => Promise<AuthResult>;
   passwordResetConfirm: (email: string, otp: string, newPassword: string, confirmPassword: string) => Promise<AuthResult>;
   changePassword: (currentPassword: string, newPassword: string, confirmPassword: string) => Promise<AuthResult>;
+  changePasswordInitiate: (currentPassword: string, newPassword: string, confirmPassword: string) => Promise<AuthResult>;
+  changePasswordVerify: (otp: string) => Promise<AuthResult>;
   register: (data: RegisterData) => Promise<AuthResult>;
   registerInitiate: (data: RegisterData) => Promise<AuthResult>;
   registerVerify: (email: string, otp: string) => Promise<AuthResult>;
@@ -313,7 +315,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   /**
-   * Change Password - Authenticated users change their password
+   * Change Password - Authenticated users change their password (legacy - no OTP)
    */
   const changePassword = async (
     currentPassword: string,
@@ -341,6 +343,74 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toast({
         title: 'Change failed',
         description: errorData?.message || errorData?.detail || 'Unable to change password. Please try again.',
+        variant: 'destructive',
+      });
+      return { ok: false, error: errorData };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Change Password Initiate - Step 1: Validate passwords and send OTP
+   */
+  const changePasswordInitiate = async (
+    currentPassword: string,
+    newPassword: string,
+    confirmPassword: string
+  ): Promise<AuthResult> => {
+    setIsLoading(true);
+    try {
+      await axiosInstance.post('/accounts/change-password/initiate/', {
+        current_password: currentPassword,
+        new_password: newPassword,
+        confirm_password: confirmPassword,
+      });
+
+      toast({
+        title: 'OTP sent',
+        description: 'Please check your email for the verification code.',
+      });
+
+      return { ok: true };
+    } catch (err: any) {
+      const errorData = getErrorData(err);
+      console.error('Change password initiate error:', errorData);
+
+      toast({
+        title: 'Validation failed',
+        description: errorData?.message || errorData?.detail || 'Unable to initiate password change.',
+        variant: 'destructive',
+      });
+      return { ok: false, error: errorData };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Change Password Verify - Step 2: Verify OTP and complete password change
+   */
+  const changePasswordVerify = async (otp: string): Promise<AuthResult> => {
+    setIsLoading(true);
+    try {
+      await axiosInstance.post('/accounts/change-password/verify/', {
+        otp: otp,
+      });
+
+      toast({
+        title: 'Password changed',
+        description: 'Your password has been changed successfully.',
+      });
+
+      return { ok: true };
+    } catch (err: any) {
+      const errorData = getErrorData(err);
+      console.error('Change password verify error:', errorData);
+
+      toast({
+        title: 'Verification failed',
+        description: errorData?.message || errorData?.detail || 'Invalid OTP. Please try again.',
         variant: 'destructive',
       });
       return { ok: false, error: errorData };
@@ -512,6 +582,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         passwordResetInitiate,
         passwordResetConfirm,
         changePassword,
+        changePasswordInitiate,
+        changePasswordVerify,
         register,
         registerInitiate,
         registerVerify, 
