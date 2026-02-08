@@ -18,10 +18,15 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 import secrets
 import string
 
-from .models import Practitioner, PractitionerRole
+from .models import Organization, Practitioner, PractitionerRole
 
 User = get_user_model()
 
+
+class OrganizationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Organization
+        fields = ['organization_id', 'name']
 
 # ============================================================================
 # UTILITY FUNCTIONS

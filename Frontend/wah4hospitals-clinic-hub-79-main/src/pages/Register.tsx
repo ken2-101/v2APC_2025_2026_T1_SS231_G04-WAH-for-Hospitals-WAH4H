@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,222 +12,1328 @@ import {
 } from '@/components/ui/select';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Loader2, Eye, EyeOff, UserPlus } from 'lucide-react';
+import { 
+  Loader2, 
+  Eye, 
+  EyeOff, 
+  UserPlus, 
+  User, 
+  MapPin, 
+  Briefcase,
+  ChevronRight,
+  ChevronLeft,
+  Check
+} from 'lucide-react';
 import { UserRole } from '@/contexts/RoleContext';
-import { ROLE_OPTIONS } from '@/lib/roleUtils';
+import { cn } from '@/lib/utils';
+
+// ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
+
+interface RegistrationFormData {
+  // Step 1: Personal Identity + Account Security
+  firstName: string;
+  middleName: string;
+  lastName: string;
+  suffixName: string;
+  mobile: string;
+  email: string;
+  gender: string;
+  birthDate: string;
+  language: string;
+  photoUrl: string;
+  role: UserRole | '';
+  password: string;
+  confirmPassword: string;
+
+  // Step 2: Address Information
+  addressLine: string;
+  addressCity: string;
+  addressDistrict: string;
+  addressState: string;
+  addressPostalCode: string;
+  addressCountry: string;
+
+  // Step 3: Professional Qualifications + Hospital Assignment
+  identifier: string; // PRC License
+  qualificationCode: string;
+  qualificationIdentifier: string;
+  qualificationIssuer: string;
+  qualificationPeriodStart: string;
+  qualificationPeriodEnd: string;
+  organization: string;
+  roleCode: string;
+  specialtyCode: string;
+}
+
+interface Organization {
+  organization_id: number;
+  name: string;
+}
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+const GENDER_OPTIONS = [
+  { value: 'male', label: 'Male' },
+  { value: 'female', label: 'Female' },
+  { value: 'other', label: 'Other' },
+];
+
+const LANGUAGE_OPTIONS = [
+  { value: 'en', label: 'English' },
+  { value: 'tl', label: 'Tagalog' },
+  { value: 'ceb', label: 'Cebuano' },
+  { value: 'ilo', label: 'Ilocano' },
+  { value: 'war', label: 'Waray' },
+  { value: 'pam', label: 'Kapampangan' },
+  { value: 'zh', label: 'Mandarin' },
+];
+
+const QUALIFICATION_OPTIONS = [
+  { value: 'MD', label: 'Doctor of Medicine (MD)' },
+  { value: 'RN', label: 'Registered Nurse (RN)' },
+  { value: 'RMT', label: 'Registered Medical Technologist (RMT)' },
+  { value: 'RPh', label: 'Registered Pharmacist (RPh)' },
+  { value: 'Admin', label: 'Administrative Staff' },
+  { value: 'Staff', label: 'Support Staff' },
+];
+
+const SPECIALTY_OPTIONS = [
+  { value: 'internal-medicine', label: 'Internal Medicine' },
+  { value: 'pediatrics', label: 'Pediatrics' },
+  { value: 'surgery', label: 'Surgery' },
+  { value: 'ob-gyn', label: 'Obstetrics & Gynecology' },
+  { value: 'family-medicine', label: 'Family Medicine' },
+  { value: 'radiology', label: 'Radiology' },
+  { value: 'anesthesiology', label: 'Anesthesiology' },
+  { value: 'emergency-medicine', label: 'Emergency Medicine' },
+  { value: 'psychiatry', label: 'Psychiatry' },
+  { value: 'none', label: 'None / Other' },
+];
+
+const ROLE_CARDS = [
+  {
+    value: 'doctor' as UserRole,
+    label: 'Doctor',
+    description: 'Medical practitioner with prescribing authority',
+    icon: '🩺',
+  },
+  {
+    value: 'nurse' as UserRole,
+    label: 'Nurse',
+    description: 'Registered healthcare professional providing patient care',
+    icon: '💉',
+  },
+  {
+    value: 'pharmacist' as UserRole,
+    label: 'Pharmacist',
+    description: 'Medication expert managing pharmacy operations',
+    icon: '💊',
+  },
+  {
+    value: 'lab-tech' as UserRole,
+    label: 'Lab Technician',
+    description: 'Laboratory specialist conducting diagnostic tests',
+    icon: '🔬',
+  },
+  {
+    value: 'admin' as UserRole,
+    label: 'Admin',
+    description: 'Administrative staff managing hospital operations',
+    icon: '👔',
+  },
+  {
+    value: 'billing-staff' as UserRole,
+    label: 'Billing Staff',
+    description: 'Financial staff handling billing and payments',
+    icon: '💰',
+  },
+];
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
 
 const Register = () => {
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState<UserRole | ''>('');
+  const [currentStep, setCurrentStep] = useState(1);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [isLoadingOrgs, setIsLoadingOrgs] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showOTPModal, setShowOTPModal] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [orgsLoaded, setOrgsLoaded] = useState(false);
 
   const navigate = useNavigate();
-  const { register, isLoading } = useAuth();
+  const { registerInitiate, registerVerify, isLoading } = useAuth();
 
-  const validateForm = () => {
+  // Form data state
+  const [formData, setFormData] = useState<RegistrationFormData>({
+    // Step 1
+    firstName: '',
+    middleName: '',
+    lastName: '',
+    suffixName: '',
+    mobile: '',
+    email: '',
+    gender: '',
+    birthDate: '',
+    language: 'en',
+    photoUrl: '',
+    role: '',
+    password: '',
+    confirmPassword: '',
+
+    // Step 2
+    addressLine: '',
+    addressCity: '',
+    addressDistrict: '',
+    addressState: '',
+    addressPostalCode: '',
+    addressCountry: 'Philippines',
+
+    // Step 3
+    identifier: '',
+    qualificationCode: '',
+    qualificationIdentifier: '',
+    qualificationIssuer: '',
+    qualificationPeriodStart: '',
+    qualificationPeriodEnd: '',
+    organization: '',
+    roleCode: '',
+    specialtyCode: '',
+  });
+
+  // ============================================================================
+  // EFFECTS
+  // ============================================================================
+
+  // Fetch organizations on mount
+  useEffect(() => {
+    fetchOrganizations();
+  }, []);
+
+  // ============================================================================
+  // API FUNCTIONS
+  // ============================================================================
+
+  const fetchOrganizations = async () => {
+    setIsLoadingOrgs(true);
+    try {
+      // 1. Get the public backend URL from the .env file
+      // Fallback to empty string if undefined (to avoid 'undefined/accounts...')
+      const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+
+      // 2. Construct the full URL
+      // We assume the endpoint is at /accounts/organizations/ based on your .env BACKEND_ACCOUNTS_8000
+      const url = `${apiBase}/accounts/organizations/`;
+
+      console.log('🏥 Fetching hospitals from:', url);
+
+      const response = await fetch(url, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setOrganizations(data || []);
+        setOrgsLoaded(true);
+      } else {
+        console.error('Server returned error:', response.status);
+        // Optional: Log the text response if it's not JSON (helps debugging 404s)
+        const text = await response.text();
+        console.error('Response body:', text);
+      }
+    } catch (error) {
+      console.error('Failed to fetch organizations:', error);
+      setOrganizations([]);
+    } finally {
+      setIsLoadingOrgs(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!orgsLoaded || !formData.organization) {
+      return;
+    }
+
+    const organizationExists = organizations.some(
+      (org) => String(org.organization_id) === formData.organization
+    );
+
+    if (!organizationExists) {
+      setFormData((prev) => ({ ...prev, organization: '' }));
+    }
+  }, [formData.organization, organizations, orgsLoaded]);
+
+  // ============================================================================
+  // VALIDATION FUNCTIONS
+  // ============================================================================
+
+  const validatePhilippineMobile = (phone: string): boolean => {
+    // Format: 09XX-XXX-XXXX (11 digits)
+    const cleanPhone = phone.replace(/[-\s]/g, '');
+    return /^09\d{9}$/.test(cleanPhone);
+  };
+
+  const validatePRCLicense = (license: string): boolean => {
+    // Exactly 7 digits numeric
+    return /^\d{7}$/.test(license);
+  };
+
+  const validatePassword = (password: string): boolean => {
+    // At least 1 uppercase, 1 lowercase, 1 number, min 8 characters
+    return (
+      password.length >= 8 &&
+      /[A-Z]/.test(password) &&
+      /[a-z]/.test(password) &&
+      /[0-9]/.test(password)
+    );
+  };
+
+  const validateStep1 = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (!firstName.trim()) newErrors.firstName = 'First name is required';
-    if (!lastName.trim()) newErrors.lastName = 'Last name is required';
+    // Required fields
+    if (!formData.firstName.trim()) newErrors.firstName = 'First name is required';
+    if (!formData.lastName.trim()) newErrors.lastName = 'Last name is required';
 
-    if (!email) newErrors.email = 'Email is required';
-    else if (!/\S+@\S+\.\S+/.test(email))
+    // Mobile validation
+    if (!formData.mobile) {
+      newErrors.mobile = 'Mobile number is required';
+    } else if (!validatePhilippineMobile(formData.mobile)) {
+      newErrors.mobile = 'Invalid format. Use 09XX-XXX-XXXX (11 digits)';
+    }
+
+    // Email validation
+    if (!formData.email) {
+      newErrors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Please enter a valid email';
+    }
 
-    if (!password) newErrors.password = 'Password is required';
-    else if (password.length < 6)
-      newErrors.password = 'Password must be at least 6 characters';
+    // Gender validation
+    if (!formData.gender) newErrors.gender = 'Gender is required';
 
-    if (!confirmPassword)
+    // Birth date validation
+    if (!formData.birthDate) {
+      newErrors.birthDate = 'Birth date is required';
+    } else {
+      const birthDate = new Date(formData.birthDate);
+      const today = new Date();
+      if (birthDate >= today) {
+        newErrors.birthDate = 'Birth date must be in the past';
+      }
+    }
+
+    // Role validation
+    if (!formData.role) newErrors.role = 'Please select your role';
+
+    // Password validation
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    } else if (!validatePassword(formData.password)) {
+      newErrors.password = 'Password must contain at least 1 uppercase, 1 lowercase, 1 number, and be 8+ characters';
+    }
+
+    // Confirm password validation
+    if (!formData.confirmPassword) {
       newErrors.confirmPassword = 'Please confirm your password';
-    else if (password !== confirmPassword)
+    } else if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match';
-
-    if (!role) newErrors.role = 'Please select your role';
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const validateStep2 = (): boolean => {
+    const newErrors: Record<string, string> = {};
 
-    if (!validateForm()) return;
+    if (!formData.addressLine.trim()) newErrors.addressLine = 'Address line is required';
+    if (!formData.addressCity.trim()) newErrors.addressCity = 'City is required';
+    if (!formData.addressState.trim()) newErrors.addressState = 'Province is required';
+    if (!formData.addressPostalCode.trim()) {
+      newErrors.addressPostalCode = 'Postal code is required';
+    } else if (!/^\d{4}$/.test(formData.addressPostalCode)) {
+      newErrors.addressPostalCode = 'Postal code must be 4 digits';
+    }
 
-    const success = await register({
-      firstName,
-      lastName,
-      email,
-      password,
-      confirmPassword,
-      role: role as UserRole,
-    });
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
-    if (success) {
-      navigate('/login');
+  const validateStep3 = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    // PRC License validation
+    if (!formData.identifier) {
+      newErrors.identifier = 'PRC License is required';
+    } else if (!validatePRCLicense(formData.identifier)) {
+      newErrors.identifier = 'PRC License must be exactly 7 digits';
+    }
+
+    // Qualification code validation
+    if (!formData.qualificationCode) {
+      newErrors.qualificationCode = 'Qualification is required';
+    }
+
+    // Qualification end date validation
+    if (!formData.qualificationPeriodEnd) {
+      newErrors.qualificationPeriodEnd = 'License expiry date is required';
+    } else {
+      const expiryDate = new Date(formData.qualificationPeriodEnd);
+      const today = new Date();
+      if (expiryDate <= today) {
+        newErrors.qualificationPeriodEnd = 'Expiry date must be in the future';
+      }
+    }
+
+    // Organization validation
+    if (!formData.organization) {
+      newErrors.organization = 'Hospital/Organization is required';
+    }
+
+    // Position validation
+    if (!formData.roleCode.trim()) {
+      newErrors.roleCode = 'Position is required';
+    }
+
+    // Specialty validation
+    if (!formData.specialtyCode) {
+      newErrors.specialtyCode = 'Specialty is required';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // ============================================================================
+  // HANDLERS
+  // ============================================================================
+
+  const handleInputChange = (field: keyof RegistrationFormData, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    // Clear error for this field
+    if (errors[field]) {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg mx-auto mb-4 flex items-center justify-center">
-            <UserPlus className="text-white w-8 h-8" />
+  const handleMobileChange = (value: string) => {
+    // Auto-format Philippine mobile: 09XX-XXX-XXXX
+    let cleaned = value.replace(/\D/g, '');
+    
+    // Limit to 11 digits
+    if (cleaned.length > 11) {
+      cleaned = cleaned.slice(0, 11);
+    }
+
+    // Format with hyphens
+    let formatted = cleaned;
+    if (cleaned.length > 4) {
+      formatted = `${cleaned.slice(0, 4)}-${cleaned.slice(4)}`;
+    }
+    if (cleaned.length > 7) {
+      formatted = `${cleaned.slice(0, 4)}-${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
+    }
+
+    handleInputChange('mobile', formatted);
+  };
+
+  const handleNext = () => {
+    let isValid = false;
+
+    if (currentStep === 1) {
+      isValid = validateStep1();
+    } else if (currentStep === 2) {
+      isValid = validateStep2();
+    }
+
+    if (isValid) {
+      setCurrentStep((prev) => prev + 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handlePrevious = () => {
+    setCurrentStep((prev) => prev - 1);
+    setErrors({});
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!validateStep3()) return;
+
+    const result = await registerInitiate({
+      ...formData,
+      role: formData.role as UserRole,
+    });
+
+    if (result.ok) {
+      setShowOTPModal(true);
+      return;
+    }
+
+    const validationErrors = result.error?.errors || result.error || {};
+    console.error('Validation errors:', validationErrors);
+
+    // Map backend field names to steps
+    const step1Fields = ['firstName', 'first_name', 'lastName', 'last_name', 'email', 'mobile', 'telecom', 'gender', 'birthDate', 'birth_date', 'password', 'confirm_password', 'role', 'identifier'];
+    const step2Fields = ['addressLine', 'address_line', 'addressCity', 'address_city', 'addressDistrict', 'address_district', 'addressState', 'address_state', 'addressPostalCode', 'address_postal_code', 'addressCountry', 'address_country'];
+
+    // Check which step has the error
+    const errorFields = Object.keys(validationErrors);
+
+    if (errorFields.some(field => step1Fields.includes(field))) {
+      setCurrentStep(1);
+      setErrors(validationErrors);
+    } else if (errorFields.some(field => step2Fields.includes(field))) {
+      setCurrentStep(2);
+      setErrors(validationErrors);
+    } else {
+      // Error is in step 3, stay on current step
+      setErrors(validationErrors);
+    }
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleOTPVerification = async () => {
+    if (!otpCode || otpCode.length !== 6) {
+      setErrors({ otp: 'Please enter a valid 6-digit OTP code' });
+      return;
+    }
+
+    setIsVerifying(true);
+    setErrors({});
+
+    try {
+      const result = await registerVerify(formData.email, otpCode);
+
+      if (result.ok) {
+        // Navigate to dashboard (protected route)
+        navigate('/dashboard');
+      }
+    } catch (error) {
+      console.error('OTP verification failed:', error);
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  // ============================================================================
+  // RENDER HELPERS
+  // ============================================================================
+
+  const renderStepIndicator = () => (
+    <div className="flex items-center justify-center mb-8">
+      {[1, 2, 3].map((step) => (
+        <React.Fragment key={step}>
+          <div
+            className={cn(
+              'flex items-center justify-center w-10 h-10 rounded-full font-semibold transition-colors',
+              currentStep === step
+                ? 'bg-blue-600 text-white'
+                : currentStep > step
+                ? 'bg-green-600 text-white'
+                : 'bg-gray-200 text-gray-600'
+            )}
+          >
+            {currentStep > step ? <Check className="w-5 h-5" /> : step}
           </div>
-          <CardTitle className="text-2xl">Create Account</CardTitle>
-          <p className="text-gray-600">Join WAH4H</p>
-        </CardHeader>
+          {step < 3 && (
+            <div
+              className={cn(
+                'w-16 h-1 mx-2 transition-colors',
+                currentStep > step ? 'bg-green-600' : 'bg-gray-200'
+              )}
+            />
+          )}
+        </React.Fragment>
+      ))}
+    </div>
+  );
 
-        <CardContent>
-          <form onSubmit={handleRegister} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="firstName">First Name</Label>
-                <Input
-                  id="firstName"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  className={errors.firstName ? 'border-red-500' : ''}
-                />
-                {errors.firstName && (
-                  <p className="text-sm text-red-500">{errors.firstName}</p>
-                )}
-              </div>
+  const renderStep1 = () => (
+    <div className="space-y-6">
+      {/* Personal Identity Section */}
+      <div>
+        <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
+          <User className="w-5 h-5" />
+          Personal Identity
+        </h3>
 
-              <div>
-                <Label htmlFor="lastName">Last Name</Label>
-                <Input
-                  id="lastName"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  className={errors.lastName ? 'border-red-500' : ''}
-                />
-                {errors.lastName && (
-                  <p className="text-sm text-red-500">{errors.lastName}</p>
-                )}
-              </div>
-            </div>
-
+        <div className="space-y-4">
+          {/* Name Fields */}
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>Email</Label>
+              <Label htmlFor="firstName">
+                First Name <span className="text-red-500">*</span>
+              </Label>
               <Input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className={errors.email ? 'border-red-500' : ''}
+                id="firstName"
+                value={formData.firstName}
+                onChange={(e) => handleInputChange('firstName', e.target.value)}
+                className={errors.firstName ? 'border-red-500' : ''}
               />
-              {errors.email && (
-                <p className="text-sm text-red-500">{errors.email}</p>
+              {errors.firstName && (
+                <p className="text-sm text-red-500 mt-1">{errors.firstName}</p>
               )}
             </div>
 
             <div>
-              <Label>Role</Label>
-              <Select value={role} onValueChange={(v) => setRole(v as UserRole)}>
-                <SelectTrigger className={errors.role ? 'border-red-500' : ''}>
-                  <SelectValue placeholder="Select your role" />
+              <Label htmlFor="middleName">
+                Middle Name <span className="text-gray-400 text-xs">(Optional)</span>
+              </Label>
+              <Input
+                id="middleName"
+                value={formData.middleName}
+                onChange={(e) => handleInputChange('middleName', e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="lastName">
+                Last Name <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="lastName"
+                value={formData.lastName}
+                onChange={(e) => handleInputChange('lastName', e.target.value)}
+                className={errors.lastName ? 'border-red-500' : ''}
+              />
+              {errors.lastName && (
+                <p className="text-sm text-red-500 mt-1">{errors.lastName}</p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="suffixName">
+                Suffix <span className="text-gray-400 text-xs">(Optional)</span>
+              </Label>
+              <Input
+                id="suffixName"
+                value={formData.suffixName}
+                onChange={(e) => handleInputChange('suffixName', e.target.value)}
+                placeholder="Jr., Sr., III"
+              />
+            </div>
+          </div>
+
+          {/* Contact Info */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="mobile">
+                Mobile Number <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="mobile"
+                value={formData.mobile}
+                onChange={(e) => handleMobileChange(e.target.value)}
+                placeholder="09XX-XXX-XXXX"
+                className={errors.mobile ? 'border-red-500' : ''}
+                maxLength={13}
+              />
+              {errors.mobile && (
+                <p className="text-sm text-red-500 mt-1">{errors.mobile}</p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="email">
+                Email <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => handleInputChange('email', e.target.value)}
+                className={errors.email ? 'border-red-500' : ''}
+              />
+              {errors.email && (
+                <p className="text-sm text-red-500 mt-1">{errors.email}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Demographics */}
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <Label htmlFor="gender">
+                Gender <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                value={formData.gender}
+                onValueChange={(v) => handleInputChange('gender', v)}
+              >
+                <SelectTrigger className={errors.gender ? 'border-red-500' : ''}>
+                  <SelectValue placeholder="Select" />
                 </SelectTrigger>
                 <SelectContent>
-                  {ROLE_OPTIONS.map((r) => (
-                    <SelectItem key={r.value} value={r.value}>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{r.label}</span>
-                        <span className="text-xs text-muted-foreground">{r.description}</span>
-                      </div>
+                  {GENDER_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {errors.role && (
-                <p className="text-sm text-red-500">{errors.role}</p>
+              {errors.gender && (
+                <p className="text-sm text-red-500 mt-1">{errors.gender}</p>
               )}
             </div>
 
             <div>
-              <Label>Password</Label>
-              <div className="relative">
-                <Input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={errors.password ? 'border-red-500 pr-10' : 'pr-10'}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-0 top-0 h-full"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? <EyeOff /> : <Eye />}
-                </Button>
-              </div>
-              {errors.password && (
-                <p className="text-sm text-red-500">{errors.password}</p>
+              <Label htmlFor="birthDate">
+                Birth Date <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="birthDate"
+                type="date"
+                value={formData.birthDate}
+                onChange={(e) => handleInputChange('birthDate', e.target.value)}
+                max={new Date().toISOString().split('T')[0]}
+                className={errors.birthDate ? 'border-red-500' : ''}
+              />
+              {errors.birthDate && (
+                <p className="text-sm text-red-500 mt-1">{errors.birthDate}</p>
               )}
             </div>
 
             <div>
-              <Label>Confirm Password</Label>
-              <div className="relative">
-                <Input
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className={
-                    errors.confirmPassword ? 'border-red-500 pr-10' : 'pr-10'
-                  }
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-0 top-0 h-full"
-                  onClick={() =>
-                    setShowConfirmPassword(!showConfirmPassword)
-                  }
-                >
-                  {showConfirmPassword ? <EyeOff /> : <Eye />}
-                </Button>
-              </div>
-              {errors.confirmPassword && (
-                <p className="text-sm text-red-500">
-                  {errors.confirmPassword}
-                </p>
-              )}
+              <Label htmlFor="language">Language</Label>
+              <Select
+                value={formData.language}
+                onValueChange={(v) => handleInputChange('language', v)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {LANGUAGE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-
-            <Button
-              type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700"
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating account...
-                </>
-              ) : (
-                'Create Account'
-              )}
-            </Button>
-          </form>
-
-          <div className="text-center mt-4">
-            <Button variant="link" onClick={() => navigate('/login')}>
-              Already have an account? Sign in
-            </Button>
           </div>
-        </CardContent>
-      </Card>
+
+          {/* Photo URL */}
+          <div>
+            <Label htmlFor="photoUrl">
+              Photo URL <span className="text-gray-400 text-xs">(Optional)</span>
+            </Label>
+            <Input
+              id="photoUrl"
+              type="url"
+              value={formData.photoUrl}
+              onChange={(e) => handleInputChange('photoUrl', e.target.value)}
+              placeholder="https://example.com/photo.jpg"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Account Security Section */}
+      <div>
+        <h3 className="text-lg font-semibold mb-4">Account Security</h3>
+
+        <div className="space-y-4">
+          {/* Role Selection - Grid of Cards */}
+          <div>
+            <Label>
+              Select Your Role <span className="text-red-500">*</span>
+            </Label>
+            <div className="grid grid-cols-2 gap-3 mt-2">
+              {ROLE_CARDS.map((roleCard) => (
+                <button
+                  key={roleCard.value}
+                  type="button"
+                  onClick={() => handleInputChange('role', roleCard.value)}
+                  className={cn(
+                    'p-4 border-2 rounded-lg text-left transition-all hover:shadow-md',
+                    formData.role === roleCard.value
+                      ? 'border-blue-600 bg-blue-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  )}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl">{roleCard.icon}</span>
+                    <div>
+                      <div className="font-semibold">{roleCard.label}</div>
+                      <div className="text-xs text-gray-600 mt-1">
+                        {roleCard.description}
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+            {errors.role && (
+              <p className="text-sm text-red-500 mt-2">{errors.role}</p>
+            )}
+          </div>
+
+          {/* Password Fields */}
+          <div>
+            <Label htmlFor="password">
+              Password <span className="text-red-500">*</span>
+            </Label>
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                value={formData.password}
+                onChange={(e) => handleInputChange('password', e.target.value)}
+                className={errors.password ? 'border-red-500' : ''}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            {errors.password && (
+              <p className="text-sm text-red-500 mt-1">{errors.password}</p>
+            )}
+            <p className="text-xs text-gray-500 mt-1">
+              Must contain 1 uppercase, 1 lowercase, 1 number, min 8 characters
+            </p>
+          </div>
+
+          <div>
+            <Label htmlFor="confirmPassword">
+              Confirm Password <span className="text-red-500">*</span>
+            </Label>
+            <div className="relative">
+              <Input
+                id="confirmPassword"
+                type={showConfirmPassword ? 'text' : 'password'}
+                value={formData.confirmPassword}
+                onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+                className={errors.confirmPassword ? 'border-red-500' : ''}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+              >
+                {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            {errors.confirmPassword && (
+              <p className="text-sm text-red-500 mt-1">{errors.confirmPassword}</p>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
+  );
+
+  const renderStep2 = () => (
+    <div className="space-y-6">
+      <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
+        <MapPin className="w-5 h-5" />
+        Address Information
+      </h3>
+
+      <div className="space-y-4">
+        {/* Address Line */}
+        <div>
+          <Label htmlFor="addressLine">
+            Street Address <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            id="addressLine"
+            value={formData.addressLine}
+            onChange={(e) => handleInputChange('addressLine', e.target.value)}
+            placeholder="House/Unit No., Street Name"
+            className={errors.addressLine ? 'border-red-500' : ''}
+          />
+          {errors.addressLine && (
+            <p className="text-sm text-red-500 mt-1">{errors.addressLine}</p>
+          )}
+        </div>
+
+        {/* City, District */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="addressCity">
+              City <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="addressCity"
+              value={formData.addressCity}
+              onChange={(e) => handleInputChange('addressCity', e.target.value)}
+              className={errors.addressCity ? 'border-red-500' : ''}
+            />
+            {errors.addressCity && (
+              <p className="text-sm text-red-500 mt-1">{errors.addressCity}</p>
+            )}
+          </div>
+
+          <div>
+            <Label htmlFor="addressDistrict">
+              Barangay <span className="text-gray-400 text-xs">(Optional)</span>
+            </Label>
+            <Input
+              id="addressDistrict"
+              value={formData.addressDistrict}
+              onChange={(e) => handleInputChange('addressDistrict', e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* Province, Postal Code */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="addressState">
+              Province <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="addressState"
+              value={formData.addressState}
+              onChange={(e) => handleInputChange('addressState', e.target.value)}
+              className={errors.addressState ? 'border-red-500' : ''}
+            />
+            {errors.addressState && (
+              <p className="text-sm text-red-500 mt-1">{errors.addressState}</p>
+            )}
+          </div>
+
+          <div>
+            <Label htmlFor="addressPostalCode">
+              Postal Code <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="addressPostalCode"
+              value={formData.addressPostalCode}
+              onChange={(e) => handleInputChange('addressPostalCode', e.target.value)}
+              placeholder="4 digits"
+              maxLength={4}
+              className={errors.addressPostalCode ? 'border-red-500' : ''}
+            />
+            {errors.addressPostalCode && (
+              <p className="text-sm text-red-500 mt-1">{errors.addressPostalCode}</p>
+            )}
+          </div>
+        </div>
+
+        {/* Country */}
+        <div>
+          <Label htmlFor="addressCountry">Country</Label>
+          <Input
+            id="addressCountry"
+            value={formData.addressCountry}
+            readOnly
+            className="bg-gray-50"
+          />
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderStep3 = () => (
+    <div className="space-y-6">
+      <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
+        <Briefcase className="w-5 h-5" />
+        Professional Qualifications
+      </h3>
+
+      <div className="space-y-4">
+        {/* PRC License */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="identifier">
+              PRC License Number <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="identifier"
+              value={formData.identifier}
+              onChange={(e) => handleInputChange('identifier', e.target.value.replace(/\D/g, ''))}
+              placeholder="7 digits"
+              maxLength={7}
+              className={errors.identifier ? 'border-red-500' : ''}
+            />
+            {errors.identifier && (
+              <p className="text-sm text-red-500 mt-1">{errors.identifier}</p>
+            )}
+          </div>
+
+          <div>
+            <Label htmlFor="qualificationCode">
+              Qualification <span className="text-red-500">*</span>
+            </Label>
+            <Select
+              value={formData.qualificationCode}
+              onValueChange={(v) => handleInputChange('qualificationCode', v)}
+            >
+              <SelectTrigger className={errors.qualificationCode ? 'border-red-500' : ''}>
+                <SelectValue placeholder="Select" />
+              </SelectTrigger>
+              <SelectContent>
+                {QUALIFICATION_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.qualificationCode && (
+              <p className="text-sm text-red-500 mt-1">{errors.qualificationCode}</p>
+            )}
+          </div>
+        </div>
+
+        {/* Certificate Number, Issuer */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="qualificationIdentifier">
+              Certificate Number <span className="text-gray-400 text-xs">(Optional)</span>
+            </Label>
+            <Input
+              id="qualificationIdentifier"
+              value={formData.qualificationIdentifier}
+              onChange={(e) => handleInputChange('qualificationIdentifier', e.target.value)}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="qualificationIssuer">
+              Issuing Organization <span className="text-gray-400 text-xs">(Optional)</span>
+            </Label>
+            <Select
+              value={formData.qualificationIssuer}
+              onValueChange={(v) => handleInputChange('qualificationIssuer', v)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select or leave empty" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None / PRC</SelectItem>
+                {organizations.map((org) => (
+                  <SelectItem key={org.organization_id} value={String(org.organization_id)}>
+                    {org.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Validity Period */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="qualificationPeriodStart">
+              License Start Date <span className="text-gray-400 text-xs">(Optional)</span>
+            </Label>
+            <Input
+              id="qualificationPeriodStart"
+              type="date"
+              value={formData.qualificationPeriodStart}
+              onChange={(e) => handleInputChange('qualificationPeriodStart', e.target.value)}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="qualificationPeriodEnd">
+              License Expiry Date <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="qualificationPeriodEnd"
+              type="date"
+              value={formData.qualificationPeriodEnd}
+              onChange={(e) => handleInputChange('qualificationPeriodEnd', e.target.value)}
+              min={new Date().toISOString().split('T')[0]}
+              className={errors.qualificationPeriodEnd ? 'border-red-500' : ''}
+            />
+            {errors.qualificationPeriodEnd && (
+              <p className="text-sm text-red-500 mt-1">{errors.qualificationPeriodEnd}</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="border-t pt-6">
+        <h3 className="text-lg font-semibold mb-4">Hospital Assignment</h3>
+
+        <div className="space-y-4">
+          {/* Organization */}
+          <div>
+            <Label htmlFor="organization">
+              Hospital / Organization <span className="text-red-500">*</span>
+            </Label>
+            <Select
+              value={formData.organization}
+              onValueChange={(v) => handleInputChange('organization', v)}
+              disabled={isLoadingOrgs}
+            >
+              <SelectTrigger className={errors.organization ? 'border-red-500' : ''}>
+                <SelectValue placeholder={isLoadingOrgs ? 'Loading...' : 'Select hospital'} />
+              </SelectTrigger>
+              <SelectContent>
+                {organizations.length > 0 ? (
+                  organizations.map((org) => (
+                    <SelectItem key={org.organization_id} value={String(org.organization_id)}>
+                      {org.name}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="none" disabled>
+                    No organizations available
+                  </SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+            {errors.organization && (
+              <p className="text-sm text-red-500 mt-1">{errors.organization}</p>
+            )}
+          </div>
+
+          {/* Position, Specialty */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="roleCode">
+                Position <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="roleCode"
+                value={formData.roleCode}
+                onChange={(e) => handleInputChange('roleCode', e.target.value)}
+                placeholder="e.g., Resident III, Head Nurse"
+                className={errors.roleCode ? 'border-red-500' : ''}
+              />
+              {errors.roleCode && (
+                <p className="text-sm text-red-500 mt-1">{errors.roleCode}</p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="specialtyCode">
+                Specialty <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                value={formData.specialtyCode}
+                onValueChange={(v) => handleInputChange('specialtyCode', v)}
+              >
+                <SelectTrigger className={errors.specialtyCode ? 'border-red-500' : ''}>
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SPECIALTY_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.specialtyCode && (
+                <p className="text-sm text-red-500 mt-1">{errors.specialtyCode}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ============================================================================
+  // MAIN RENDER
+  // ============================================================================
+
+  return (
+    <>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <Card className="w-full max-w-4xl">
+          <CardHeader className="text-center">
+            <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg mx-auto mb-4 flex items-center justify-center">
+              <UserPlus className="text-white w-8 h-8" />
+            </div>
+            <CardTitle className="text-2xl">Create Professional Account</CardTitle>
+            <p className="text-gray-600">Join WAH4H Healthcare System</p>
+          </CardHeader>
+
+          <CardContent>
+            {renderStepIndicator()}
+
+            <form onSubmit={handleSubmit}>
+              {currentStep === 1 && renderStep1()}
+              {currentStep === 2 && renderStep2()}
+              {currentStep === 3 && renderStep3()}
+
+              {/* Navigation Buttons */}
+              <div className="flex justify-between mt-8 pt-6 border-t">
+                {currentStep > 1 ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handlePrevious}
+                    disabled={isLoading}
+                  >
+                    <ChevronLeft className="w-4 h-4 mr-2" />
+                    Previous
+                  </Button>
+                ) : (
+                  <div />
+                )}
+
+                {currentStep < 3 ? (
+                  <Button
+                    type="button"
+                    onClick={handleNext}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    Next
+                    <ChevronRight className="w-4 h-4 ml-2" />
+                  </Button>
+                ) : (
+                  <Button
+                    type="submit"
+                    className="bg-green-600 hover:bg-green-700"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Sending verification code...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4 mr-2" />
+                        Complete Registration
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+            </form>
+
+            <div className="text-center mt-6">
+              <Button variant="link" onClick={() => navigate('/login')}>
+                Already have an account? Sign in
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* OTP Verification Modal */}
+      {showOTPModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="text-center">Verify Your Email</CardTitle>
+              <p className="text-sm text-gray-600 text-center mt-2">
+                We've sent a 6-digit verification code to:
+                <br />
+                <strong>{formData.email}</strong>
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="otp">Verification Code</Label>
+                  <Input
+                    id="otp"
+                    type="text"
+                    placeholder="Enter 6-digit code"
+                    value={otpCode}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                      setOtpCode(value);
+                      setErrors({});
+                    }}
+                    maxLength={6}
+                    className={cn(
+                      'text-center text-2xl tracking-widest font-mono',
+                      errors.otp && 'border-red-500'
+                    )}
+                    autoFocus
+                  />
+                  {errors.otp && (
+                    <p className="text-sm text-red-500 mt-1">{errors.otp}</p>
+                  )}
+                </div>
+
+                <div className="flex gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setShowOTPModal(false);
+                      setOtpCode('');
+                      setErrors({});
+                    }}
+                    disabled={isVerifying}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleOTPVerification}
+                    disabled={isVerifying || otpCode.length !== 6}
+                    className="flex-1 bg-green-600 hover:bg-green-700"
+                  >
+                    {isVerifying ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Verifying...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4 mr-2" />
+                        Verify & Continue
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                <div className="text-center text-sm text-gray-600">
+                  <p>Didn't receive the code?</p>
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="text-blue-600 p-0 h-auto"
+                    onClick={async () => {
+                      const result = await registerInitiate({
+                        ...formData,
+                        role: formData.role as UserRole,
+                      });
+                      if (!result.ok) {
+                        console.error('Failed to resend OTP:', result.error);
+                      }
+                    }}
+                  >
+                    Resend verification code
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </>
   );
 };
 

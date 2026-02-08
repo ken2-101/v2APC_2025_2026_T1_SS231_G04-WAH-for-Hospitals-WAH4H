@@ -28,8 +28,17 @@ const Login = () => {
     e.preventDefault();
     if (!validateForm() || isLoading) return;
 
-    const success = await login(email, password);
-    if (success) navigate('/dashboard');
+    const result = await login(email, password);
+    if (result.ok) {
+      navigate('/dashboard');
+      return;
+    }
+    if (result.error?.errors) {
+      setErrors({
+        email: result.error.errors.email,
+        password: result.error.errors.password,
+      });
+    }
   };
 
   const handleDemoLogin = async () => {
@@ -38,8 +47,17 @@ const Login = () => {
     const demoPassword = 'Doctor123';
     setEmail(demoEmail);
     setPassword(demoPassword);
-    const success = await login(demoEmail, demoPassword);
-    if (success) navigate('/dashboard');
+    const result = await login(demoEmail, demoPassword);
+    if (result.ok) {
+      navigate('/dashboard');
+      return;
+    }
+    if (result.error?.errors) {
+      setErrors({
+        email: result.error.errors.email,
+        password: result.error.errors.password,
+      });
+    }
   };
 
   const handleForgotPassword = () => {

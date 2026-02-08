@@ -19,7 +19,8 @@ from .views import (
     LoginInitiateAPIView,
     LoginVerifyAPIView,
     PasswordResetInitiateAPIView,
-    PasswordResetConfirmAPIView
+    PasswordResetConfirmAPIView,
+    OrganizationListAPIView
 )
 
 urlpatterns = [
@@ -73,4 +74,7 @@ urlpatterns = [
         TokenRefreshView.as_view(),
         name='token-refresh'
     ),
+
+
+    path('organizations/', OrganizationListAPIView.as_view(), name='organization-list'),
 ]

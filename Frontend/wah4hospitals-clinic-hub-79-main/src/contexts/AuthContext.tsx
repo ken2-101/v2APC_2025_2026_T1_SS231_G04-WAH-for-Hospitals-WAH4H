@@ -1,12 +1,9 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import axios from 'axios';
 import { useToast } from '@/hooks/use-toast';
 import { UserRole } from './RoleContext';
 
-const API_BASE_URL =
-  import.meta.env.STURDY_ADVENTURE_BASE_8000 ||
-  import.meta.env.LOCAL_8000 ||
-  import.meta.env.STURDY_ADVENTURE_BASE;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
 
 interface User {
   id: string;
@@ -17,22 +14,55 @@ interface User {
 }
 
 interface RegisterData {
+  // Personal Identity
   firstName: string;
+  middleName?: string;
   lastName: string;
+  suffixName?: string;
+  mobile: string;
   email: string;
+  gender: string;
+  birthDate: string;
+  language?: string;
+  photoUrl?: string;
+  role: UserRole | string;
   password: string;
   confirmPassword: string;
-  role: UserRole;
+
+  // Address Information
+  addressLine?: string;
+  addressCity?: string;
+  addressDistrict?: string;
+  addressState?: string;
+  addressPostalCode?: string;
+  addressCountry?: string;
+
+  // Professional Qualifications
+  identifier: string; // PRC License
+  qualificationCode?: string;
+  qualificationIdentifier?: string;
+  qualificationIssuer?: string;
+  qualificationPeriodStart?: string;
+  qualificationPeriodEnd?: string;
+  organization?: string;
+  roleCode?: string;
+  specialtyCode?: string;
 }
+
+type AuthResult = {
+  ok: boolean;
+  error?: any;
+};
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
-  register: (data: RegisterData) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<AuthResult>;
+  register: (data: RegisterData) => Promise<AuthResult>;
+  registerInitiate: (data: RegisterData) => Promise<AuthResult>;
+  registerVerify: (email: string, otp: string) => Promise<AuthResult>;
   logout: () => void;
   isLoading: boolean;
   isAuthenticated: boolean;
-  refreshUserData: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -48,20 +78,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  // Initialize user from localStorage on mount
-  useEffect(() => {
-    const saved = localStorage.getItem('currentUser');
-    if (saved) {
-      try {
-        const userData = JSON.parse(saved);
-        setUser(userData);
-      } catch (error) {
-        console.error('Failed to parse saved user data:', error);
-        localStorage.removeItem('currentUser');
-      }
-    }
-  }, []);
-
   // Create axios instance with base configuration
   const axiosInstance = axios.create({
     baseURL: API_BASE_URL,
@@ -69,6 +85,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       'Content-Type': 'application/json',
     },
   });
+
+  const getErrorData = (err: any) => err?.response?.data || { message: 'Request failed.' };
 
   // Request interceptor: Add auth token to all requests
   axiosInstance.interceptors.request.use(
@@ -122,7 +140,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * Login user with email and password
    * Validates credentials and stores authentication tokens
    */
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<AuthResult> => {
     setIsLoading(true);
     try {
       const res = await axiosInstance.post('/accounts/login/', {
@@ -145,9 +163,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role: rawUser.role as UserRole,
       };
 
-      localStorage.setItem('currentUser', JSON.stringify(userObj));
-      localStorage.setItem('userRole', rawUser.role);
-
       setUser(userObj);
 
       toast({
@@ -155,30 +170,126 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         description: `Logged in as ${userObj.firstName} ${userObj.lastName} (${userObj.role})`,
       });
 
-      return true;
+      return { ok: true };
     } catch (err: any) {
-      console.error('Login error:', err.response?.data);
+      const errorData = getErrorData(err);
+      console.error('Login error:', errorData);
 
       toast({
         title: 'Login failed',
-        description: err.response?.data?.detail || 'Invalid email or password. Please try again.',
+        description: errorData?.message || errorData?.detail || 'Invalid email or password. Please try again.',
         variant: 'destructive',
       });
-      return false;
+      return { ok: false, error: errorData };
     } finally {
       setIsLoading(false);
     }
   };
 
   /**
-   * Register new user account
-   * Creates account and provides appropriate user feedback
+   * Register Initiate - Step 1: Validate and cache registration data, send OTP
    */
-  const register = async (data: RegisterData): Promise<boolean> => {
+  const registerInitiate = async (data: RegisterData): Promise<AuthResult> => {
     setIsLoading(true);
 
     try {
-      const res = await axiosInstance.post('/accounts/register/', {
+      await axiosInstance.post('/accounts/register/initiate/', {
+        identifier: data.identifier,
+        first_name: data.firstName,
+        middle_name: data.middleName || '',
+        last_name: data.lastName,
+        suffix_name: data.suffixName || '',
+        gender: data.gender,
+        birth_date: data.birthDate || null,
+        telecom: data.mobile,
+        email: data.email,
+        password: data.password,
+        confirm_password: data.confirmPassword,
+        role: data.role,
+      });
+
+      toast({
+        title: 'OTP Sent',
+        description: 'Please check your email for the verification code.',
+      });
+
+      return { ok: true };
+    } catch (err: any) {
+      const errorData = getErrorData(err);
+      console.error('Registration initiate error:', errorData);
+
+      toast({
+        title: 'Registration failed',
+        description: errorData?.message || 'Unable to initiate registration. Please try again.',
+        variant: 'destructive',
+      });
+
+      return { ok: false, error: errorData };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Register Verify - Step 2: Verify OTP and create account with auto-login
+   * Returns true on success, false on failure
+   */
+  const registerVerify = async (email: string, otp: string): Promise<AuthResult> => {
+    setIsLoading(true);
+
+    try {
+      const res = await axiosInstance.post('/accounts/register/verify/', {
+        email,
+        otp,
+      });
+
+      const { tokens, user: rawUser } = res.data.data;
+
+      // Store authentication tokens
+      localStorage.setItem('accessToken', tokens.access);
+      localStorage.setItem('refreshToken', tokens.refresh);
+
+      // Map backend user data to frontend User interface
+      const userObj: User = {
+        id: String(rawUser.id),
+        email: rawUser.email,
+        firstName: rawUser.first_name,
+        lastName: rawUser.last_name,
+        role: rawUser.role as UserRole,
+      };
+
+      setUser(userObj);
+
+      toast({
+        title: 'Welcome!',
+        description: `Account created successfully. Welcome, ${userObj.firstName}!`,
+      });
+
+      return { ok: true };
+    } catch (err: any) {
+      const errorData = getErrorData(err);
+      console.error('Registration verify error:', errorData);
+
+      toast({
+        title: 'Verification failed',
+        description: errorData?.message || 'Invalid or expired OTP. Please try again.',
+        variant: 'destructive',
+      });
+      return { ok: false, error: errorData };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Register new user account (Legacy method - kept for backward compatibility)
+   * Creates account and provides appropriate user feedback
+   */
+  const register = async (data: RegisterData): Promise<AuthResult> => {
+    setIsLoading(true);
+
+    try {
+      await axiosInstance.post('/accounts/register/', {
         first_name: data.firstName,
         last_name: data.lastName,
         email: data.email,
@@ -192,56 +303,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         description: `Welcome ${data.firstName}! You can now log in with your credentials.`,
       });
 
-      return true;
+      return { ok: true };
     } catch (err: any) {
-      console.error('Registration error:', err.response?.data);
-
-      // Format error messages for better user experience
-      let errorMessage = 'Unable to complete registration. Please try again.';
-
-      if (err.response?.data) {
-        const errorData = err.response.data;
-
-        if (typeof errorData === 'object') {
-          // Handle field-specific validation errors
-          const fieldErrors = Object.entries(errorData)
-            .map(([field, errors]) => {
-              const fieldName = field.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-              if (Array.isArray(errors)) {
-                return `${fieldName}: ${errors.join(', ')}`;
-              }
-              return `${fieldName}: ${errors}`;
-            })
-            .join('\n');
-
-          errorMessage = fieldErrors || errorMessage;
-        } else if (typeof errorData === 'string') {
-          errorMessage = errorData;
-        }
-      }
+      const errorData = getErrorData(err);
+      console.error('Registration error:', errorData);
 
       toast({
         title: 'Registration failed',
-        description: errorMessage,
+        description: errorData?.message || 'Unable to complete registration. Please try again.',
         variant: 'destructive',
       });
-      return false;
+      return { ok: false, error: errorData };
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  /**
-   * Refresh user data from server (if needed)
-   */
-  const refreshUserData = async () => {
-    try {
-      const saved = localStorage.getItem('currentUser');
-      if (saved) {
-        setUser(JSON.parse(saved));
-      }
-    } catch (error) {
-      console.error('Failed to refresh user data:', error);
     }
   };
 
@@ -271,11 +345,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{ 
         user, 
         login, 
-        register, 
+        register,
+        registerInitiate,
+        registerVerify, 
         logout, 
         isLoading,
         isAuthenticated,
-        refreshUserData,
       }}
     >
       {children}

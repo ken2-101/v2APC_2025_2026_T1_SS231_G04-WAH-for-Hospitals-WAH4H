@@ -20,16 +20,19 @@ Response Format:
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import status, generics
 from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.core.mail import send_mail
 from django.core.cache import cache
 from django.conf import settings
+from django.db import transaction
 import json
 from datetime import date
 
+from .models import Organization
 from .serializers import (
+    OrganizationSerializer,
     PractitionerSignupSerializer,
     VerifyAccountSerializer,
     LoginStepOneSerializer,
@@ -43,6 +46,16 @@ from .serializers import (
 # ============================================================================
 # UTILITY FUNCTIONS
 # ============================================================================
+
+def get_client_ip(request):
+    """Extract client IP address from request, handling proxies."""
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0].strip()
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
+
 
 def get_jwt_tokens(user):
     """Generate JWT access and refresh tokens for user."""
@@ -114,39 +127,26 @@ def error_response(message, errors=None, http_status=status.HTTP_400_BAD_REQUEST
 class RegisterInitiateAPIView(APIView):
     """
     POST /api/accounts/register/initiate/
-    
     Step 1: Validate Data + Cache + Send OTP (NO DB WRITES).
-    
-    Cache-First Strategy:
-    - Validates registration data (no database writes)
-    - Generates OTP
-    - Caches validated_data + OTP for 5 minutes
-    - Sends OTP via email
-    
-    Request Body:
-    {
-        "identifier": "PRC-12345",
-        "first_name": "Juan",
-        "last_name": "Dela Cruz",
-        "email": "juan@example.com",
-        "password": "SecurePass123",
-        "confirm_password": "SecurePass123",
-        "role": "doctor"
-    }
-    
-    Response:
-    {
-        "status": "success",
-        "message": "Registration initiated. Please check your email for OTP.",
-        "data": {
-            "email": "juan@example.com",
-            "otp_sent": true
-        }
-    }
     """
     permission_classes = [AllowAny]
     
     def post(self, request):
+        # Security Throttling: Prevent spam (1 attempt per IP per minute)
+        ip_address = get_client_ip(request)
+        throttle_key = f"register_throttle_{ip_address}"
+        
+        # Check if this IP has already initiated registration within the last 60 seconds
+        if cache.get(throttle_key):
+            return error_response(
+                message='Too many registration attempts. Please try again in 1 minute.',
+                errors={'detail': 'Rate limit exceeded. Wait 60 seconds before retrying.'},
+                http_status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+        
+        # Set throttle flag for 60 seconds
+        cache.set(throttle_key, True, timeout=60)
+        
         serializer = PractitionerSignupSerializer(data=request.data)
         
         try:
@@ -155,7 +155,7 @@ class RegisterInitiateAPIView(APIView):
             # Generate OTP
             otp = generate_otp()
             
-            # Prepare data for caching (handle date serialization)
+            # Prepare data for caching
             cache_data = serializer.validated_data.copy()
             
             # Convert date to string for JSON serialization
@@ -165,9 +165,9 @@ class RegisterInitiateAPIView(APIView):
             # Add OTP to cached data
             cache_data['otp'] = otp
             
-            # Cache the registration data with OTP (5 minutes)
+            # Cache the registration data (15 minutes)
             cache_key = f"registration_{cache_data['email']}"
-            cache.set(cache_key, cache_data, timeout=300)
+            cache.set(cache_key, cache_data, timeout=900)
             
             # Send OTP via email
             send_otp_email(cache_data['email'], otp, purpose='verification')
@@ -177,7 +177,7 @@ class RegisterInitiateAPIView(APIView):
                 data={
                     'email': cache_data['email'],
                     'otp_sent': True,
-                    'expires_in': '5 minutes'
+                    'expires_in': '15 minutes'
                 },
                 http_status=status.HTTP_200_OK
             )
@@ -189,16 +189,16 @@ class RegisterInitiateAPIView(APIView):
                 http_status=status.HTTP_400_BAD_REQUEST
             )
 
-
 class RegisterVerifyAPIView(APIView):
     """
     POST /api/accounts/register/verify/
     
-    Step 2: Verify OTP + Create Account from Cache (Cache-First Strategy).
+    Step 2: Verify OTP + Create Account from Cache (Cache-First Strategy + Auto-Login).
     
     - Retrieves cached registration data
     - Validates OTP
     - Creates Practitioner + User records (both ACTIVE)
+    - Generates JWT tokens for immediate auto-login
     - Deletes cache after successful creation
     
     Request Body:
@@ -210,10 +210,20 @@ class RegisterVerifyAPIView(APIView):
     Response:
     {
         "status": "success",
-        "message": "Account created successfully. You can now login.",
+        "message": "Account created successfully. You are now logged in.",
         "data": {
-            "email": "juan@example.com",
-            "is_active": true
+            "user": {
+                "id": 1,
+                "username": "juan",
+                "email": "juan@example.com",
+                "first_name": "Juan",
+                "last_name": "Dela Cruz",
+                "role": "doctor"
+            },
+            "tokens": {
+                "access": "eyJ0eXAiOiJKV1QiLCJhbGc...",
+                "refresh": "eyJ0eXAiOiJKV1QiLCJhbGc..."
+            }
         }
     }
     """
@@ -231,48 +241,58 @@ class RegisterVerifyAPIView(APIView):
                     errors={'detail': 'Missing required fields'}
                 )
             
-            # Retrieve cached registration data
-            cache_key = f"registration_{email}"
-            cached_data = cache.get(cache_key)
-            
-            if not cached_data:
-                return error_response(
-                    message='Registration expired or not found. Please start registration again.',
-                    errors={'detail': 'No registration data found for this email'},
-                    http_status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            # Validate OTP
-            cached_otp = cached_data.get('otp')
-            if not cached_otp or cached_otp != otp:
-                return error_response(
-                    message='Invalid OTP.',
-                    errors={'otp': 'The OTP you entered is incorrect'},
-                    http_status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            # Convert birth_date back from string to date object if present
-            if cached_data.get('birth_date') and isinstance(cached_data['birth_date'], str):
-                from datetime import datetime
-                cached_data['birth_date'] = datetime.fromisoformat(cached_data['birth_date']).date()
-            
-            # Remove OTP from cached data before creating account
-            cached_data.pop('otp', None)
-            cached_data.pop('confirm_password', None)  # Remove confirm_password too
-            
-            # Create account using VerifyAccountSerializer
-            serializer = VerifyAccountSerializer()
-            user = serializer.create_account(cached_data)
-            
-            # Delete cache after successful creation (prevent replay)
-            cache.delete(cache_key)
+            with transaction.atomic():
+                # Retrieve cached registration data
+                cache_key = f"registration_{email}"
+                cached_data = cache.get(cache_key)
+
+                if not cached_data:
+                    return error_response(
+                        message='Registration expired or not found. Please start registration again.',
+                        errors={'detail': 'No registration data found for this email'},
+                        http_status=status.HTTP_400_BAD_REQUEST
+                    )
+
+                # Validate OTP
+                cached_otp = cached_data.get('otp')
+                if not cached_otp or cached_otp != otp:
+                    return error_response(
+                        message='Invalid OTP.',
+                        errors={'otp': 'The OTP you entered is incorrect'},
+                        http_status=status.HTTP_400_BAD_REQUEST
+                    )
+
+                # Convert birth_date back from string to date object if present
+                if cached_data.get('birth_date') and isinstance(cached_data['birth_date'], str):
+                    from datetime import datetime
+                    cached_data['birth_date'] = datetime.fromisoformat(cached_data['birth_date']).date()
+
+                # Remove OTP from cached data before creating account
+                cached_data.pop('otp', None)
+                cached_data.pop('confirm_password', None)  # Remove confirm_password too
+
+                # Create account using VerifyAccountSerializer
+                serializer = VerifyAccountSerializer()
+                user = serializer.create_account(cached_data)
+
+                # Delete cache after successful creation (prevent replay)
+                cache.delete(cache_key)
+
+                # Generate JWT tokens for auto-login
+                tokens = get_jwt_tokens(user)
             
             return success_response(
-                message='Account created successfully. You can now login.',
+                message='Account created successfully. You are now logged in.',
                 data={
-                    'email': user.email,
-                    'username': user.username,
-                    'is_active': user.is_active
+                    'user': {
+                        'id': user.practitioner.practitioner_id,
+                        'username': user.username,
+                        'email': user.email,
+                        'first_name': user.first_name,
+                        'last_name': user.last_name,
+                        'role': user.role
+                    },
+                    'tokens': tokens
                 },
                 http_status=status.HTTP_201_CREATED
             )
@@ -288,6 +308,16 @@ class RegisterVerifyAPIView(APIView):
 # ============================================================================
 # LOGIN FLOW
 # ============================================================================
+
+class OrganizationListAPIView(generics.ListAPIView):
+    """
+    GET /api/accounts/organizations/
+    Public endpoint to list all available hospitals for registration dropdowns.
+    """
+    authentication_classes = [] # Public access
+    permission_classes = [AllowAny]
+    queryset = Organization.objects.filter(active=True) # Only show active hospitals
+    serializer_class = OrganizationSerializer
 
 class LoginInitiateAPIView(APIView):
     """

@@ -231,7 +231,7 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
 
     # Attach standard UserManager for Django authentication
     objects = UserManager()
-
+    
     # ---------------------------------------------------------
     # DJANGO AUTH CONFIGURATION
     # ---------------------------------------------------------
@@ -241,6 +241,17 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
 
     class Meta:
         db_table = 'user'
+
+    # =========================================================
+    # THE FIX: Alias 'id' to primary key
+    # =========================================================
+    @property
+    def id(self):
+        """
+        Alias 'id' to the actual primary key (practitioner_id) 
+        to satisfy libraries (like SimpleJWT) expecting a standard 'id' field.
+        """
+        return self.pk
 
     def __str__(self):
         return self.username
