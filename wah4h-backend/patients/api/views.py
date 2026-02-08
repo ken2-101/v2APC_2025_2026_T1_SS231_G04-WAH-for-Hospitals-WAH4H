@@ -15,7 +15,10 @@ from rest_framework.decorators import action, api_view
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 
-from patients.wah4pc import request_patient, fhir_to_dict
+import requests as http_requests
+
+from patients.wah4pc import request_patient, fhir_to_dict, push_patient, patient_to_fhir
+from patients.models import Patient, WAH4PCTransaction
 
 from patients.api.serializers import (
     PatientInputSerializer,
@@ -580,21 +583,141 @@ class ImmunizationViewSet(viewsets.ModelViewSet):
 @api_view(['POST'])
 def fetch_wah4pc(request):
     """Fetch patient data from WAH4PC gateway."""
-    result = request_patient(
-        request.data['targetProviderId'],
-        request.data['philHealthId'],
-    )
-    return Response(result)
+    target_id = request.data.get('targetProviderId')
+    philhealth_id = request.data.get('philHealthId')
+    if not target_id or not philhealth_id:
+        return Response(
+            {'error': 'targetProviderId and philHealthId are required'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    result = request_patient(target_id, philhealth_id)
+    txn_id = result.get('id')
+    if txn_id:
+        WAH4PCTransaction.objects.create(
+            transaction_id=txn_id,
+            type='fetch',
+            status='PENDING',
+            target_provider_id=target_id,
+        )
+    return Response(result, status=status.HTTP_202_ACCEPTED)
 
 
 @api_view(['POST'])
 def webhook_receive(request):
     """Receive webhook from WAH4PC gateway."""
-    if request.headers.get('X-Gateway-Auth') != os.getenv('GATEWAY_AUTH_KEY'):
+    gateway_key = os.getenv('GATEWAY_AUTH_KEY')
+    auth_header = request.headers.get('X-Gateway-Auth')
+    if not gateway_key or not auth_header or auth_header != gateway_key:
         return Response({'error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    txn_id = request.data.get('transactionId')
+    txn = WAH4PCTransaction.objects.filter(transaction_id=txn_id).first() if txn_id else None
 
     if request.data.get('status') == 'SUCCESS':
         patient_data = fhir_to_dict(request.data['data'])
-        request.session[f"wah4pc_{request.data['transactionId']}"] = patient_data
+        request.session[f"wah4pc_{txn_id}"] = patient_data
+        if txn:
+            txn.status = 'COMPLETED'
+            txn.save()
+    else:
+        if txn:
+            txn.status = 'FAILED'
+            txn.error_message = request.data.get('data', {}).get('error', 'Unknown')
+            txn.save()
 
     return Response({'message': 'Received'})
+
+
+@api_view(['POST'])
+def send_to_wah4pc(request):
+    """Send local patient data to another provider via WAH4PC gateway."""
+    patient_id = request.data.get('patientId')
+    target_id = request.data.get('targetProviderId')
+    if not patient_id or not target_id:
+        return Response(
+            {'error': 'patientId and targetProviderId are required'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    try:
+        patient = Patient.objects.get(id=patient_id)
+    except Patient.DoesNotExist:
+        return Response({'error': 'Patient not found'}, status=status.HTTP_404_NOT_FOUND)
+    result = push_patient(target_id, patient)
+    txn_id = result.get('id')
+    if txn_id:
+        WAH4PCTransaction.objects.create(
+            transaction_id=txn_id,
+            type='send',
+            status='PENDING',
+            patient_id=patient.id,
+            target_provider_id=target_id,
+        )
+    return Response(result, status=status.HTTP_202_ACCEPTED)
+
+
+@api_view(['POST'])
+def webhook_process_query(request):
+    """Process incoming query from another provider via WAH4PC gateway."""
+    gateway_key = os.getenv('GATEWAY_AUTH_KEY')
+    auth_header = request.headers.get('X-Gateway-Auth')
+    if not gateway_key or not auth_header or auth_header != gateway_key:
+        return Response({'error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    txn_id = request.data.get('transactionId')
+    identifiers = request.data.get('identifiers', [])
+    return_url = request.data.get('gatewayReturnUrl')
+
+    if not txn_id or not return_url:
+        return Response(
+            {'error': 'transactionId and gatewayReturnUrl are required'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    patient = None
+    for ident in identifiers:
+        if 'philhealth' in ident.get('system', '').lower():
+            patient = Patient.objects.filter(philhealth_id=ident['value']).first()
+        if patient:
+            break
+
+    try:
+        http_requests.post(
+            return_url,
+            headers={
+                "X-API-Key": os.getenv('WAH4PC_API_KEY'),
+                "X-Provider-ID": os.getenv('WAH4PC_PROVIDER_ID'),
+            },
+            json={
+                "transactionId": txn_id,
+                "status": "SUCCESS" if patient else "REJECTED",
+                "data": patient_to_fhir(patient) if patient else {"error": "Not found"},
+            },
+        )
+    except http_requests.RequestException:
+        return Response(
+            {'error': 'Failed to send response to gateway'},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+    return Response({'message': 'Processing'})
+
+
+@api_view(['GET'])
+def list_transactions(request):
+    """List WAH4PC transactions, optionally filtered by patient_id."""
+    patient_id = request.query_params.get('patient_id')
+    txns = WAH4PCTransaction.objects.all().order_by('-created_at')
+    if patient_id:
+        txns = txns.filter(patient_id=patient_id)
+    return Response([
+        {
+            'id': t.transaction_id,
+            'type': t.type,
+            'status': t.status,
+            'patientId': t.patient_id,
+            'targetProviderId': t.target_provider_id,
+            'errorMessage': t.error_message,
+            'createdAt': t.created_at,
+        }
+        for t in txns
+    ])

@@ -331,3 +331,18 @@ class Immunization(FHIRResourceModel):
 
     def __str__(self):
         return f"Immunization {self.identifier}: {self.vaccine_display or self.vaccine_code}"
+
+
+class WAH4PCTransaction(TimeStampedModel):
+    transaction_id = models.CharField(max_length=255, unique=True, db_index=True)
+    type = models.CharField(max_length=20)
+    status = models.CharField(max_length=20, default='PENDING')
+    patient_id = models.IntegerField(null=True, blank=True)
+    target_provider_id = models.CharField(max_length=255, null=True, blank=True)
+    error_message = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'wah4pc_transaction'
+
+    def __str__(self):
+        return f"{self.type} {self.transaction_id}: {self.status}"

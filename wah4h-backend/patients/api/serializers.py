@@ -37,9 +37,9 @@ class PatientInputSerializer(serializers.ModelSerializer):
             'gender', 'birthdate', 'civil_status', 'nationality', 'religion',
             'philhealth_id', 'blood_type', 'pwd_type',
             'occupation', 'education', 'mobile_number',
-            'address_line', 'address_city', 'address_district', 
+            'address_line', 'address_city', 'address_district',
             'address_state', 'address_postal_code', 'address_country',
-            'contact_first_name', 'contact_last_name', 
+            'contact_first_name', 'contact_last_name',
             'contact_mobile_number', 'contact_relationship',
             'indigenous_flag', 'indigenous_group',
             'consent_flag', 'image_url'

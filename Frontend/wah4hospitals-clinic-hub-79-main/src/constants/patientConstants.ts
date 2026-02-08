@@ -131,8 +131,8 @@ export const CONTACT_RELATIONSHIP_OPTIONS = [
 export const REGISTRATION_STEPS = [
   {
     step: 1,
-    title: 'Personal Information',
-    description: 'Name, gender, birthdate, civil status, religion, nationality',
+    title: 'Basic Info',
+    description: 'Name, birthdate, gender, civil status, blood type, PWD, indigenous status',
   },
   {
     step: 2,
@@ -141,12 +141,12 @@ export const REGISTRATION_STEPS = [
   },
   {
     step: 3,
-    title: 'Health Information',
-    description: 'PhilHealth ID, blood type, PWD type, occupation, education',
+    title: 'Emergency Contact',
+    description: 'Emergency contact name, number, and relationship',
   },
   {
     step: 4,
-    title: 'Additional Information',
-    description: 'Emergency contact, indigenous status, consent',
+    title: 'Additional Info',
+    description: 'Nationality, religion, occupation, education, PhilHealth, consent',
   },
 ];

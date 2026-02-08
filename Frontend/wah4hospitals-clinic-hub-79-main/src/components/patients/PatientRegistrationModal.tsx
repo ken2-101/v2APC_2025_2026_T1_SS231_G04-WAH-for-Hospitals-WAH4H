@@ -1,6 +1,11 @@
 /**
  * Patient Registration Modal - 4-Step Wizard
- * Uses React Hook Form + Zod for validation
+ * Aligned with Patient model (wah4h-backend/patients/models.py)
+ *
+ * Page 1: Basic Info
+ * Page 2: Contact & Address
+ * Page 3: Emergency Contact
+ * Page 4: Additional Info
  */
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -27,7 +32,6 @@ import {
   BLOOD_TYPE_OPTIONS,
   MARITAL_STATUS_OPTIONS,
   PWD_TYPE_OPTIONS,
-  NATIONALITY_OPTIONS,
   RELIGION_OPTIONS,
   CONTACT_RELATIONSHIP_OPTIONS,
   REGISTRATION_STEPS,
@@ -52,7 +56,7 @@ export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> =
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
   const [allStepsData, setAllStepsData] = useState<Partial<PatientFormData>>({});
 
-  // Step 1: Personal Information
+  // Step 1: Basic Info
   const step1Form = useForm<PatientStep1FormData>({
     resolver: zodResolver(patientStep1Schema),
     mode: 'onChange',
@@ -64,13 +68,13 @@ export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> =
     mode: 'onChange',
   });
 
-  // Step 3: Health Information
+  // Step 3: Emergency Contact
   const step3Form = useForm<PatientStep3FormData>({
     resolver: zodResolver(patientStep3Schema),
     mode: 'onChange',
   });
 
-  // Step 4: Additional Information
+  // Step 4: Additional Info
   const step4Form = useForm<PatientStep4FormData>({
     resolver: zodResolver(patientStep4Schema),
     mode: 'onChange',
@@ -112,7 +116,7 @@ export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> =
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validate step 4
     const isValid = await step4Form.trigger();
     if (!isValid) return;
@@ -149,8 +153,8 @@ export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> =
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) return; }}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" onPointerDownOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>Register New Patient - Step {currentStep} of 4</DialogTitle>
         </DialogHeader>
@@ -178,16 +182,16 @@ export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> =
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* STEP 1: Personal Information */}
+          {/* STEP 1: Basic Info */}
           {currentStep === 1 && <Step1Form form={step1Form} />}
 
           {/* STEP 2: Contact & Address */}
           {currentStep === 2 && <Step2Form form={step2Form} />}
 
-          {/* STEP 3: Health Information */}
+          {/* STEP 3: Emergency Contact */}
           {currentStep === 3 && <Step3Form form={step3Form} />}
 
-          {/* STEP 4: Additional Information */}
+          {/* STEP 4: Additional Info */}
           {currentStep === 4 && <Step4Form form={step4Form} />}
 
           {/* Action Buttons */}
@@ -198,8 +202,7 @@ export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> =
               onClick={currentStep === 1 ? handleClose : handlePreviousStep}
               disabled={isLoading}
             >
-              {currentStep === 1 ? 'Cancel' : <ChevronLeft className="w-4 h-4 mr-2" />}
-              {currentStep === 1 ? 'Cancel' : 'Previous'}
+              {currentStep === 1 ? 'Cancel' : <><ChevronLeft className="w-4 h-4 mr-2" /> Previous</>}
             </Button>
 
             {currentStep < 4 ? (
@@ -228,13 +231,15 @@ export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> =
 };
 
 // ============================================================================
-// STEP 1: PERSONAL INFORMATION
+// STEP 1: BASIC INFO
 // ============================================================================
 const Step1Form = ({ form }: { form: any }) => {
-  const { register, formState: { errors } } = form;
+  const { register, formState: { errors }, watch } = form;
+  const indigenousFlag = watch('indigenous_flag');
 
   return (
     <div className="space-y-4">
+      {/* Name Fields */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <FormField
           label="Last Name *"
@@ -262,49 +267,59 @@ const Step1Form = ({ form }: { form: any }) => {
         />
       </div>
 
+      {/* Demographics */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <SelectField
-          label="Gender *"
-          error={errors.gender}
-          {...register('gender')}
-          options={[{ value: '', label: 'Select Gender' }, ...GENDER_OPTIONS]}
-        />
         <FormField
           label="Date of Birth *"
           type="date"
           error={errors.birthdate}
           {...register('birthdate')}
         />
+        <SelectField
+          label="Gender *"
+          error={errors.gender}
+          {...register('gender')}
+          options={[{ value: '', label: 'Select Gender' }, ...GENDER_OPTIONS]}
+        />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <FormField
-          label="Nationality"
-          error={errors.nationality}
-          {...register('nationality')}
-          placeholder="e.g., Filipino"
-        />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <SelectField
           label="Civil Status"
           error={errors.civil_status}
           {...register('civil_status')}
           options={[{ value: '', label: 'Select Status' }, ...MARITAL_STATUS_OPTIONS]}
         />
+        <SelectField
+          label="Blood Type"
+          error={errors.blood_type}
+          {...register('blood_type')}
+          options={[{ value: '', label: 'Select Blood Type' }, ...BLOOD_TYPE_OPTIONS]}
+        />
+        <SelectField
+          label="PWD Type"
+          error={errors.pwd_type}
+          {...register('pwd_type')}
+          options={[{ value: '', label: 'Select PWD Type' }, ...PWD_TYPE_OPTIONS]}
+        />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <SelectField
-          label="Religion"
-          error={errors.religion}
-          {...register('religion')}
-          options={[{ value: '', label: 'Select Religion' }, ...RELIGION_OPTIONS]}
+      {/* Indigenous */}
+      <div className="pt-2 border-t">
+        <CheckboxField
+          label="Indigenous Person"
+          {...register('indigenous_flag')}
         />
-        <FormField
-          label="Race"
-          error={errors.race}
-          {...register('race')}
-          placeholder="e.g., Tagalog"
-        />
+        {indigenousFlag && (
+          <div className="mt-2">
+            <FormField
+              label="Indigenous Group"
+              error={errors.indigenous_group}
+              {...register('indigenous_group')}
+              placeholder="e.g., Ilocano, Bicolano"
+            />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -314,10 +329,20 @@ const Step1Form = ({ form }: { form: any }) => {
 // STEP 2: CONTACT & ADDRESS
 // ============================================================================
 const Step2Form = ({ form }: { form: any }) => {
-  const { register, formState: { errors }, watch } = form;
+  const { register, formState: { errors }, watch, setValue } = form;
   const selectedRegion = watch('address_state');
   const selectedProvince = watch('address_district');
   const selectedCity = watch('address_city');
+
+  // Check if cascading data exists for the selected values
+  const regionArr = Array.isArray(addressData.regions) ? addressData.regions : [];
+  const provinces = selectedRegion && (addressData.provinces as Record<string, any[]>)?.[selectedRegion];
+  const cities = selectedProvince && (addressData.cities as Record<string, any[]>)?.[selectedProvince];
+  const barangays = selectedCity && (addressData.barangays as Record<string, string[]>)?.[selectedCity];
+
+  const hasProvinces = Array.isArray(provinces) && provinces.length > 0;
+  const hasCities = Array.isArray(cities) && cities.length > 0;
+  const hasBarangays = Array.isArray(barangays) && barangays.length > 0;
 
   return (
     <div className="space-y-4">
@@ -330,68 +355,104 @@ const Step2Form = ({ form }: { form: any }) => {
 
       <div className="pt-4 border-t">
         <h4 className="text-sm font-semibold mb-4">Address (PSGC)</h4>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <SelectField
-            label="Region *"
+            label="Region"
             error={errors.address_state}
-            {...register('address_state')}
+            {...register('address_state', {
+              onChange: () => {
+                setValue('address_district', '');
+                setValue('address_city', '');
+                setValue('address_line', '');
+              },
+            })}
             options={[
               { value: '', label: 'Select Region' },
-              ...Object.entries(addressData.regions || {}).map(([code, name]: any) => ({
-                value: code,
-                label: typeof name === 'object' ? name.name : name,
+              ...regionArr.map((r: any) => ({
+                value: r.code,
+                label: r.name,
               })),
             ]}
           />
-          <SelectField
-            label="Province *"
-            error={errors.address_district}
-            {...register('address_district')}
-            disabled={!selectedRegion}
-            options={[
-              { value: '', label: 'Select Province' },
-              ...(selectedRegion && addressData.provinces?.[selectedRegion]
-                ? addressData.provinces[selectedRegion].map((p: any) => ({
-                    value: p.code,
-                    label: p.name,
-                  }))
-                : []),
-            ]}
-          />
+          {hasProvinces ? (
+            <SelectField
+              label="Province"
+              error={errors.address_district}
+              {...register('address_district', {
+                onChange: () => {
+                  setValue('address_city', '');
+                  setValue('address_line', '');
+                },
+              })}
+              options={[
+                { value: '', label: 'Select Province' },
+                ...provinces.map((p: any) => ({
+                  value: p.code,
+                  label: p.name,
+                })),
+              ]}
+            />
+          ) : (
+            <FormField
+              label="Province"
+              error={errors.address_district}
+              {...register('address_district')}
+              placeholder="Enter province name"
+              disabled={!selectedRegion}
+            />
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <SelectField
-            label="City/Municipality *"
-            error={errors.address_city}
-            {...register('address_city')}
-            disabled={!selectedProvince}
-            options={[
-              { value: '', label: 'Select City/Municipality' },
-              ...(selectedProvince && addressData.cities?.[selectedProvince]
-                ? addressData.cities[selectedProvince].map((c: any) => ({
-                    value: c.code,
-                    label: c.name,
-                  }))
-                : []),
-            ]}
-          />
-          <SelectField
-            label="Barangay *"
-            error={errors.address_line}
-            {...register('address_line')}
-            disabled={!selectedCity}
-            options={[
-              { value: '', label: 'Select Barangay' },
-              ...(selectedCity && addressData.barangays?.[selectedCity]
-                ? addressData.barangays[selectedCity].map((b: any) => ({
-                    value: b,
-                    label: b,
-                  }))
-                : []),
-            ]}
-          />
+          {hasCities ? (
+            <SelectField
+              label="City/Municipality *"
+              error={errors.address_city}
+              {...register('address_city', {
+                onChange: () => {
+                  setValue('address_line', '');
+                },
+              })}
+              options={[
+                { value: '', label: 'Select City/Municipality' },
+                ...cities.map((c: any) => ({
+                  value: c.code,
+                  label: c.name,
+                })),
+              ]}
+            />
+          ) : (
+            <FormField
+              label="City/Municipality *"
+              error={errors.address_city}
+              {...register('address_city')}
+              placeholder="Enter city/municipality name"
+              disabled={!selectedProvince}
+            />
+          )}
+          {hasBarangays ? (
+            <SelectField
+              label="Barangay *"
+              error={errors.address_line}
+              {...register('address_line')}
+              options={[
+                { value: '', label: 'Select Barangay' },
+                ...barangays.map((b: string) => ({
+                  value: b,
+                  label: b,
+                })),
+              ]}
+            />
+          ) : (
+            <FormField
+              label="Barangay *"
+              error={errors.address_line}
+              {...register('address_line')}
+              placeholder="Enter barangay name"
+              disabled={!selectedCity}
+            />
+          )}
         </div>
       </div>
 
@@ -414,32 +475,64 @@ const Step2Form = ({ form }: { form: any }) => {
 };
 
 // ============================================================================
-// STEP 3: HEALTH INFORMATION
+// STEP 3: EMERGENCY CONTACT
 // ============================================================================
 const Step3Form = ({ form }: { form: any }) => {
   const { register, formState: { errors } } = form;
 
   return (
     <div className="space-y-4">
-      <FormField
-        label="PhilHealth ID"
-        error={errors.philhealth_id}
-        {...register('philhealth_id')}
-        placeholder="e.g., PH-123456-789"
-      />
-
+      <h4 className="text-sm font-semibold">Emergency Contact Information</h4>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <SelectField
-          label="Blood Type"
-          error={errors.blood_type}
-          {...register('blood_type')}
-          options={[{ value: '', label: 'Select Blood Type' }, ...BLOOD_TYPE_OPTIONS]}
+        <FormField
+          label="Contact First Name *"
+          error={errors.contact_first_name}
+          {...register('contact_first_name')}
+          placeholder="e.g., Maria"
+        />
+        <FormField
+          label="Contact Last Name *"
+          error={errors.contact_last_name}
+          {...register('contact_last_name')}
+          placeholder="e.g., Dela Cruz"
+        />
+        <FormField
+          label="Contact Mobile Number *"
+          error={errors.contact_mobile_number}
+          {...register('contact_mobile_number')}
+          placeholder="e.g., 09123456789"
         />
         <SelectField
-          label="PWD Type"
-          error={errors.pwd_type}
-          {...register('pwd_type')}
-          options={[{ value: '', label: 'Select PWD Type' }, ...PWD_TYPE_OPTIONS]}
+          label="Relationship"
+          error={errors.contact_relationship}
+          {...register('contact_relationship')}
+          options={[{ value: '', label: 'Select Relationship' }, ...CONTACT_RELATIONSHIP_OPTIONS]}
+        />
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// STEP 4: ADDITIONAL INFO
+// ============================================================================
+const Step4Form = ({ form }: { form: any }) => {
+  const { register, formState: { errors } } = form;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <FormField
+          label="Nationality"
+          error={errors.nationality}
+          {...register('nationality')}
+          placeholder="e.g., Filipino"
+        />
+        <SelectField
+          label="Religion"
+          error={errors.religion}
+          {...register('religion')}
+          options={[{ value: '', label: 'Select Religion' }, ...RELIGION_OPTIONS]}
         />
       </div>
 
@@ -457,67 +550,24 @@ const Step3Form = ({ form }: { form: any }) => {
           placeholder="e.g., Bachelor's Degree"
         />
       </div>
-    </div>
-  );
-};
 
-// ============================================================================
-// STEP 4: ADDITIONAL INFORMATION
-// ============================================================================
-const Step4Form = ({ form }: { form: any }) => {
-  const { register, formState: { errors } } = form;
+      <FormField
+        label="PhilHealth ID"
+        error={errors.philhealth_id}
+        {...register('philhealth_id')}
+        placeholder="e.g., PH-123456-789"
+      />
 
-  return (
-    <div className="space-y-4">
-      <div className="border-b pb-4">
-        <h4 className="text-sm font-semibold mb-3">Emergency Contact</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            label="Contact First Name"
-            error={errors.contact_first_name}
-            {...register('contact_first_name')}
-            placeholder="e.g., Maria"
-          />
-          <FormField
-            label="Contact Last Name"
-            error={errors.contact_last_name}
-            {...register('contact_last_name')}
-            placeholder="e.g., Dela Cruz"
-          />
-          <FormField
-            label="Contact Mobile Number"
-            error={errors.contact_mobile_number}
-            {...register('contact_mobile_number')}
-            placeholder="e.g., 09123456789"
-          />
-          <SelectField
-            label="Relationship"
-            error={errors.contact_relationship}
-            {...register('contact_relationship')}
-            options={[{ value: '', label: 'Select Relationship' }, ...CONTACT_RELATIONSHIP_OPTIONS]}
-          />
-        </div>
-      </div>
+      <FormField
+        label="Image URL"
+        error={errors.image_url}
+        {...register('image_url')}
+        placeholder="e.g., https://example.com/photo.jpg"
+      />
 
-      <div className="border-b pb-4">
-        <h4 className="text-sm font-semibold mb-3">Special Requirements</h4>
-        <div className="space-y-3">
-          <CheckboxField
-            label="Indigenous Person"
-            {...register('indigenous_flag')}
-          />
-          <FormField
-            label="Indigenous Group"
-            error={errors.indigenous_group}
-            {...register('indigenous_group')}
-            placeholder="e.g., Ilocano, Bicolano"
-          />
-        </div>
-      </div>
-
-      <div>
+      <div className="pt-2 border-t">
         <CheckboxField
-          label="Consent to Data Processing *"
+          label="Consent to Data Processing"
           {...register('consent_flag')}
         />
         <p className="text-xs text-gray-500 mt-1">

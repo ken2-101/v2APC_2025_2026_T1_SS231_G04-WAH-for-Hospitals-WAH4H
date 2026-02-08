@@ -21,6 +21,9 @@ from patients.api.views import (
     ImmunizationViewSet,
     fetch_wah4pc,
     webhook_receive,
+    send_to_wah4pc,
+    webhook_process_query,
+    list_transactions,
 )
 
 # Initialize router
@@ -35,6 +38,9 @@ router.register(r'immunizations', ImmunizationViewSet, basename='immunization')
 # URL patterns
 urlpatterns = [
     path('wah4pc/fetch', fetch_wah4pc),
+    path('wah4pc/send', send_to_wah4pc),
+    path('wah4pc/transactions/', list_transactions),
     path('webhooks/receive', webhook_receive),
+    path('webhooks/process-query', webhook_process_query),
     path('', include(router.urls)),
 ]

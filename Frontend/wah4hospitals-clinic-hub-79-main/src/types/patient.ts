@@ -83,7 +83,7 @@ export type Patient = {
 
   /** Consent & Media */
   consent_flag?: boolean;
-  image_url?: string;
+  image_url?: string | null;
 
   /** System */
   active?: boolean;
@@ -141,6 +141,7 @@ export type PatientFormData = {
 
   /** Consent & Media */
   consent_flag?: boolean;
+  image_url?: string;
 };
 
 // ============================================================================
