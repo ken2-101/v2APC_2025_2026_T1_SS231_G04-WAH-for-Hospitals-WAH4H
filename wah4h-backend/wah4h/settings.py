@@ -138,6 +138,18 @@ REST_FRAMEWORK = {
         "rest_framework.filters.SearchFilter",
         "rest_framework.filters.OrderingFilter",
     ],
+
+    # Rate Limiting / Throttling
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+        "rest_framework.throttling.ScopedRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "20/minute",      # Anonymous users: 20 req/min (prevent scraping/spam)
+        "user": "100/minute",     # Authenticated users: 100 req/min (standard usage)
+        "login": "5/minute",      # Login attempts: 5 req/min (brute-force protection)
+    },
 }
 
 # JWT Settings

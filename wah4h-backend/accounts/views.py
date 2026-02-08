@@ -314,6 +314,7 @@ class LoginInitiateAPIView(APIView):
     }
     """
     permission_classes = [AllowAny]
+    throttle_scope = 'login'  # 5 requests per minute (brute-force protection)
     
     def post(self, request):
         serializer = LoginStepOneSerializer(data=request.data)
