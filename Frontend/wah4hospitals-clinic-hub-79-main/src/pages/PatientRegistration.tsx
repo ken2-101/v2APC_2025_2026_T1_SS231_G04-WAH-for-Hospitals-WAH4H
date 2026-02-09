@@ -106,15 +106,20 @@ export const PatientRegistration: React.FC = () => {
   // Filter & search
   useEffect(() => {
     let temp = [...patients];
-    if (activeFilters.status.length) temp = temp.filter(p => activeFilters.status.includes(p.status || 'Active'));
+    if (activeFilters.status.length) {
+      temp = temp.filter(p => {
+        const status = p.active ? 'Active' : 'Inactive';
+        return activeFilters.status.includes(status);
+      });
+    }
     if (activeFilters.gender.length) temp = temp.filter(p => activeFilters.gender.includes(p.gender));
     if (activeFilters.civilStatus.length) temp = temp.filter(p => activeFilters.civilStatus.includes(p.civil_status));
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       temp = temp.filter(
         p => `${p.last_name} ${p.first_name} ${p.middle_name || ''}`.toLowerCase().includes(q) ||
-          p.patient_id.toLowerCase().includes(q) ||
-          p.mobile_number.includes(searchQuery)
+          (p.patient_id && p.patient_id.toLowerCase().includes(q)) ||
+          (p.mobile_number && p.mobile_number.includes(searchQuery))
       );
     }
     setFilteredPatients(temp);
@@ -126,25 +131,33 @@ export const PatientRegistration: React.FC = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleRegisterPatient = async (e: FormEvent) => {
-    e.preventDefault();
-    setFormLoading(true); setFormError(''); setFormSuccess('');
+  const handleRegisterPatient = async (patientData: PatientFormData) => {
+    setFormLoading(true);
+    setFormError('');
+    setFormSuccess('');
     try {
-      const res = await axios.post(API_URL, formData);
+      const res = await axios.post(API_URL, patientData);
       const registeredPatient: Patient = res.data;
       setFormSuccess(`Patient registered successfully! ID: ${registeredPatient.patient_id}`);
-      setShowRegistrationModal(false);
-      setFormData({ ...initialFormData });
+      // Don't close modal here - let modal close itself on success
       fetchPatients();
+      // Return success - modal will close after this resolves
     } catch (err: any) {
       console.error('Full Axios error:', err);
+      console.error('Error response data:', err.response?.data);
       if (err.response) {
         const messages = typeof err.response.data === 'object'
           ? Object.entries(err.response.data).map(([f, m]) => Array.isArray(m) ? `${f}: ${m.join(', ')}` : `${f}: ${m}`).join('\n')
           : err.response.data;
         setFormError(messages);
-      } else { setFormError(err.message || 'Failed to register patient'); }
-    } finally { setFormLoading(false); }
+      } else {
+        setFormError(err.message || 'Failed to register patient');
+      }
+      // Re-throw error so modal knows to stay open
+      throw err;
+    } finally {
+      setFormLoading(false);
+    }
   };
 
   const handleFilterChange = (filterType: string, value: string) => {
@@ -230,12 +243,9 @@ export const PatientRegistration: React.FC = () => {
       <PatientRegistrationModal
         isOpen={showRegistrationModal}
         onClose={() => setShowRegistrationModal(false)}
-        formData={formData}
-        handleFormChange={handleFormChange}
-        handleRegisterPatient={handleRegisterPatient}
-        formLoading={formLoading}
-        success={formSuccess}
-        formError={formError}
+        onSuccess={handleRegisterPatient}
+        isLoading={formLoading}
+        error={formError}
       />
 
       {selectedPatient && (

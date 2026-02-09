@@ -1,18 +1,17 @@
 /**
- * Patient Registration Modal - 4-Step Wizard
+ * Patient Registration Modal - 3-Step Wizard
  * Aligned with Patient model (wah4h-backend/patients/models.py)
  *
- * Page 1: Basic Info
+ * Page 1: Basic Info + Additional Info
  * Page 2: Contact & Address
  * Page 3: Emergency Contact
- * Page 4: Additional Info
  */
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
 import type { PatientFormData } from '../../types/patient';
@@ -53,8 +52,23 @@ export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> =
   isLoading = false,
   error,
 }) => {
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
   const [allStepsData, setAllStepsData] = useState<Partial<PatientFormData>>({});
+  const [isTransitioning, setIsTransitioning] = React.useState(false);
+
+  // Debug: Track step changes
+  React.useEffect(() => {
+    console.log('[PatientRegistrationModal] Step changed to:', currentStep);
+    // Unlock after 100ms to allow form to stabilize
+    const timer = setTimeout(() => {
+      setIsTransitioning(false);
+      console.log('[PatientRegistrationModal] Step transition complete');
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [currentStep]);
+
+  // Safety: ensure currentStep never exceeds 3
+  const normalizedStep = Math.min(currentStep, 3) as 1 | 2 | 3;
 
   // Step 1: Basic Info
   const step1Form = useForm<PatientStep1FormData>({
@@ -68,73 +82,106 @@ export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> =
     mode: 'onChange',
   });
 
-  // Step 3: Emergency Contact
+  // Step 3: Emergency Contact + Consent
   const step3Form = useForm<PatientStep3FormData>({
     resolver: zodResolver(patientStep3Schema),
     mode: 'onChange',
+    defaultValues: {
+      contact_first_name: '',
+      contact_last_name: '',
+      contact_mobile_number: '',
+      contact_relationship: '',
+      consent_flag: false,
+    },
   });
 
-  // Step 4: Additional Info
-  const step4Form = useForm<PatientStep4FormData>({
-    resolver: zodResolver(patientStep4Schema),
-    mode: 'onChange',
-  });
+
 
   const handleNextStep = async () => {
+    console.log('[PatientRegistrationModal] handleNextStep called on step:', currentStep);
+
     if (currentStep === 1) {
       const isValid = await step1Form.trigger();
       if (!isValid) return;
+      const step1Data = step1Form.getValues();
+      console.log('[PatientRegistrationModal] Step 1 data:', step1Data);
       setAllStepsData(prev => ({
         ...prev,
-        ...step1Form.getValues(),
+        ...step1Data,
       }));
+      // Lock BEFORE state change
+      setIsTransitioning(true);
       setCurrentStep(2);
     } else if (currentStep === 2) {
       const isValid = await step2Form.trigger();
       if (!isValid) return;
+      const step2Data = step2Form.getValues();
+      console.log('[PatientRegistrationModal] Step 2 data:', step2Data);
       setAllStepsData(prev => ({
         ...prev,
-        ...step2Form.getValues(),
+        ...step2Data,
       }));
+      // Lock BEFORE state change - critical for step 3
+      setIsTransitioning(true);
       setCurrentStep(3);
     } else if (currentStep === 3) {
-      const isValid = await step3Form.trigger();
-      if (!isValid) return;
-      setAllStepsData(prev => ({
-        ...prev,
-        ...step3Form.getValues(),
-      }));
-      setCurrentStep(4);
+      // SHOULD NEVER REACH HERE - step 3 has no "next" button
+      console.error('[PatientRegistrationModal] handleNextStep called on step 3 - this should not happen!');
+      return;
     }
   };
 
   const handlePreviousStep = () => {
     if (currentStep > 1) {
-      setCurrentStep((prev) => (prev - 1) as 1 | 2 | 3 | 4);
+      setCurrentStep((prev) => (prev - 1) as 1 | 2 | 3);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate step 4
-    const isValid = await step4Form.trigger();
+    console.log('[PatientRegistrationModal] handleSubmit called on step:', currentStep, 'isTransitioning:', isTransitioning);
+
+    // GUARD 1: Block submission during step transitions
+    if (isTransitioning) {
+      console.warn('[PatientRegistrationModal] Blocked submission - step transition in progress');
+      return;
+    }
+
+    // GUARD 2: Only allow submission on step 3
+    if (currentStep !== 3) {
+      console.warn('[PatientRegistrationModal] Blocked submission - not on step 3');
+      return;
+    }
+
+    // Validate step 3
+    const isValid = await step3Form.trigger();
     if (!isValid) return;
 
     const finalData: PatientFormData = {
       ...allStepsData,
-      ...step4Form.getValues(),
+      ...step3Form.getValues(),
+      active: true, // Default status to active
+      status: 'active', // Default status field to active
     } as PatientFormData;
+
+    console.log('[PatientRegistrationModal] Final merged data:', finalData);
 
     // Validate complete form
     try {
       const validatedData = patientFormDataSchema.parse(finalData);
+      console.log('[PatientRegistrationModal] Validation passed, submitting:', validatedData);
+
       if (onSuccess) {
-        onSuccess(validatedData);
+        // Await the async API call - if it throws, we catch it below
+        await onSuccess(validatedData);
       }
+
+      // Only close modal if API call succeeded
       handleClose();
     } catch (err) {
-      console.error('Validation error:', err);
+      console.error('[PatientRegistrationModal] Submission error:', err);
+      // Modal stays open on error so user can see the error message
     }
   };
 
@@ -144,19 +191,31 @@ export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> =
     step1Form.reset();
     step2Form.reset();
     step3Form.reset();
-    step4Form.reset();
     onClose();
   };
 
+
+
   const getStepProgress = () => {
-    return Math.round(((currentStep - 1) / 4) * 100);
+    // Progress: Step 1 = 0%, Step 2 = 50%, Step 3 = 100%
+    return Math.round(((currentStep - 1) / 2) * 100);
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) return; }}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      console.log('[PatientRegistrationModal] Dialog onOpenChange called, open:', open, 'currentStep:', currentStep);
+      if (!open) {
+        console.warn('[PatientRegistrationModal] Dialog trying to close on step:', currentStep);
+        // Only allow close from handleClose() function, not from dialog internal events
+        // onClose();
+      }
+    }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" onPointerDownOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
         <DialogHeader>
-          <DialogTitle>Register New Patient - Step {currentStep} of 4</DialogTitle>
+          <DialogTitle>Register New Patient - Step {currentStep} of 3</DialogTitle>
+          <DialogDescription>
+            Complete the form to register a new patient. Use Next to proceed between sections.
+          </DialogDescription>
         </DialogHeader>
 
         {/* Progress Bar */}
@@ -181,7 +240,21 @@ export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> =
           </Alert>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form
+          onSubmit={handleSubmit}
+          onKeyDown={(e: React.KeyboardEvent<HTMLFormElement>) => {
+            // Prevent accidental Enter-submits - only allow explicit button clicks
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              // If not on last step, go to next step
+              if (currentStep < 3) {
+                void handleNextStep();
+              }
+              // On step 3, do nothing - user must click "Register Patient" button
+            }
+          }}
+          className="space-y-6"
+        >
           {/* STEP 1: Basic Info */}
           {currentStep === 1 && <Step1Form form={step1Form} />}
 
@@ -190,9 +263,6 @@ export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> =
 
           {/* STEP 3: Emergency Contact */}
           {currentStep === 3 && <Step3Form form={step3Form} />}
-
-          {/* STEP 4: Additional Info */}
-          {currentStep === 4 && <Step4Form form={step4Form} />}
 
           {/* Action Buttons */}
           <div className="flex justify-between gap-2 pt-4 border-t">
@@ -205,7 +275,7 @@ export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> =
               {currentStep === 1 ? 'Cancel' : <><ChevronLeft className="w-4 h-4 mr-2" /> Previous</>}
             </Button>
 
-            {currentStep < 4 ? (
+            {currentStep < 3 ? (
               <Button
                 type="button"
                 onClick={handleNextStep}
@@ -321,6 +391,51 @@ const Step1Form = ({ form }: { form: any }) => {
           </div>
         )}
       </div>
+      {/* Additional info (moved from Step 4) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <FormField
+          label="Nationality"
+          error={errors.nationality}
+          {...register('nationality')}
+          placeholder="e.g., Filipino"
+        />
+        <SelectField
+          label="Religion"
+          error={errors.religion}
+          {...register('religion')}
+          options={[{ value: '', label: 'Select Religion' }, ...RELIGION_OPTIONS]}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <FormField
+          label="Occupation"
+          error={errors.occupation}
+          {...register('occupation')}
+          placeholder="e.g., Teacher, Engineer"
+        />
+        <FormField
+          label="Education"
+          error={errors.education}
+          {...register('education')}
+          placeholder="e.g., Bachelor's Degree"
+        />
+      </div>
+
+      <FormField
+        label="PhilHealth ID"
+        error={errors.philhealth_id}
+        {...register('philhealth_id')}
+        placeholder="e.g., PH-123456-789"
+      />
+
+      <FormField
+        label="Image URL"
+        error={errors.image_url}
+        {...register('image_url')}
+        placeholder="e.g., https://example.com/photo.jpg"
+      />
+
     </div>
   );
 };
@@ -478,26 +593,27 @@ const Step2Form = ({ form }: { form: any }) => {
 // STEP 3: EMERGENCY CONTACT
 // ============================================================================
 const Step3Form = ({ form }: { form: any }) => {
-  const { register, formState: { errors } } = form;
+  const { register, formState: { errors }, watch } = form;
+  const consentFlag = watch('consent_flag');
 
   return (
     <div className="space-y-4">
-      <h4 className="text-sm font-semibold">Emergency Contact Information</h4>
+      <h4 className="text-sm font-semibold">Emergency Contact Information (Optional)</h4>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <FormField
-          label="Contact First Name *"
+          label="Contact First Name"
           error={errors.contact_first_name}
           {...register('contact_first_name')}
           placeholder="e.g., Maria"
         />
         <FormField
-          label="Contact Last Name *"
+          label="Contact Last Name"
           error={errors.contact_last_name}
           {...register('contact_last_name')}
           placeholder="e.g., Dela Cruz"
         />
         <FormField
-          label="Contact Mobile Number *"
+          label="Contact Mobile Number"
           error={errors.contact_mobile_number}
           {...register('contact_mobile_number')}
           placeholder="e.g., 09123456789"
@@ -509,74 +625,35 @@ const Step3Form = ({ form }: { form: any }) => {
           options={[{ value: '', label: 'Select Relationship' }, ...CONTACT_RELATIONSHIP_OPTIONS]}
         />
       </div>
-    </div>
-  );
-};
 
-// ============================================================================
-// STEP 4: ADDITIONAL INFO
-// ============================================================================
-const Step4Form = ({ form }: { form: any }) => {
-  const { register, formState: { errors } } = form;
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <FormField
-          label="Nationality"
-          error={errors.nationality}
-          {...register('nationality')}
-          placeholder="e.g., Filipino"
-        />
-        <SelectField
-          label="Religion"
-          error={errors.religion}
-          {...register('religion')}
-          options={[{ value: '', label: 'Select Religion' }, ...RELIGION_OPTIONS]}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <FormField
-          label="Occupation"
-          error={errors.occupation}
-          {...register('occupation')}
-          placeholder="e.g., Teacher, Engineer"
-        />
-        <FormField
-          label="Education"
-          error={errors.education}
-          {...register('education')}
-          placeholder="e.g., Bachelor's Degree"
-        />
-      </div>
-
-      <FormField
-        label="PhilHealth ID"
-        error={errors.philhealth_id}
-        {...register('philhealth_id')}
-        placeholder="e.g., PH-123456-789"
-      />
-
-      <FormField
-        label="Image URL"
-        error={errors.image_url}
-        {...register('image_url')}
-        placeholder="e.g., https://example.com/photo.jpg"
-      />
-
-      <div className="pt-2 border-t">
-        <CheckboxField
-          label="Consent to Data Processing"
-          {...register('consent_flag')}
-        />
-        <p className="text-xs text-gray-500 mt-1">
-          I consent to the processing and storage of my personal health information
-        </p>
+      {/* Data Privacy Consent */}
+      <div className="pt-4 border-t">
+        <div className="flex items-start space-x-3 p-4 bg-blue-50 rounded-md">
+          <input
+            type="checkbox"
+            id="consent_flag"
+            {...register('consent_flag')}
+            className="w-4 h-4 mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          />
+          <label htmlFor="consent_flag" className="text-sm text-gray-700 flex-1">
+            <span className="font-semibold">I consent to the collection and processing of my personal health data</span>
+            {' '}in accordance with the Data Privacy Act of 2012 (Republic Act No. 10173) and its implementing rules and regulations.
+          </label>
+        </div>
+        {errors.consent_flag && (
+          <p className="text-xs text-red-500 mt-2">{errors.consent_flag.message}</p>
+        )}
+        {!consentFlag && (
+          <p className="text-xs text-amber-600 mt-2">
+            ⚠️ Consent is required to proceed with patient registration
+          </p>
+        )}
       </div>
     </div>
   );
 };
+
+
 
 // ============================================================================
 // REUSABLE FORM FIELDS

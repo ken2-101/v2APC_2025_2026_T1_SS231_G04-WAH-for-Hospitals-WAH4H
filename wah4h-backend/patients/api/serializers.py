@@ -42,7 +42,8 @@ class PatientInputSerializer(serializers.ModelSerializer):
             'contact_first_name', 'contact_last_name',
             'contact_mobile_number', 'contact_relationship',
             'indigenous_flag', 'indigenous_group',
-            'consent_flag', 'image_url'
+            'consent_flag', 'image_url',
+            'active', 'status'
         ]
         extra_kwargs = {
             'patient_id': {'required': False},
@@ -50,6 +51,8 @@ class PatientInputSerializer(serializers.ModelSerializer):
             'last_name': {'required': True},
             'birthdate': {'required': True},
             'gender': {'required': True},
+            'active': {'required': False, 'default': True},
+            'status': {'required': False, 'default': 'active'},
         }
     
     def validate_birthdate(self, value):
@@ -141,7 +144,11 @@ class PatientOutputSerializer(serializers.Serializer):
     # Consent and Media
     consent_flag = serializers.BooleanField(required=False, allow_null=True)
     image_url = serializers.URLField(required=False, allow_null=True)
-    
+
+    # Status
+    active = serializers.BooleanField(required=False)
+    status = serializers.CharField(required=False, allow_null=True)
+
     # Timestamps
     created_at = serializers.DateTimeField(required=False)
     updated_at = serializers.DateTimeField(required=False)

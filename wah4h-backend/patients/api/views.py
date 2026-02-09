@@ -327,9 +327,9 @@ class PatientViewSet(viewsets.ViewSet):
     def immunizations(self, request, pk=None):
         """
         Get all immunizations for a patient.
-        
+
         Example: GET /patients/{id}/immunizations/
-        
+
         Delegates to: PatientACL.get_patient_immunizations(id)
         """
         try:
@@ -339,13 +339,41 @@ class PatientViewSet(viewsets.ViewSet):
                 {'error': 'Invalid patient ID'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        # Delegate to ACL (Assuming this method exists or you will add it)
-        # If it doesn't exist yet, we should check patient_acl.py
-        # For now, adding basic structure matching others
-        # You might need to add get_patient_immunizations to PatientACL if missing
+
+        # Delegate to ACL
         immunizations = patient_acl.get_patient_immunizations(patient_id)
         return Response(immunizations, status=status.HTTP_200_OK)
+
+    def destroy(self, request, pk=None):
+        """
+        Soft delete a patient (set status to inactive).
+
+        Example: DELETE /patients/{id}/
+        """
+        try:
+            patient_id = int(pk)
+        except (ValueError, TypeError):
+            return Response(
+                {'error': 'Invalid patient ID'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            from patients.models import Patient
+            patient = Patient.objects.get(id=patient_id)
+            patient.status = 'inactive'
+            patient.active = False
+            patient.save()
+
+            return Response(
+                {'message': f'Patient {patient.patient_id} deactivated successfully'},
+                status=status.HTTP_200_OK
+            )
+        except Patient.DoesNotExist:
+            return Response(
+                {'error': 'Patient not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 
 # ============================================================================

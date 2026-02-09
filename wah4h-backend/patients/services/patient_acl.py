@@ -95,31 +95,32 @@ def get_patient_details(patient_id: int) -> Optional[Dict[str, Any]]:
 def search_patients(query: str, limit: int = 50) -> List[Dict[str, Any]]:
     """
     Search patients by name or patient ID string.
-    
+
     Args:
         query: Search term (name or patient_id string)
         limit: Maximum number of results (default: 50)
-    
+
     Returns:
-        List of patient summary dictionaries
+        List of patient summary dictionaries (active patients only)
     """
     if not query:
-        # Default list behavior: Return recent/all patients if query is empty
-        patients = Patient.objects.all().order_by('last_name', 'first_name')[:limit]
+        # Default list behavior: Return recent/all active patients if query is empty
+        patients = Patient.objects.filter(status='active').order_by('last_name', 'first_name')[:limit]
         return [_patient_to_summary_dict(patient) for patient in patients]
 
     if len(query.strip()) < 2:
         return []
-    
+
     try:
         query = query.strip()
         patients = Patient.objects.filter(
-            Q(patient_id__icontains=query) |
+            Q(status='active') &
+            (Q(patient_id__icontains=query) |
             Q(first_name__icontains=query) |
             Q(last_name__icontains=query) |
-            Q(middle_name__icontains=query)
+            Q(middle_name__icontains=query))
         ).order_by('last_name', 'first_name')[:limit]
-        
+
         return [_patient_to_summary_dict(patient) for patient in patients]
     except Exception:
         return []
@@ -273,6 +274,7 @@ def _patient_to_summary_dict(patient: Patient) -> Dict[str, Any]:
     
     Includes both computed full_name and granular name components
     for flexible display logic in consuming apps.
+    NOTE: Now returns all patient fields to ensure complete data in list views.
     """
     return {
         'id': patient.id,
@@ -284,11 +286,34 @@ def _patient_to_summary_dict(patient: Patient) -> Dict[str, Any]:
         'suffix_name': patient.suffix_name or "",
         'gender': patient.gender or "",
         'birthdate': patient.birthdate.isoformat() if patient.birthdate else None,
-        'mobile_number': patient.mobile_number or "",
+        'age': patient.age,
+        'civil_status': patient.civil_status or "",
+        'nationality': patient.nationality or "",
+        'religion': patient.religion or "",
         'philhealth_id': patient.philhealth_id or "",
         'blood_type': patient.blood_type or "",
+        'pwd_type': patient.pwd_type or "",
+        'occupation': patient.occupation or "",
+        'education': patient.education or "",
+        'mobile_number': patient.mobile_number or "",
         'address_line': patient.address_line or "",
         'address_city': patient.address_city or "",
+        'address_district': patient.address_district or "",
+        'address_state': patient.address_state or "",
+        'address_postal_code': patient.address_postal_code or "",
+        'address_country': patient.address_country or "",
+        'contact_first_name': patient.contact_first_name or "",
+        'contact_last_name': patient.contact_last_name or "",
+        'contact_mobile_number': patient.contact_mobile_number or "",
+        'contact_relationship': patient.contact_relationship or "",
+        'indigenous_flag': patient.indigenous_flag,
+        'indigenous_group': patient.indigenous_group or "",
+        'consent_flag': patient.consent_flag,
+        'image_url': patient.image_url or "",
+        'active': patient.active,
+        'status': patient.status or 'active',
+        'created_at': patient.created_at.isoformat() if hasattr(patient, 'created_at') else None,
+        'updated_at': patient.updated_at.isoformat() if hasattr(patient, 'updated_at') else None,
     }
 
 
@@ -327,6 +352,7 @@ def _patient_to_full_dict(patient: Patient) -> Dict[str, Any]:
         'indigenous_group': patient.indigenous_group or "",
         'consent_flag': patient.consent_flag,
         'image_url': patient.image_url or "",
+        'status': patient.status or 'active',
         'created_at': patient.created_at.isoformat() if hasattr(patient, 'created_at') else None,
         'updated_at': patient.updated_at.isoformat() if hasattr(patient, 'updated_at') else None,
     }

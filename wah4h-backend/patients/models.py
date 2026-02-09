@@ -56,7 +56,20 @@ class Patient(TimeStampedModel):
     # Consent and media
     consent_flag = models.BooleanField(null=True, blank=True)
     image_url = models.URLField(max_length=255, null=True, blank=True)
-    
+
+    # Status
+    active = models.BooleanField(default=True)
+    status = models.CharField(max_length=20, default='active')  # active/inactive
+
+    @property
+    def age(self):
+        """Calculate age from birthdate."""
+        if not self.birthdate:
+            return None
+        from datetime import date
+        today = date.today()
+        return today.year - self.birthdate.year - ((today.month, today.day) < (self.birthdate.month, self.birthdate.day))
+
     class Meta:
         db_table = 'patient'
         indexes = [
