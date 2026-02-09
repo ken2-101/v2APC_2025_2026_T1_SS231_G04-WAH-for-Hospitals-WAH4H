@@ -21,6 +21,7 @@ from patients.api.views import (
     ImmunizationViewSet,
     fetch_wah4pc,
     send_to_wah4pc,
+    list_providers,
     list_transactions,
     get_transaction,
 )
@@ -37,6 +38,7 @@ router.register(r'immunizations', ImmunizationViewSet, basename='immunization')
 # URL patterns
 urlpatterns = [
     # WAH4PC Operations (your backend -> gateway)
+    path('wah4pc/providers/', list_providers, name='wah4pc_list_providers'),
     path('wah4pc/fetch', fetch_wah4pc, name='wah4pc_fetch'),
     path('wah4pc/send', send_to_wah4pc, name='wah4pc_send'),
     path('wah4pc/transactions/', list_transactions, name='wah4pc_list_transactions'),

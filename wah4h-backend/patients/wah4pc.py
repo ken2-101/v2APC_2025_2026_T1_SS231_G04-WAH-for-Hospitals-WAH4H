@@ -281,6 +281,29 @@ def _get_extension(extensions, url):
     return None
 
 
+def get_providers():
+    """Fetch all registered providers from WAH4PC gateway (public endpoint).
+
+    Returns:
+        list: List of active provider dictionaries with id, name, type, isActive fields
+    """
+    try:
+        response = requests.get(f"{URL}/api/v1/providers", timeout=10)
+
+        if response.status_code == 200:
+            result = response.json()
+            # Handle both wrapped {"data": [...]} and flat array formats
+            providers = result.get("data", result) if isinstance(result, dict) else result
+            # Filter to only return active providers
+            return [p for p in providers if p.get("isActive", True)]
+
+        return []
+
+    except requests.RequestException as e:
+        print(f"[WAH4PC] Error fetching providers: {str(e)}")
+        return []
+
+
 def gateway_list_transactions(status_filter=None, limit=50):
     """List transactions from WAH4PC gateway.
 

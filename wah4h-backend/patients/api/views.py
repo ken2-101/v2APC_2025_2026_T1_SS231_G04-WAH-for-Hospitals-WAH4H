@@ -17,7 +17,7 @@ from rest_framework.filters import SearchFilter
 
 import requests as http_requests
 
-from patients.wah4pc import request_patient, fhir_to_dict, push_patient, patient_to_fhir
+from patients.wah4pc import request_patient, fhir_to_dict, push_patient, patient_to_fhir, get_providers
 from patients.models import Patient, WAH4PCTransaction
 
 from patients.api.serializers import (
@@ -842,6 +842,20 @@ def webhook_process_query(request):
         )
 
     return Response({'message': 'Processing'})
+
+
+@api_view(['GET'])
+def list_providers(request):
+    """List all active WAH4PC providers.
+
+    This endpoint fetches the list of registered providers from the WAH4PC gateway.
+    No authentication required as the gateway endpoint is public.
+
+    Returns:
+        Response: List of active providers with id, name, type, and isActive fields
+    """
+    providers = get_providers()
+    return Response(providers, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])

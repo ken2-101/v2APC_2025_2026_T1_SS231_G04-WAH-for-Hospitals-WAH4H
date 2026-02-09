@@ -3,6 +3,7 @@ import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { UserPlus, Search, Download } from 'lucide-react';
 import { PatientDetailsModal } from '@/components/patients/PatientDetailsModal';
 import { PatientRegistrationModal } from '@/components/patients/PatientRegistrationModal';
@@ -64,7 +65,22 @@ export const PatientRegistration: React.FC = () => {
   // WAH4PC integration state
   const [philHealthId, setPhilHealthId] = useState('');
   const [targetProvider, setTargetProvider] = useState('');
+  const [providers, setProviders] = useState<Array<{id: string; name: string; type: string; isActive: boolean}>>([]);
   const [wah4pcLoading, setWah4pcLoading] = useState(false);
+
+  // Fetch providers from WAH4PC gateway
+  useEffect(() => {
+    const fetchProviders = async () => {
+      try {
+        const res = await axios.get(`${API_URL}wah4pc/providers/`);
+        setProviders(Array.isArray(res.data) ? res.data : []);
+      } catch (err) {
+        console.error('Failed to load WAH4PC providers:', err);
+        setProviders([]);
+      }
+    };
+    fetchProviders();
+  }, []);
 
   const fetchFromWAH4PC = async () => {
     setWah4pcLoading(true);
@@ -207,12 +223,22 @@ export const PatientRegistration: React.FC = () => {
               placeholder="PhilHealth ID"
               className="max-w-xs"
             />
-            <Input
-              value={targetProvider}
-              onChange={e => setTargetProvider(e.target.value)}
-              placeholder="Target Provider ID"
-              className="max-w-xs"
-            />
+            <Select value={targetProvider} onValueChange={setTargetProvider}>
+              <SelectTrigger className="max-w-xs">
+                <SelectValue placeholder="Select Target Provider" />
+              </SelectTrigger>
+              <SelectContent>
+                {providers.length === 0 ? (
+                  <SelectItem value="loading" disabled>Loading providers...</SelectItem>
+                ) : (
+                  providers.map(p => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name} ({p.type})
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
             <Button
               onClick={fetchFromWAH4PC}
               disabled={wah4pcLoading || !philHealthId || !targetProvider}
