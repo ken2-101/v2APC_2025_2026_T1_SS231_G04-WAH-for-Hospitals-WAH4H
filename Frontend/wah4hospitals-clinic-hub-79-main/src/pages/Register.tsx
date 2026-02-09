@@ -232,12 +232,14 @@ const Register = () => {
     setIsLoadingOrgs(true);
     try {
       // 1. Get the public backend URL from the .env file
-      // Fallback to empty string if undefined (to avoid 'undefined/accounts...')
-      const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+      // Fallback to local development URL if undefined
+      const apiBase = import.meta.env.LOCAL_8000 || 'http://127.0.0.1:8000';
 
       // 2. Construct the full URL
-      // We assume the endpoint is at /accounts/organizations/ based on your .env BACKEND_ACCOUNTS_8000
-      const url = `${apiBase}/accounts/organizations/`;
+      // We assume the endpoint is at /accounts/organizations/
+      // Ensure there are no double slashes except after the protocol
+      const normalizedBase = apiBase.endsWith('/') ? apiBase.slice(0, -1) : apiBase;
+      const url = `${normalizedBase}/accounts/organizations/`;
 
       console.log('Fetching hospitals from:', url);
 
