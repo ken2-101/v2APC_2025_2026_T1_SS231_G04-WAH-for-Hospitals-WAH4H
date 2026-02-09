@@ -20,7 +20,7 @@ from datetime import datetime
 from discharge.models import Discharge, Procedure, ProcedurePerformer
 
 # ACL Imports (Fortress Pattern - No direct model imports from other apps)
-from admission.services.admission_acl import EncounterACL
+from admission.serializers import EncounterACL
 from patients.services.patient_acl import validate_patient_exists, get_patient_summary
 from accounts.services.accounts_acl import PractitionerACL
 

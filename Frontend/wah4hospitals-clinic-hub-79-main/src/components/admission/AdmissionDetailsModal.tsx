@@ -31,7 +31,7 @@ interface AdmissionDetailsModalProps {
   onClose: () => void;
   admission: Admission | null;
   onUpdate?: (updatedAdmission: Admission) => void;
-  onDelete?: (id: number) => void;
+  onDelete?: (id: number | string) => void;
 }
 
 export const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({
@@ -62,7 +62,7 @@ export const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({
       const fetchFullDetails = async () => {
         setIsLoading(true);
         try {
-          const freshData = await admissionService.getById(Number(admission.id));
+          const freshData = await admissionService.getById(admission.id);
           setCurrentAdmission(freshData);
           setEditData({ 
             ...freshData, 
@@ -138,7 +138,7 @@ export const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({
     if (!editData) return;
     setIsLoading(true);
     try {
-      const updated = await admissionService.update(Number(editData.id), editData);
+      const updated = await admissionService.update(editData.id, editData);
       onUpdate?.(updated);
       setMode('view');
       alert('✅ Admission updated successfully!');
@@ -153,8 +153,8 @@ export const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({
     if (confirmText !== 'DELETE') return;
     setIsLoading(true);
     try {
-      await admissionService.delete(Number(data.id));
-      onDelete?.(Number(data.id));
+      await admissionService.delete(data.id);
+      onDelete?.(data.id);
       onClose();
       alert('✅ Admission deleted successfully!');
     } catch (err: any) {
@@ -377,25 +377,25 @@ export const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
                    <div className="space-y-2">
                       <label className="text-xs font-bold text-slate-500 mb-1 block uppercase tracking-wider">Primary Physician</label>
-                      <select 
-                         className="w-full p-2.5 bg-white border border-slate-200 rounded-md text-sm outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-700"
-                         value={editData?.physicianId || ''}
-                         onChange={e => {
-                            const id = Number(e.target.value);
-                            const p = practitioners.find(prac => prac.practitioner_id === id);
-                            if (p) {
-                               handleEditChange('physician', `${p.first_name} ${p.last_name}`);
-                               handleEditChange('physicianId', p.practitioner_id);
-                            }
-                         }}
-                      >
-                         <option value="" disabled>Select Physician</option>
-                         {practitioners.map(p => (
-                            <option key={p.practitioner_id} value={p.practitioner_id}>
-                               {p.first_name} {p.last_name} ({p.user_role || 'Staff'})
-                            </option>
-                         ))}
-                      </select>
+                       <select 
+                          className="w-full p-2.5 bg-white border border-slate-200 rounded-md text-sm outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-700"
+                          value={editData?.participant_individual_id || ''}
+                          onChange={e => {
+                             const id = Number(e.target.value);
+                             const p = practitioners.find(prac => prac.practitioner_id === id);
+                             if (p) {
+                                handleEditChange('physician', `${p.first_name} ${p.last_name}`);
+                                handleEditChange('participant_individual_id', p.practitioner_id);
+                             }
+                          }}
+                       >
+                          <option value="" disabled>Select Physician</option>
+                          {practitioners.map(p => (
+                             <option key={p.practitioner_id} value={p.practitioner_id}>
+                                {p.first_name} {p.last_name} ({p.identifier}) - {p.user_role || 'Staff'}
+                             </option>
+                          ))}
+                       </select>
                    </div>
                    <div className="space-y-2">
                       <label className="text-xs font-bold text-slate-500 mb-1 block uppercase tracking-wider">Participant Role</label>

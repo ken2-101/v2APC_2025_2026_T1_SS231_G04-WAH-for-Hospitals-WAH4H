@@ -17,8 +17,8 @@ export interface Admission {
     };
     location_ids?: (string | number)[];
     physician: string;
-    physicianId?: number;
     participant_individual_id?: number;
+    physicianId?: number; // Legacy, prefer participant_individual_id
     serviceType: string;
     admissionDate: string;
     admissionTime?: string;
@@ -64,7 +64,8 @@ export interface NewAdmission {
     patientName: string;
     admissionDate: string;
     physician: string; // Name
-    physicianId?: number;
+    participant_individual_id?: number;
+    physicianId?: number; // Legacy
     serviceType: string;
     priority: 'routine' | 'urgent' | 'emergency';
     location: {
@@ -94,6 +95,5 @@ export interface NewAdmission {
 
     // Backend mapping fields
     subject_id?: number;
-    participant_individual_id?: number;
 }
 

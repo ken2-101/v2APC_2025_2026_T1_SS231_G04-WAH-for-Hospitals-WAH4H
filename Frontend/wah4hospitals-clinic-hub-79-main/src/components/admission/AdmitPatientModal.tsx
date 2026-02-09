@@ -21,6 +21,7 @@ const INITIAL_FORM: NewAdmission = {
   admissionDate: new Date().toISOString().slice(0, 10),
   admissionTime: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
   physician: '',
+  participant_individual_id: undefined,
   serviceType: 'Internal Medicine',
   reasonForAdmission: '',
   priority: 'routine',
@@ -334,7 +335,7 @@ const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({ isOpen, onClose, 
                    <label className="text-sm font-semibold text-slate-700">Attending Physician <span className="text-red-500">*</span></label>
                     <select 
                        className="w-full p-3 bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-                       value={formData.physicianId || ''}
+                       value={formData.participant_individual_id || ''}
                        onChange={e => {
                           const id = Number(e.target.value);
                           const p = practitioners.find(prac => prac.practitioner_id === id);
@@ -342,7 +343,7 @@ const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({ isOpen, onClose, 
                              setFormData({
                                 ...formData, 
                                 physician: `${p.first_name} ${p.last_name}`, 
-                                physicianId: p.practitioner_id
+                                participant_individual_id: p.practitioner_id
                              });
                           }
                        }}
@@ -350,7 +351,7 @@ const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({ isOpen, onClose, 
                        <option value="" disabled>Select Attending Physician</option>
                        {practitioners.map(p => (
                           <option key={p.practitioner_id} value={p.practitioner_id}>
-                             {p.first_name} {p.last_name} ({p.user_role || 'Staff'})
+                             {p.first_name} {p.last_name} ({p.identifier}) - {p.user_role || 'Staff'}
                           </option>
                        ))}
                     </select>

@@ -55,7 +55,8 @@ export const admissionService = {
                 const summaryName = d.location_name || '';
 
                 return {
-                    id: d.encounter_id,
+                    id: d.identifier,
+                    encounter_id: d.encounter_id,
                     admissionNo: d.identifier || `ENC-${d.encounter_id}`, 
                     patientId: d.patient_summary?.patient_id || d.subject_id?.toString() || "N/A", 
                     patientName: d.patient_summary?.full_name || "Unknown Patient",
@@ -123,7 +124,7 @@ export const admissionService = {
             priority: admission.priority,
             period_start: `${admission.admissionDate}T${admission.admissionTime}:00Z`,
             reason_code: admission.reasonForAdmission,
-            participant_individual_id: admission.physicianId || 1, 
+            participant_individual_id: admission.participant_individual_id || admission.physicianId || 1, 
             location_id: null, 
             location_ids: admission.location_ids,
             // Save standardized location string
@@ -145,13 +146,14 @@ export const admissionService = {
     /**
      * Get Single Admission Details
      */
-    getById: async (id: number): Promise<Admission> => {
+    getById: async (id: number | string): Promise<Admission> => {
         const { data } = await api.get<any>(`/api/admission/encounters/${id}/`);
         const locParts = data.location_status ? data.location_status.split('|') : [];
         
         return {
             ...data, 
-            id: data.encounter_id,
+            id: data.identifier,
+            encounter_id: data.encounter_id,
             admissionNo: data.identifier,
             status: data.status,
             priority: data.priority || 'routine',
@@ -189,7 +191,7 @@ export const admissionService = {
     /**
      * Update Admission
      */
-    async update(id: number, admission: Partial<Admission>): Promise<Admission> {
+    async update(id: number | string, admission: Partial<Admission>): Promise<Admission> {
         try {
             const payload: any = { ...admission };
             
@@ -230,7 +232,8 @@ export const admissionService = {
             
             return {
                 ...data,
-                id: data.encounter_id,
+                id: data.identifier,
+                encounter_id: data.encounter_id,
                 admissionNo: data.identifier,
                 status: data.status,
                 priority: data.priority || 'routine',
@@ -272,7 +275,7 @@ export const admissionService = {
     /**
      * Discharge Patient
      */
-    async discharge(id: number, dischargeData: { period_end: string; discharge_disposition?: string; discharge_destination_id?: number }): Promise<Admission> {
+    async discharge(id: number | string, dischargeData: { period_end: string; discharge_disposition?: string; discharge_destination_id?: number }): Promise<Admission> {
         const { data } = await api.post<Admission>(`/api/admission/encounters/${id}/discharge/`, dischargeData);
         return data;
     },

@@ -29,7 +29,7 @@ from pharmacy.models import (
 
 # ACL Imports (Fortress Pattern - No direct model access)
 from patients.services.patient_acl import validate_patient_exists
-from admission.services.admission_acl import EncounterACL
+from admission.serializers import EncounterACL
 from accounts.services.accounts_acl import PractitionerACL
 
 

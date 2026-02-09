@@ -38,7 +38,7 @@ const CapacityCard = ({ name, type, occupied, total, status }: any) => {
   const colorClass = status === 'full' ? 'bg-red-500' : status === 'near-full' ? 'bg-amber-500' : 'bg-emerald-500';
 
   return (
-    <Card className="border-l-4 border-l-blue-600 shadow-sm hover:shadow-md transition-all duration-200">
+    <Card className="shadow-sm hover:shadow-md transition-all duration-200">
       <CardContent className="p-5">
         <div className="flex justify-between items-start mb-3">
           <div>

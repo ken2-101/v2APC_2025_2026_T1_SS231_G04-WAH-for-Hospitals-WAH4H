@@ -70,8 +70,9 @@ export const PatientSelector: React.FC<PatientSelectorProps> = ({
                                 'Unknown Patient';
 
                             const alreadyBilled = billingRecords.some(b =>
-                                b.hospitalId === admission.admission_id ||
-                                b.patientId === admission.patient_id
+                                b.hospitalId === admission.id ||
+                                b.hospitalId === admission.encounter_id ||
+                                b.patientId === admission.subject_id
                             );
 
                             // Helper to construct Patient object
@@ -94,10 +95,8 @@ export const PatientSelector: React.FC<PatientSelectorProps> = ({
                                 let patientId = 0;
                                 if (admission.subject_id) {
                                     patientId = admission.subject_id;
-                                } else if (typeof admission.patient === 'number') {
-                                    patientId = admission.patient;
-                                } else if (typeof admission.patient === 'string' && !isNaN(parseInt(admission.patient))) {
-                                    patientId = parseInt(admission.patient);
+                                } else if (admission.patientId && !isNaN(parseInt(admission.patientId))) {
+                                    patientId = parseInt(admission.patientId);
                                 } else if (admission.patient_summary?.id) {
                                      patientId = admission.patient_summary.id;
                                 }
