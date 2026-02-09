@@ -1,60 +1,158 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Search } from 'lucide-react';
 import {
-  MonitoringAdmission,
-  VitalSign,
-  ClinicalNote,
-  DietaryOrder,
-  HistoryEvent,
-} from '../types/monitoring';
-import { PatientMonitoringPage } from '@/components/monitoring/PatientMonitoringPage';
-import { MonitoringDashboard } from '@/components/monitoring/MonitoringDashboard';
-import { Activity, Users, AlertTriangle, Heart } from 'lucide-react';
+  Activity, Heart, FileText, Pill, FlaskConical, Clock, User,
+  Calendar, ChevronRight, Plus, X, Save, Search, Stethoscope,
+  ArrowLeft, BarChart3, Table2, AlertCircle, Check, ArrowRight,
+  Package, Syringe, ClipboardCheck, PlayCircle, Eye, Beaker,
+  Send, FileCheck
+} from 'lucide-react';
 import { admissionService } from '@/services/admissionService';
 import monitoringService from '@/services/monitoringService';
+import { VitalSign, ClinicalNote } from '@/types/monitoring';
+
+// ==================== TYPE DEFINITIONS ====================
+interface Patient {
+  id: number;
+  name: string;
+  patientId: string;
+  room: string;
+  attendingPhysician: string;
+  nurseName: string;
+  admissionDate: string;
+  status: 'stable' | 'critical' | 'monitoring';
+  encounterId: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface VitalRecord {
+  id: number;
+  bp: string;
+  hr: string;
+  rr: string;
+  temp: string;
+  o2: string;
+  recordedBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface ClinicalNoteRecord {
+  id: number;
+  type: 'soap' | 'rounds' | 'progress';
+  content: string;
+  subjective?: string;
+  objective?: string;
+  assessment?: string;
+  plan?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedBy: string;
+  updatedAt: string;
+}
+
+interface MedicationRequest {
+  id: number;
+  medicationName: string;
+  quantity: number;
+  dosage: string;
+  route: string;
+  frequency: string;
+  notes: string;
+  lifecycleStatus: 'prescribed' | 'requested' | 'ready-for-admin' | 'administered';
+  intent: 'order' | 'proposal';
+  prescribedBy: string;
+  prescribedAt: string;
+  requestedBy?: string;
+  requestedAt?: string;
+  dispensedAt?: string;
+  administeredBy?: string;
+  administeredAt?: string;
+}
+
+interface LabRequest {
+  id: number;
+  testName: string;
+  testCode: string;
+  priority: 'routine' | 'urgent' | 'stat';
+  notes: string;
+  lifecycleStatus: 'ordered' | 'requested' | 'completed';
+  orderedBy: string;
+  orderedAt: string;
+  requestedBy?: string;
+  requestedAt?: string;
+  completedAt?: string;
+  resultContent?: {
+    findings: string;
+    values: { parameter: string; value: string; reference: string; flag?: string }[];
+    interpretation: string;
+    reportedBy: string;
+    reportedAt: string;
+  };
+}
 
 const Monitoring: React.FC = () => {
-  const [currentView, setCurrentView] = useState<'dashboard' | 'patient'>('dashboard');
-  const [admissions, setAdmissions] = useState<MonitoringAdmission[]>([]);
-  const [selectedAdmission, setSelectedAdmission] = useState<MonitoringAdmission | null>(null);
-
-  const [vitals, setVitals] = useState<VitalSign[]>([]);
-  const [notes, setNotes] = useState<ClinicalNote[]>([]);
-  const [dietary, setDietary] = useState<DietaryOrder | null>(null);
-  const [history, setHistory] = useState<HistoryEvent[]>([]);
-
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [activeTab, setActiveTab] = useState<'vitals' | 'notes' | 'medication' | 'laboratory'>('vitals');
+  const [currentRole, setCurrentRole] = useState<'doctor' | 'nurse'>('doctor');
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeFilters, setActiveFilters] = useState({ ward: '', status: '', doctor: '' });
+  const [filterStatus, setFilterStatus] = useState<'all' | 'stable' | 'critical' | 'monitoring'>('all');
+  const [vitalsViewMode, setVitalsViewMode] = useState<'graph' | 'table'>('table');
 
-  // Fetch all admissions
+  const [showVitalsModal, setShowVitalsModal] = useState(false);
+  const [showNotesModal, setShowNotesModal] = useState(false);
+  const [showMedicationModal, setShowMedicationModal] = useState(false);
+  const [showLabModal, setShowLabModal] = useState(false);
+  const [showLabResultModal, setShowLabResultModal] = useState(false);
+  const [selectedLabResult, setSelectedLabResult] = useState<LabRequest | null>(null);
+
+  const [vitalSigns, setVitalSigns] = useState({
+    systolic: '', diastolic: '', heartRate: '', respiratoryRate: '',
+    temperature: '', oxygenSaturation: '', height: '', weight: ''
+  });
+
+  const [clinicalNote, setClinicalNote] = useState({
+    type: 'rounds' as 'soap' | 'rounds' | 'progress',
+    content: '', subjective: '', objective: '', assessment: '', plan: ''
+  });
+
+  const [medicationForm, setMedicationForm] = useState({
+    medication: '', quantity: '1', dosage: '', route: 'oral', frequency: '', notes: ''
+  });
+
+  const [labForm, setLabForm] = useState({
+    testCode: '', priority: 'routine' as 'routine' | 'urgent' | 'stat', notes: ''
+  });
+
+  // State for loaded data
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [vitalsHistory, setVitalsHistory] = useState<VitalRecord[]>([]);
+  const [notesHistory, setNotesHistory] = useState<ClinicalNoteRecord[]>([]);
+  const [medicationRequests, setMedicationRequests] = useState<MedicationRequest[]>([]);
+  const [labRequests, setLabRequests] = useState<LabRequest[]>([]);
+
+  // Fetch all admitted patients
   useEffect(() => {
     const fetchAdmissions = async () => {
       try {
         const data = await admissionService.getAll();
         if (Array.isArray(data)) {
-          const mapped: MonitoringAdmission[] = data.map((adm: any) => ({
-            id: adm.encounter_id, // Use encounter_id as primary ID
-            patientId: adm.subject_id,
-            patientName: adm.patient_summary
+          const mapped: Patient[] = data.map((adm: any) => ({
+            id: adm.encounter_id,
+            name: adm.patient_summary
               ? `${adm.patient_summary.last_name}, ${adm.patient_summary.first_name}`
               : 'Unknown Patient',
+            patientId: `P-${adm.subject_id}`,
             room: adm.location_summary?.name || '—',
-            doctorName: adm.participant_summary?.[0]?.name || 'Unknown Doctor', // Approximation
+            attendingPhysician: adm.participant_summary?.[0]?.name || 'Unknown Doctor',
             nurseName: 'Unknown Nurse',
-            status: adm.status === 'in-progress' ? 'Stable' : 'Observation', // Map status
-            encounterType: adm.class_code,
-            admittingDiagnosis: adm.hospitalization?.admitting_diagnosis_code || 'N/A',
-            reasonForAdmission: adm.reason_code?.[0] || 'N/A',
-            admissionCategory: adm.service_type,
-            modeOfArrival: adm.hospitalization?.admit_source,
+            status: adm.status === 'in-progress' ? 'stable' : 'monitoring',
+            encounterId: adm.encounter_id,
             admissionDate: adm.period_start,
-            attendingPhysician: adm.participant_summary?.[0]?.name,
-            assignedNurse: 'Unknown',
-            ward: adm.location_summary?.name || 'General Ward',
+            createdAt: adm.period_start,
+            updatedAt: adm.meta?.last_updated || adm.period_start
           }));
-          setAdmissions(mapped);
+          setPatients(mapped);
         }
       } catch (err) {
         console.error('Error fetching admissions:', err);
@@ -63,158 +161,1440 @@ const Monitoring: React.FC = () => {
     fetchAdmissions();
   }, []);
 
-  // Filter handlers
-  const handleFilterChange = (key: string, value: string) => {
-    setActiveFilters(prev => ({ ...prev, [key]: value }));
-  };
+  const handleSelectPatient = async (patient: Patient) => {
+    setSelectedPatient(patient);
+    setActiveTab('vitals');
 
-  const clearFilters = () => {
-    setActiveFilters({ ward: '', status: '', doctor: '' });
-  };
-
-  // Select an admission
-  const handleSelectAdmission = async (adm: MonitoringAdmission) => {
-    setSelectedAdmission(adm);
-    setCurrentView('patient');
-
+    // Fetch patient's vitals, notes, etc.
     try {
-      // Fetch data using monitoringService
-      const [fetchedVitals, fetchedNotes, fetchedDietary] = await Promise.all([
-        monitoringService.getVitals(adm.id),
-        monitoringService.getNotes(adm.id),
-        monitoringService.getDietary(adm.id)
-      ]);
+      const vitals = await monitoringService.getVitals(patient.encounterId);
+      const notes = await monitoringService.getNotes(patient.encounterId);
 
-      setVitals(fetchedVitals);
-      setNotes(fetchedNotes);
-      setDietary(fetchedDietary);
-      // History not yet implemented in service
-      setHistory([]); 
+      // Convert vitals to VitalRecord format
+      const vitalRecords: VitalRecord[] = vitals.map((v) => ({
+        id: parseInt(v.id || '0'),
+        bp: v.bloodPressure || '',
+        hr: v.heartRate?.toString() || '',
+        rr: v.respiratoryRate?.toString() || '',
+        temp: v.temperature?.toString() || '',
+        o2: v.oxygenSaturation?.toString() + '%' || '',
+        recordedBy: v.staffName || 'Unknown',
+        createdAt: v.dateTime,
+        updatedAt: v.dateTime
+      }));
+
+      // Convert notes to ClinicalNoteRecord format
+      const noteRecords: ClinicalNoteRecord[] = notes.map((n) => ({
+        id: parseInt(n.id || '0'),
+        type: n.type.toLowerCase() === 'soap' ? 'soap' : 'progress',
+        content: n.assessment || '',
+        subjective: n.subjective,
+        objective: n.objective,
+        assessment: n.assessment,
+        plan: n.plan,
+        createdBy: n.providerName || 'Unknown',
+        createdAt: n.dateTime,
+        updatedBy: n.providerName || 'Unknown',
+        updatedAt: n.dateTime
+      }));
+
+      setVitalsHistory(vitalRecords);
+      setNotesHistory(noteRecords);
+
+      // Mock data for medication and lab (these would be from actual services)
+      setMedicationRequests([]);
+      setLabRequests([]);
     } catch (err) {
-      console.error('Error fetching admission details:', err);
+      console.error('Error fetching patient data:', err);
     }
   };
 
-  // Filtered admissions
-  const filteredAdmissions = admissions.filter(admission => {
-    const matchesSearch =
-      admission.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      admission.id.toString().includes(searchTerm);
+  const handleBackToList = () => {
+    setSelectedPatient(null);
+  };
 
-    const matchesWard = !activeFilters.ward || admission.ward === activeFilters.ward;
-    const matchesStatus = !activeFilters.status || admission.status === activeFilters.status;
-    const matchesDoctor = !activeFilters.doctor || admission.attendingPhysician === activeFilters.doctor;
+  const handleSaveVitals = async () => {
+    if (!selectedPatient) return;
 
-    return matchesSearch && matchesWard && matchesStatus && matchesDoctor;
+    try {
+      const vitalData = {
+        admissionId: selectedPatient.encounterId.toString(),
+        dateTime: new Date().toISOString(),
+        bloodPressure: vitalSigns.systolic && vitalSigns.diastolic
+          ? `${vitalSigns.systolic}/${vitalSigns.diastolic}`
+          : '',
+        heartRate: vitalSigns.heartRate ? parseFloat(vitalSigns.heartRate) : undefined,
+        respiratoryRate: vitalSigns.respiratoryRate ? parseFloat(vitalSigns.respiratoryRate) : undefined,
+        temperature: vitalSigns.temperature ? parseFloat(vitalSigns.temperature) : undefined,
+        oxygenSaturation: vitalSigns.oxygenSaturation ? parseFloat(vitalSigns.oxygenSaturation) : undefined,
+        staffName: `${currentRole.charAt(0).toUpperCase() + currentRole.slice(1)} User`
+      };
+
+      await monitoringService.addVital(vitalData, selectedPatient.id);
+
+      // Refresh vitals
+      const updatedVitals = await monitoringService.getVitals(selectedPatient.encounterId);
+      const vitalRecords: VitalRecord[] = updatedVitals.map((v) => ({
+        id: parseInt(v.id || '0'),
+        bp: v.bloodPressure || '',
+        hr: v.heartRate?.toString() || '',
+        rr: v.respiratoryRate?.toString() || '',
+        temp: v.temperature?.toString() || '',
+        o2: v.oxygenSaturation?.toString() + '%' || '',
+        recordedBy: v.staffName || 'Unknown',
+        createdAt: v.dateTime,
+        updatedAt: v.dateTime
+      }));
+      setVitalsHistory(vitalRecords);
+
+      alert('✅ Vital signs recorded!\n\nObservation created:\n- Category: vital-signs\n- Status: final');
+      setShowVitalsModal(false);
+      setVitalSigns({ systolic: '', diastolic: '', heartRate: '', respiratoryRate: '', temperature: '', oxygenSaturation: '', height: '', weight: '' });
+    } catch (err) {
+      console.error('Error saving vitals:', err);
+      alert('❌ Failed to save vital signs');
+    }
+  };
+
+  const handleSaveClinicalNote = async () => {
+    if (!selectedPatient) return;
+
+    try {
+      const noteData: ClinicalNote = {
+        id: '',
+        admissionId: selectedPatient.encounterId.toString(),
+        dateTime: new Date().toISOString(),
+        type: clinicalNote.type === 'soap' ? 'SOAP' : 'Progress',
+        subjective: clinicalNote.subjective || '',
+        objective: clinicalNote.objective || '',
+        assessment: clinicalNote.assessment || clinicalNote.content || '',
+        plan: clinicalNote.plan || '',
+        providerName: `Dr. ${currentRole.charAt(0).toUpperCase() + currentRole.slice(1)}`
+      };
+
+      await monitoringService.addNote(noteData, selectedPatient.id);
+
+      // Refresh notes
+      const updatedNotes = await monitoringService.getNotes(selectedPatient.encounterId);
+      const noteRecords: ClinicalNoteRecord[] = updatedNotes.map((n) => ({
+        id: parseInt(n.id || '0'),
+        type: n.type.toLowerCase() === 'soap' ? 'soap' : 'progress',
+        content: n.assessment || '',
+        subjective: n.subjective,
+        objective: n.objective,
+        assessment: n.assessment,
+        plan: n.plan,
+        createdBy: n.providerName || 'Unknown',
+        createdAt: n.dateTime,
+        updatedBy: n.providerName || 'Unknown',
+        updatedAt: n.dateTime
+      }));
+      setNotesHistory(noteRecords);
+
+      alert('✅ Clinical note recorded!\n\nObservation created:\n- Category: ' + clinicalNote.type);
+      setShowNotesModal(false);
+      setClinicalNote({ type: 'rounds', content: '', subjective: '', objective: '', assessment: '', plan: '' });
+    } catch (err) {
+      console.error('Error saving note:', err);
+      alert('❌ Failed to save clinical note');
+    }
+  };
+
+  const handlePrescribeMedication = () => {
+    const newMed: MedicationRequest = {
+      id: Date.now(),
+      medicationName: medicationForm.medication,
+      quantity: parseInt(medicationForm.quantity) || 1,
+      dosage: medicationForm.dosage,
+      route: medicationForm.route,
+      frequency: medicationForm.frequency,
+      notes: medicationForm.notes,
+      lifecycleStatus: 'prescribed',
+      intent: 'order',
+      prescribedBy: 'Dr. ' + currentRole,
+      prescribedAt: new Date().toISOString()
+    };
+    setMedicationRequests([...medicationRequests, newMed]);
+    alert('✅ Medication prescribed!');
+    setShowMedicationModal(false);
+    setMedicationForm({ medication: '', quantity: '1', dosage: '', route: 'oral', frequency: '', notes: '' });
+  };
+
+  const handleRequestFromPharmacy = (medId: number) => {
+    setMedicationRequests(medicationRequests.map(med =>
+      med.id === medId
+        ? { ...med, lifecycleStatus: 'requested', requestedBy: 'Nurse ' + currentRole, requestedAt: new Date().toISOString() }
+        : med
+    ));
+    alert('✅ Medication requested from Pharmacy!');
+  };
+
+  const handleSimulateDispense = (medId: number) => {
+    setMedicationRequests(medicationRequests.map(med =>
+      med.id === medId
+        ? { ...med, lifecycleStatus: 'ready-for-admin', dispensedAt: new Date().toISOString() }
+        : med
+    ));
+    alert('🧪 DEBUG: Pharmacy Dispensed!');
+  };
+
+  const handleAdministerMedication = (medId: number) => {
+    setMedicationRequests(medicationRequests.map(med =>
+      med.id === medId
+        ? { ...med, lifecycleStatus: 'administered', administeredBy: 'Nurse ' + currentRole, administeredAt: new Date().toISOString() }
+        : med
+    ));
+    alert('✅ Medication administered!');
+  };
+
+  const handleOrderLabTest = () => {
+    const testNames: { [key: string]: string } = {
+      'CBC': 'Complete Blood Count (CBC)', 'CHEM7': 'Chemistry Panel (CHEM-7)', 'LIPID': 'Lipid Profile',
+      'URINALYSIS': 'Urinalysis', 'XRAY-CHEST': 'Chest X-Ray', 'ECG': 'Electrocardiogram (ECG)'
+    };
+    const newLab: LabRequest = {
+      id: Date.now(),
+      testName: testNames[labForm.testCode] || labForm.testCode,
+      testCode: labForm.testCode,
+      priority: labForm.priority,
+      notes: labForm.notes,
+      lifecycleStatus: 'ordered',
+      orderedBy: 'Dr. ' + currentRole,
+      orderedAt: new Date().toISOString()
+    };
+    setLabRequests([...labRequests, newLab]);
+    alert('✅ Laboratory test ordered!\n\nStatus: ordered (Pending Nurse Request)');
+    setShowLabModal(false);
+    setLabForm({ testCode: '', priority: 'routine', notes: '' });
+  };
+
+  const handleSendRequestToLab = (labId: number) => {
+    setLabRequests(labRequests.map(lab =>
+      lab.id === labId
+        ? { ...lab, lifecycleStatus: 'requested', requestedBy: 'Nurse ' + currentRole, requestedAt: new Date().toISOString() }
+        : lab
+    ));
+    alert('✅ Lab request sent!\n\nStatus: requested (Pending Laboratory)');
+  };
+
+  const handleSimulateLabResult = (labId: number) => {
+    const lab = labRequests.find(l => l.id === labId);
+    if (!lab) return;
+
+    let mockResult;
+    if (lab.testCode === 'CBC') {
+      mockResult = {
+        findings: 'Complete Blood Count shows elevated white blood cell count.',
+        values: [
+          { parameter: 'WBC', value: '12.0', reference: '4.0-11.0', flag: 'HIGH' },
+          { parameter: 'RBC', value: '4.5', reference: '4.2-5.9' },
+          { parameter: 'Hemoglobin', value: '14.2', reference: '12.0-16.0' },
+          { parameter: 'Hematocrit', value: '42', reference: '37-47' },
+          { parameter: 'Platelets', value: '250', reference: '150-400' }
+        ],
+        interpretation: 'Mild leukocytosis noted. May indicate infection or inflammation. Clinical correlation recommended.',
+        reportedBy: 'Lab Tech Maria Santos',
+        reportedAt: new Date().toISOString()
+      };
+    } else if (lab.testCode === 'CHEM7') {
+      mockResult = {
+        findings: 'Basic metabolic panel shows normal electrolyte levels.',
+        values: [
+          { parameter: 'Sodium', value: '140', reference: '136-145' },
+          { parameter: 'Potassium', value: '4.0', reference: '3.5-5.0' },
+          { parameter: 'Chloride', value: '102', reference: '98-107' },
+          { parameter: 'CO2', value: '24', reference: '23-29' },
+          { parameter: 'BUN', value: '18', reference: '7-20' },
+          { parameter: 'Creatinine', value: '1.0', reference: '0.7-1.3' },
+          { parameter: 'Glucose', value: '95', reference: '70-100' }
+        ],
+        interpretation: 'All values within normal limits. No immediate concerns.',
+        reportedBy: 'Lab Tech Juan Cruz',
+        reportedAt: new Date().toISOString()
+      };
+    } else {
+      mockResult = {
+        findings: lab.testName + ' completed successfully.',
+        values: [{ parameter: 'Result', value: 'Normal', reference: 'Normal' }],
+        interpretation: 'Test results are within acceptable parameters.',
+        reportedBy: 'Lab Department',
+        reportedAt: new Date().toISOString()
+      };
+    }
+
+    setLabRequests(labRequests.map(l =>
+      l.id === labId
+        ? { ...l, lifecycleStatus: 'completed', completedAt: new Date().toISOString(), resultContent: mockResult }
+        : l
+    ));
+    alert('🧪 DEBUG: Lab Results Ready!\n\nStatus: completed');
+  };
+
+  const handleViewLabResult = (lab: LabRequest) => {
+    setSelectedLabResult(lab);
+    setShowLabResultModal(true);
+  };
+
+  const filteredPatients = patients.filter(p => {
+    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         p.patientId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         p.room.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = filterStatus === 'all' || p.status === filterStatus;
+    return matchesSearch && matchesStatus;
   });
 
-  const hasActiveFilters = Object.values(activeFilters).some(Boolean);
-
-  // Add new vital (backend-compatible)
-  const handleAddVital = async (newVital: Omit<VitalSign, 'id'>) => {
-    if (!selectedAdmission) return;
-    try {
-      await monitoringService.addVital(newVital, selectedAdmission.patientId);
-      // Refresh list
-      const updatedVitals = await monitoringService.getVitals(selectedAdmission.id);
-      setVitals(updatedVitals);
-    } catch (err) {
-      console.error('Error adding vital:', err);
+  const getMedicationStatusBadge = (status: string) => {
+    switch(status) {
+      case 'prescribed': return { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Prescribed (Pending Request)' };
+      case 'requested': return { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Requested (Pending Pharmacy)' };
+      case 'ready-for-admin': return { bg: 'bg-purple-100', text: 'text-purple-800', label: 'Ready for Administration' };
+      case 'administered': return { bg: 'bg-green-100', text: 'text-green-800', label: 'Administered' };
+      default: return { bg: 'bg-gray-100', text: 'text-gray-800', label: status };
     }
   };
 
-  // Add new clinical note
-  const handleAddNote = async (newNote: ClinicalNote) => {
-    if (!selectedAdmission) return;
-    try {
-      await monitoringService.addNote(newNote, selectedAdmission.patientId);
-      // Refresh list
-      const updatedNotes = await monitoringService.getNotes(selectedAdmission.id);
-      setNotes(updatedNotes);
-    } catch (err) {
-      console.error(err);
+  const getLabStatusBadge = (status: string) => {
+    switch(status) {
+      case 'ordered': return { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Ordered (Pending Request)' };
+      case 'requested': return { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Requested (Pending Lab)' };
+      case 'completed': return { bg: 'bg-green-100', text: 'text-green-800', label: 'Result Available' };
+      default: return { bg: 'bg-gray-100', text: 'text-gray-800', label: status };
     }
   };
 
-  // Update dietary order
-  const handleUpdateDietary = async (order: DietaryOrder) => {
-    if (!selectedAdmission) return;
-    try {
-      await monitoringService.saveDietary(order, selectedAdmission.patientId);
-      const updatedDietary = await monitoringService.getDietary(selectedAdmission.id);
-      setDietary(updatedDietary);
-    } catch (err) {
-      console.error('Error updating dietary order:', err);
-    }
-  };
-
-  // Render patient page
-  if (currentView === 'patient' && selectedAdmission) {
-    return (
-      <PatientMonitoringPage
-        patient={selectedAdmission}
-        vitals={vitals}
-        notes={notes}
-        history={history}
-        dietaryOrder={dietary || undefined}
-        onBack={() => setCurrentView('dashboard')}
-        onAddVital={handleAddVital}
-        onAddNote={handleAddNote}
-        onUpdateDietary={handleUpdateDietary}
-      />
-    );
-  }
-
-  // Render dashboard
   return (
-    <div className="space-y-6 pb-8">
-      {/* Enhanced Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg shadow-lg p-8 text-white">
-        <div className="flex items-center gap-4 mb-3">
-          <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 border border-white/30">
-            <Activity className="w-8 h-8" />
+    <div className="h-screen flex flex-col bg-gray-50">
+      {/* Header */}
+      <header className="bg-white border-b border-gray-200 px-6 py-4 flex-shrink-0">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-400 rounded-lg flex items-center justify-center">
+                <Activity className="text-white" size={24} />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">WAH4H</h1>
+                <p className="text-xs text-gray-500">V6.0 - Monitoring Module</p>
+              </div>
+            </div>
+
+            <div className="ml-8 flex items-center gap-2 text-sm text-gray-600">
+              <span className="cursor-pointer hover:text-gray-900">Dashboard</span>
+              <ChevronRight size={16} />
+              <span className="cursor-pointer hover:text-gray-900">Patients</span>
+              <ChevronRight size={16} />
+              <span className="cursor-pointer hover:text-gray-900">Admission</span>
+              <ChevronRight size={16} />
+              <span className="font-medium text-blue-600">Monitoring</span>
+            </div>
           </div>
-          <div>
-            <h1 className="text-3xl font-bold">Patient Monitoring</h1>
-            <p className="text-blue-100 text-sm mt-1">Real-time patient care and vital signs tracking</p>
+
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setCurrentRole('doctor')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  currentRole === 'doctor'
+                    ? 'bg-white text-purple-700 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                👨‍⚕️ Doctor
+              </button>
+              <button
+                onClick={() => setCurrentRole('nurse')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  currentRole === 'nurse'
+                    ? 'bg-white text-blue-700 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                👩‍⚕️ Nurse
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-medium text-sm ${
+                currentRole === 'doctor' ? 'bg-purple-600' : 'bg-blue-600'
+              }`}>
+                JN
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-medium text-gray-900">Jhon Lloyd Nicolas</p>
+                <p className="text-xs text-gray-500 capitalize">{currentRole}</p>
+              </div>
+            </div>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-blue-100 text-xs font-medium uppercase tracking-wide">Active Patients</p>
-                <p className="text-3xl font-bold mt-1">{admissions.length}</p>
+      </header>
+
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Panel - Patient List */}
+        <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
+          {!selectedPatient ? (
+            <>
+              <div className="p-4 border-b border-gray-100">
+                <h2 className="text-lg font-semibold text-gray-900 mb-3">Admitted Patients</h2>
+                <div className="relative mb-3">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                  <input
+                    type="text"
+                    placeholder="Search patients..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  />
+                </div>
+
+                <div className="flex gap-2 flex-wrap">
+                  {(['all', 'stable', 'monitoring', 'critical'] as const).map((status) => (
+                    <button
+                      key={status}
+                      onClick={() => setFilterStatus(status)}
+                      className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
+                        filterStatus === status
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {status.charAt(0).toUpperCase() + status.slice(1)}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <Users className="w-8 h-8 text-white/60" />
-            </div>
-          </div>
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-blue-100 text-xs font-medium uppercase tracking-wide">Critical Status</p>
-                <p className="text-3xl font-bold mt-1">
-                  {admissions.filter(a => a.status === 'Critical').length}
-                </p>
+
+              <div className="flex-1 overflow-y-auto">
+                {filteredPatients.map((patient) => (
+                  <div
+                    key={patient.id}
+                    onClick={() => handleSelectPatient(patient)}
+                    className="p-4 border-b border-gray-100 hover:bg-blue-50 cursor-pointer transition-colors"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <h3 className="font-semibold text-gray-900">{patient.name}</h3>
+                        <p className="text-sm text-gray-500">{patient.patientId}</p>
+                      </div>
+                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                        patient.status === 'stable' ? 'bg-green-100 text-green-700' :
+                        patient.status === 'critical' ? 'bg-red-100 text-red-700' :
+                        'bg-yellow-100 text-yellow-700'
+                      }`}>
+                        {patient.status}
+                      </span>
+                    </div>
+                    <div className="space-y-1 text-xs text-gray-600">
+                      <div className="flex items-center gap-1">
+                        <User size={12} />
+                        <span>{patient.room}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Clock size={12} />
+                        <span>Updated: {patient.updatedAt}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <AlertTriangle className="w-8 h-8 text-red-300" />
-            </div>
-          </div>
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-blue-100 text-xs font-medium uppercase tracking-wide">Stable Status</p>
-                <p className="text-3xl font-bold mt-1">
-                  {admissions.filter(a => a.status === 'Stable').length}
-                </p>
+            </>
+          ) : (
+            <>
+              <div className="p-4 border-b border-gray-100">
+                <button
+                  onClick={handleBackToList}
+                  className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium mb-4 text-sm"
+                >
+                  <ArrowLeft size={16} />
+                  Back to List
+                </button>
+
+                <div className="bg-gradient-to-r from-blue-600 to-blue-500 rounded-lg p-4 text-white">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                      <User size={24} />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold">{selectedPatient.name}</h2>
+                      <p className="text-sm text-blue-100">Patient ID: {selectedPatient.patientId}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-blue-200 text-xs">Room</p>
+                      <p className="font-medium">{selectedPatient.room}</p>
+                    </div>
+                    <div>
+                      <p className="text-blue-200 text-xs">Status</p>
+                      <p className="font-medium capitalize">{selectedPatient.status}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-blue-200 text-xs">Attending Physician</p>
+                      <p className="font-medium">{selectedPatient.attendingPhysician}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-blue-200 text-xs">Assigned Nurse</p>
+                      <p className="font-medium">{selectedPatient.nurseName}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <Heart className="w-8 h-8 text-green-300" />
+
+              <div className="p-4 space-y-2 text-xs text-gray-600">
+                <div className="flex justify-between">
+                  <span>Encounter ID:</span>
+                  <span className="font-medium">{selectedPatient.encounterId}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Admitted:</span>
+                  <span className="font-medium">{selectedPatient.admissionDate}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Created:</span>
+                  <span className="font-medium">{selectedPatient.createdAt}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Updated:</span>
+                  <span className="font-medium">{selectedPatient.updatedAt}</span>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Right Panel */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {!selectedPatient ? (
+            <div className="flex-1 flex items-center justify-center bg-gray-50">
+              <div className="text-center">
+                <div className="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Stethoscope className="text-gray-400" size={48} />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Select a patient to view details</h3>
+                <p className="text-gray-600">Choose a patient from the list to access their clinical workspace</p>
+              </div>
             </div>
-          </div>
+          ) : (
+            <>
+              {/* Tabs */}
+              <div className="bg-white border-b border-gray-200 flex-shrink-0">
+                <nav className="flex">
+                  {[
+                    { id: 'vitals', label: 'Vitals', icon: Heart },
+                    { id: 'notes', label: 'Clinical Notes', icon: FileText },
+                    { id: 'medication', label: 'Medication', icon: Pill },
+                    { id: 'laboratory', label: 'Laboratory', icon: FlaskConical }
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id as any)}
+                      className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+                        activeTab === tab.id
+                          ? 'border-blue-600 text-blue-600 bg-blue-50'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <tab.icon size={18} />
+                      {tab.label}
+                    </button>
+                  ))}
+                </nav>
+              </div>
+
+              {/* Tab Content */}
+              <div className="flex-1 overflow-y-auto bg-gray-50 p-6">
+                {/* Vitals Tab */}
+                {activeTab === 'vitals' && (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setVitalsViewMode('graph')}
+                          className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors ${
+                            vitalsViewMode === 'graph'
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          <BarChart3 size={18} />Graph View
+                        </button>
+                        <button
+                          onClick={() => setVitalsViewMode('table')}
+                          className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors ${
+                            vitalsViewMode === 'table'
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          <Table2 size={18} />Table View
+                        </button>
+                      </div>
+
+                      <button
+                        onClick={() => setShowVitalsModal(true)}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2"
+                      >
+                        <Plus size={18} />Record Vitals
+                      </button>
+                    </div>
+
+                    {vitalsViewMode === 'table' ? (
+                      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">BP</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">HR</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">RR</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Temp</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">O2</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Recorded By</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created At</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {vitalsHistory.map((vital) => (
+                              <tr key={vital.id} className="hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{vital.bp}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{vital.hr}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{vital.rr}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{vital.temp}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{vital.o2}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{vital.recordedBy}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{vital.createdAt}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="bg-white rounded-lg border border-gray-200 p-6">
+                        <p className="text-gray-500 text-center">Graph view visualization will be implemented here</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Clinical Notes Tab */}
+                {activeTab === 'notes' && (
+                  <div className="space-y-4">
+                    <div className="flex justify-end">
+                      <button
+                        onClick={() => setShowNotesModal(true)}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2"
+                      >
+                        <Plus size={18} />Add Clinical Note
+                      </button>
+                    </div>
+
+                    {notesHistory.map((note) => (
+                      <div key={note.id} className="bg-white rounded-lg border border-gray-200 p-6">
+                        <div className="flex items-start justify-between mb-4">
+                          <div>
+                            <h3 className="font-semibold text-gray-900 capitalize">{note.type} Note</h3>
+                            <div className="text-sm text-gray-600 space-y-1 mt-2">
+                              <p>Created by: {note.createdBy} at {note.createdAt}</p>
+                              <p>Updated by: {note.updatedBy} at {note.updatedAt}</p>
+                            </div>
+                          </div>
+                        </div>
+                        <p className="text-gray-700">{note.content}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Medication Tab */}
+                {activeTab === 'medication' && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          {currentRole === 'doctor' ? 'Medication Prescriptions' : 'Medication Requests'}
+                        </h3>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {currentRole === 'doctor'
+                            ? 'Manage and track medication prescriptions'
+                            : 'Request and administer medications'
+                          }
+                        </p>
+                      </div>
+
+                      {currentRole === 'doctor' && (
+                        <button
+                          onClick={() => setShowMedicationModal(true)}
+                          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium flex items-center gap-2"
+                        >
+                          <Plus size={18} />Prescribe Medication
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="space-y-3">
+                      {medicationRequests.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 bg-white rounded-lg border border-gray-200">
+                          <Pill className="text-purple-400 mb-4" size={48} />
+                          <h3 className="text-lg font-semibold text-gray-900 mb-2">No Medications</h3>
+                          <p className="text-gray-600 text-sm">
+                            {currentRole === 'doctor'
+                              ? 'Prescribe medications to get started'
+                              : 'No medications prescribed yet'
+                            }
+                          </p>
+                        </div>
+                      ) : (
+                        medicationRequests.map((med) => {
+                          const statusBadge = getMedicationStatusBadge(med.lifecycleStatus);
+
+                          return (
+                            <div key={med.id} className="bg-white rounded-lg border border-gray-200 p-5 hover:shadow-md transition-shadow">
+                              <div className="flex items-start justify-between mb-4">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-3 mb-2">
+                                    <h4 className="text-lg font-semibold text-gray-900">{med.medicationName}</h4>
+                                    <span className={`px-3 py-1 text-xs font-semibold rounded-full ${statusBadge.bg} ${statusBadge.text}`}>
+                                      {statusBadge.label}
+                                    </span>
+                                  </div>
+
+                                  <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm text-gray-600 mb-3">
+                                    <div><span className="font-medium">Dosage:</span> {med.dosage}</div>
+                                    <div><span className="font-medium">Route:</span> {med.route}</div>
+                                    <div><span className="font-medium">Frequency:</span> {med.frequency}</div>
+                                    <div><span className="font-medium">Quantity:</span> {med.quantity}</div>
+                                  </div>
+
+                                  <div className="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500">
+                                    <p>Prescribed by: {med.prescribedBy} at {med.prescribedAt}</p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex gap-2 flex-wrap">
+                                {currentRole === 'nurse' && med.lifecycleStatus === 'prescribed' && (
+                                  <button
+                                    onClick={() => handleRequestFromPharmacy(med.id)}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2 text-sm"
+                                  >
+                                    <Package size={16} />Request from Pharmacy
+                                  </button>
+                                )}
+
+                                {med.lifecycleStatus === 'requested' && (
+                                  <>
+                                    <button
+                                      disabled
+                                      className="px-4 py-2 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed font-medium flex items-center gap-2 text-sm"
+                                    >
+                                      <Clock size={16} />Pending Pharmacy Approval
+                                    </button>
+                                    <button
+                                      onClick={() => handleSimulateDispense(med.id)}
+                                      className="px-4 py-2 bg-orange-100 text-orange-700 border border-orange-300 rounded-lg hover:bg-orange-200 font-medium flex items-center gap-2 text-sm"
+                                    >
+                                      <PlayCircle size={16} />🧪 Debug: Simulate Dispense
+                                    </button>
+                                  </>
+                                )}
+
+                                {currentRole === 'nurse' && med.lifecycleStatus === 'ready-for-admin' && (
+                                  <button
+                                    onClick={() => handleAdministerMedication(med.id)}
+                                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium flex items-center gap-2 text-sm"
+                                  >
+                                    <Syringe size={16} />Administer Medication
+                                  </button>
+                                )}
+
+                                {med.lifecycleStatus === 'administered' && (
+                                  <div className="px-4 py-2 bg-green-100 text-green-700 rounded-lg font-medium flex items-center gap-2 text-sm">
+                                    <Check size={16} />✅ Completed
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Laboratory Tab */}
+                {activeTab === 'laboratory' && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          {currentRole === 'doctor' ? 'Laboratory Test Orders' : 'Laboratory Requests'}
+                        </h3>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {currentRole === 'doctor'
+                            ? 'Order and track laboratory tests'
+                            : 'Send requests and view results'
+                          }
+                        </p>
+                      </div>
+
+                      {currentRole === 'doctor' && (
+                        <button
+                          onClick={() => setShowLabModal(true)}
+                          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium flex items-center gap-2"
+                        >
+                          <Plus size={18} />Order Lab Test
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="space-y-3">
+                      {labRequests.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 bg-white rounded-lg border border-gray-200">
+                          <FlaskConical className="text-purple-400 mb-4" size={48} />
+                          <h3 className="text-lg font-semibold text-gray-900 mb-2">No Lab Tests</h3>
+                          <p className="text-gray-600 text-sm">
+                            {currentRole === 'doctor'
+                              ? 'Order laboratory tests to get started'
+                              : 'No laboratory tests ordered yet'
+                            }
+                          </p>
+                        </div>
+                      ) : (
+                        labRequests.map((lab) => {
+                          const statusBadge = getLabStatusBadge(lab.lifecycleStatus);
+
+                          return (
+                            <div key={lab.id} className="bg-white rounded-lg border border-gray-200 p-5 hover:shadow-md transition-shadow">
+                              <div className="flex items-start justify-between mb-4">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-3 mb-2">
+                                    <Beaker className="text-purple-600" size={20} />
+                                    <h4 className="text-lg font-semibold text-gray-900">{lab.testName}</h4>
+                                    <span className={`px-3 py-1 text-xs font-semibold rounded-full ${statusBadge.bg} ${statusBadge.text}`}>
+                                      {statusBadge.label}
+                                    </span>
+                                  </div>
+
+                                  <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm text-gray-600 mb-3">
+                                    <div><span className="font-medium">Test Code:</span> {lab.testCode}</div>
+                                    <div>
+                                      <span className="font-medium">Priority:</span>
+                                      <span className={`ml-2 px-2 py-0.5 text-xs font-semibold rounded ${
+                                        lab.priority === 'stat' ? 'bg-red-100 text-red-700' :
+                                        lab.priority === 'urgent' ? 'bg-orange-100 text-orange-700' :
+                                        'bg-blue-100 text-blue-700'
+                                      }`}>
+                                        {lab.priority.toUpperCase()}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  {lab.notes && (
+                                    <p className="text-sm text-gray-600 mb-3">
+                                      <span className="font-medium">Notes:</span> {lab.notes}
+                                    </p>
+                                  )}
+
+                                  <div className="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500 space-y-1">
+                                    <p>Ordered by: {lab.orderedBy} at {lab.orderedAt}</p>
+                                    {lab.requestedBy && <p>Requested by: {lab.requestedBy} at {lab.requestedAt}</p>}
+                                    {lab.completedAt && <p>Completed at: {lab.completedAt}</p>}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex gap-2 flex-wrap">
+                                {currentRole === 'nurse' && lab.lifecycleStatus === 'ordered' && (
+                                  <button
+                                    onClick={() => handleSendRequestToLab(lab.id)}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2 text-sm"
+                                  >
+                                    <Send size={16} />Send Request to Lab
+                                  </button>
+                                )}
+
+                                {lab.lifecycleStatus === 'requested' && (
+                                  <>
+                                    <button
+                                      disabled
+                                      className="px-4 py-2 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed font-medium flex items-center gap-2 text-sm"
+                                    >
+                                      <Clock size={16} />Pending Laboratory Processing
+                                    </button>
+                                    <button
+                                      onClick={() => handleSimulateLabResult(lab.id)}
+                                      className="px-4 py-2 bg-orange-100 text-orange-700 border border-orange-300 rounded-lg hover:bg-orange-200 font-medium flex items-center gap-2 text-sm"
+                                    >
+                                      <PlayCircle size={16} />🧪 Debug: Simulate Lab Result
+                                    </button>
+                                  </>
+                                )}
+
+                                {lab.lifecycleStatus === 'completed' && (
+                                  <button
+                                    onClick={() => handleViewLabResult(lab)}
+                                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium flex items-center gap-2 text-sm"
+                                  >
+                                    <Eye size={16} />👁️ View Result
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
-      
-      <MonitoringDashboard admissions={admissions} onSelectAdmission={handleSelectAdmission} />
+
+      {/* MODALS */}
+
+      {/* Record Vitals Modal */}
+      {showVitalsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">Record Vital Signs</h3>
+              <button
+                onClick={() => setShowVitalsModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Systolic BP</label>
+                  <input
+                    type="number"
+                    value={vitalSigns.systolic}
+                    onChange={(e) => setVitalSigns({...vitalSigns, systolic: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="120"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Diastolic BP</label>
+                  <input
+                    type="number"
+                    value={vitalSigns.diastolic}
+                    onChange={(e) => setVitalSigns({...vitalSigns, diastolic: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="80"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Heart Rate (bpm)</label>
+                  <input
+                    type="number"
+                    value={vitalSigns.heartRate}
+                    onChange={(e) => setVitalSigns({...vitalSigns, heartRate: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="72"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Resp Rate (br/min)</label>
+                  <input
+                    type="number"
+                    value={vitalSigns.respiratoryRate}
+                    onChange={(e) => setVitalSigns({...vitalSigns, respiratoryRate: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="16"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Temp (°C)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={vitalSigns.temperature}
+                    onChange={(e) => setVitalSigns({...vitalSigns, temperature: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="36.5"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">O2 Sat (%)</label>
+                  <input
+                    type="number"
+                    value={vitalSigns.oxygenSaturation}
+                    onChange={(e) => setVitalSigns({...vitalSigns, oxygenSaturation: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="98"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="sticky bottom-0 bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t border-gray-200">
+              <button
+                onClick={() => setShowVitalsModal(false)}
+                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveVitals}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2"
+              >
+                <Save size={18} />Save Record
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clinical Notes Modal */}
+      {showNotesModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">New Clinical Note</h3>
+              <button
+                onClick={() => setShowNotesModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Note Type</label>
+                <select
+                  value={clinicalNote.type}
+                  onChange={(e) => setClinicalNote({...clinicalNote, type: e.target.value as any})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="rounds">Rounds Note</option>
+                  <option value="progress">Progress Note</option>
+                  <option value="soap">SOAP Note</option>
+                </select>
+              </div>
+
+              {clinicalNote.type === 'soap' ? (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Subjective</label>
+                    <textarea
+                      value={clinicalNote.subjective}
+                      onChange={(e) => setClinicalNote({...clinicalNote, subjective: e.target.value})}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Patient complaints, history..."
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Objective</label>
+                    <textarea
+                      value={clinicalNote.objective}
+                      onChange={(e) => setClinicalNote({...clinicalNote, objective: e.target.value})}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Physical exam findings, vitals..."
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Assessment</label>
+                    <textarea
+                      value={clinicalNote.assessment}
+                      onChange={(e) => setClinicalNote({...clinicalNote, assessment: e.target.value})}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Diagnosis, differential..."
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Plan</label>
+                    <textarea
+                      value={clinicalNote.plan}
+                      onChange={(e) => setClinicalNote({...clinicalNote, plan: e.target.value})}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Treatment, meds, follow-up..."
+                    />
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Note Content</label>
+                  <textarea
+                    value={clinicalNote.content}
+                    onChange={(e) => setClinicalNote({...clinicalNote, content: e.target.value})}
+                    rows={8}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter details..."
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="sticky bottom-0 bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t border-gray-200">
+              <button
+                onClick={() => setShowNotesModal(false)}
+                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveClinicalNote}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+              >
+                Finalize Note
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Medication Modal */}
+      {showMedicationModal && currentRole === 'doctor' && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <Pill className="text-purple-600" size={24} />
+                <h3 className="text-lg font-semibold text-gray-900">Prescribe Medication</h3>
+              </div>
+              <button
+                onClick={() => setShowMedicationModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="p-3 rounded-lg text-sm bg-purple-50 text-purple-800">
+                <p className="font-medium">🔹 Creating FHIR MedicationRequest with intent: order (Prescription)</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Select Medication</label>
+                <select
+                  value={medicationForm.medication}
+                  onChange={(e) => setMedicationForm({...medicationForm, medication: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                >
+                  <option value="">-- Choose medication from inventory --</option>
+                  <option value="Paracetamol 500mg">Paracetamol 500mg</option>
+                  <option value="Amoxicillin 500mg">Amoxicillin 500mg</option>
+                  <option value="Ibuprofen 400mg">Ibuprofen 400mg</option>
+                  <option value="Metformin 500mg">Metformin 500mg</option>
+                  <option value="Omeprazole 20mg">Omeprazole 20mg</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Dosage</label>
+                  <input
+                    type="text"
+                    value={medicationForm.dosage}
+                    onChange={(e) => setMedicationForm({...medicationForm, dosage: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="e.g., 500mg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Route</label>
+                  <select
+                    value={medicationForm.route}
+                    onChange={(e) => setMedicationForm({...medicationForm, route: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    <option value="oral">Oral</option>
+                    <option value="iv">IV</option>
+                    <option value="im">IM</option>
+                    <option value="subcutaneous">Subcutaneous</option>
+                    <option value="topical">Topical</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Frequency</label>
+                  <input
+                    type="text"
+                    value={medicationForm.frequency}
+                    onChange={(e) => setMedicationForm({...medicationForm, frequency: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="e.g., TID, BID, QD"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={medicationForm.quantity}
+                    onChange={(e) => setMedicationForm({...medicationForm, quantity: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Prescription Notes</label>
+                <textarea
+                  value={medicationForm.notes}
+                  onChange={(e) => setMedicationForm({...medicationForm, notes: e.target.value})}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="Add prescription instructions..."
+                />
+              </div>
+            </div>
+
+            <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t border-gray-200">
+              <button
+                onClick={() => setShowMedicationModal(false)}
+                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePrescribeMedication}
+                disabled={!medicationForm.medication}
+                className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Submit Prescription
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Laboratory Order Modal */}
+      {showLabModal && currentRole === 'doctor' && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <FlaskConical className="text-purple-600" size={24} />
+                <h3 className="text-lg font-semibold text-gray-900">Order Laboratory Test</h3>
+              </div>
+              <button
+                onClick={() => setShowLabModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="p-3 rounded-lg text-sm bg-purple-50 text-purple-800">
+                <p className="font-medium">🔹 Creating FHIR DiagnosticReport - Status: Ordered</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Select Lab Test</label>
+                <select
+                  value={labForm.testCode}
+                  onChange={(e) => setLabForm({...labForm, testCode: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                >
+                  <option value="">-- Choose laboratory test --</option>
+                  <option value="CBC">Complete Blood Count (CBC)</option>
+                  <option value="CHEM7">Chemistry Panel (CHEM-7)</option>
+                  <option value="LIPID">Lipid Profile</option>
+                  <option value="URINALYSIS">Urinalysis</option>
+                  <option value="XRAY-CHEST">Chest X-Ray</option>
+                  <option value="ECG">Electrocardiogram (ECG)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+                <div className="flex gap-3">
+                  {(['routine', 'urgent', 'stat'] as const).map(priority => (
+                    <button
+                      key={priority}
+                      onClick={() => setLabForm({...labForm, priority})}
+                      className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+                        labForm.priority === priority
+                          ? priority === 'routine' ? 'bg-blue-600 text-white' :
+                            priority === 'urgent' ? 'bg-orange-600 text-white' :
+                            'bg-red-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {priority.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Clinical Notes (Optional)</label>
+                <textarea
+                  value={labForm.notes}
+                  onChange={(e) => setLabForm({...labForm, notes: e.target.value})}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="Add clinical indication or special instructions..."
+                />
+              </div>
+            </div>
+
+            <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t border-gray-200">
+              <button
+                onClick={() => setShowLabModal(false)}
+                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleOrderLabTest}
+                disabled={!labForm.testCode}
+                className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Submit Order
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lab Result Modal */}
+      {showLabResultModal && selectedLabResult && selectedLabResult.resultContent && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-gradient-to-r from-green-600 to-green-500 text-white px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <FileCheck size={24} />
+                <div>
+                  <h3 className="text-lg font-semibold">Laboratory Test Result</h3>
+                  <p className="text-sm text-green-100">{selectedLabResult.testName}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowLabResultModal(false)}
+                className="text-white hover:text-green-100"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-600">Patient</p>
+                    <p className="font-medium text-gray-900">{selectedPatient?.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600">Patient ID</p>
+                    <p className="font-medium text-gray-900">{selectedPatient?.patientId}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600">Test Code</p>
+                    <p className="font-medium text-gray-900">{selectedLabResult.testCode}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600">Priority</p>
+                    <p className="font-medium text-gray-900 uppercase">{selectedLabResult.priority}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600">Ordered By</p>
+                    <p className="font-medium text-gray-900">{selectedLabResult.orderedBy}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600">Completed At</p>
+                    <p className="font-medium text-gray-900">{selectedLabResult.completedAt}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-2">Findings</h4>
+                <p className="text-gray-700 bg-blue-50 p-4 rounded-lg">{selectedLabResult.resultContent.findings}</p>
+              </div>
+
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-3">Test Results</h4>
+                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Parameter</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reference Range</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Flag</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {selectedLabResult.resultContent.values.map((item, index) => (
+                        <tr key={index} className={item.flag ? 'bg-red-50' : ''}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.parameter}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.value}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.reference}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {item.flag && (
+                              <span className="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                                {item.flag}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-2">Clinical Interpretation</h4>
+                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                  <div className="flex">
+                    <AlertCircle className="text-yellow-600 flex-shrink-0 mr-3" size={20} />
+                    <p className="text-sm text-gray-700">{selectedLabResult.resultContent.interpretation}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-gray-200 pt-4">
+                <div className="flex justify-between items-center text-sm text-gray-600">
+                  <div>
+                    <p>Reported by: <span className="font-medium text-gray-900">{selectedLabResult.resultContent.reportedBy}</span></p>
+                    <p>Report Date: <span className="font-medium text-gray-900">{selectedLabResult.resultContent.reportedAt}</span></p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500">FHIR DiagnosticReport</p>
+                    <p className="text-xs text-gray-500">Status: Final</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="sticky bottom-0 bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t border-gray-200">
+              <button
+                onClick={() => setShowLabResultModal(false)}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+              >
+                Close
+              </button>
+              <button className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium">
+                Print Report
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
