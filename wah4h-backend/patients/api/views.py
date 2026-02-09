@@ -811,10 +811,28 @@ def webhook_process_query(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    # Enhanced identifier matching - supports multiple identifier systems
     patient = None
     for ident in identifiers:
-        if 'philhealth' in ident.get('system', '').lower():
-            patient = Patient.objects.filter(philhealth_id=ident['value']).first()
+        system = ident.get('system', '').lower()
+        value = ident.get('value')
+
+        if not value:
+            continue
+
+        # PhilHealth ID
+        if 'philhealth' in system:
+            patient = Patient.objects.filter(philhealth_id=value).first()
+
+        # Medical Record Number (MRN) - matches patient_id field
+        elif 'mrn' in system or 'medical-record' in system:
+            patient = Patient.objects.filter(patient_id=value).first()
+
+        # Mobile number (for additional matching)
+        elif 'phone' in system or 'mobile' in system:
+            patient = Patient.objects.filter(mobile_number=value).first()
+
+        # If patient found, stop searching
         if patient:
             break
 
