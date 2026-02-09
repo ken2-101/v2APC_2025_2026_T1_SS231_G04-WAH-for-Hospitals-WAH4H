@@ -18,10 +18,18 @@ API Structure:
 
 from django.contrib import admin
 from django.urls import path, include
+from patients.api import views as patient_views
 
 urlpatterns = [
     # Django Admin
     path('admin/', admin.site.urls),
+
+    # ============================================================================
+    # WAH4PC GATEWAY WEBHOOKS - Must be at /fhir/* per API specification
+    # ============================================================================
+    path('fhir/process-query', patient_views.webhook_process_query, name='wah4pc_process_query'),
+    path('fhir/receive-results', patient_views.webhook_receive, name='wah4pc_receive_results'),
+    path('fhir/receive-push', patient_views.webhook_receive_push, name='wah4pc_receive_push'),
 
     # ============================================================================
     # API ENDPOINTS - 8 Core Modules

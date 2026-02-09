@@ -14,7 +14,12 @@
       "Bash(GATEWAY_AUTH_KEY=test-secret python:*)",
       "Bash(python manage.py makemigrations:*)",
       "Bash(python manage.py migrate:*)",
-      "Bash(python manage.py shell:*)"
+      "Bash(python manage.py shell:*)",
+      "Bash(python manage.py check:*)",
+      "Bash(python manage.py show_urls:*)",
+      "Bash(findstr:*)",
+      "Bash(python test_webhooks.py:*)",
+      "Bash(del:*)"
     ]
   }
 }

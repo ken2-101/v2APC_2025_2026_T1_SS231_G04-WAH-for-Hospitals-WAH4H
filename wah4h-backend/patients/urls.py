@@ -20,9 +20,7 @@ from patients.api.views import (
     AllergyViewSet,
     ImmunizationViewSet,
     fetch_wah4pc,
-    webhook_receive,
     send_to_wah4pc,
-    webhook_process_query,
     list_transactions,
     get_transaction,
 )
@@ -38,11 +36,12 @@ router.register(r'immunizations', ImmunizationViewSet, basename='immunization')
 
 # URL patterns
 urlpatterns = [
-    path('wah4pc/fetch', fetch_wah4pc),
-    path('wah4pc/send', send_to_wah4pc),
-    path('wah4pc/transactions/', list_transactions),
-    path('wah4pc/transactions/<str:transaction_id>/', get_transaction),
-    path('webhooks/receive', webhook_receive),
-    path('webhooks/process-query', webhook_process_query),
+    # WAH4PC Operations (your backend -> gateway)
+    path('wah4pc/fetch', fetch_wah4pc, name='wah4pc_fetch'),
+    path('wah4pc/send', send_to_wah4pc, name='wah4pc_send'),
+    path('wah4pc/transactions/', list_transactions, name='wah4pc_list_transactions'),
+    path('wah4pc/transactions/<str:transaction_id>/', get_transaction, name='wah4pc_get_transaction'),
+
+    # Patient API routes
     path('', include(router.urls)),
 ]

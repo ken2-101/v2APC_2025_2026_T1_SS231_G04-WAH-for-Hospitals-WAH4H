@@ -710,8 +710,92 @@ def send_to_wah4pc(request):
 
 
 @api_view(['POST'])
+def webhook_receive_push(request):
+    """Receive pushed patient data from another provider via WAH4PC gateway."""
+    gateway_key = os.getenv('GATEWAY_AUTH_KEY')
+    auth_header = request.headers.get('X-Gateway-Auth')
+    if not gateway_key or not auth_header or auth_header != gateway_key:
+        return Response({'error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    txn_id = request.data.get('transactionId')
+    sender_id = request.data.get('senderId')
+    resource_type = request.data.get('resourceType')
+    data = request.data.get('data')
+
+    if not txn_id or not sender_id or not resource_type or not data:
+        return Response(
+            {'error': 'transactionId, senderId, resourceType, and data are required'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Only handle Patient resources for now
+    if resource_type != 'Patient':
+        return Response(
+            {'error': f'Unsupported resource type: {resource_type}'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        # Convert FHIR to dict
+        patient_data = fhir_to_dict(data)
+
+        # Check if patient already exists by PhilHealth ID
+        philhealth_id = patient_data.get('philhealth_id')
+        if philhealth_id:
+            existing_patient = Patient.objects.filter(philhealth_id=philhealth_id).first()
+            if existing_patient:
+                # Update existing patient
+                for key, value in patient_data.items():
+                    if value is not None:
+                        setattr(existing_patient, key, value)
+                existing_patient.save()
+                patient = existing_patient
+                action = 'updated'
+            else:
+                # Create new patient
+                patient = Patient.objects.create(**patient_data)
+                action = 'created'
+        else:
+            # No PhilHealth ID, create new patient
+            patient = Patient.objects.create(**patient_data)
+            action = 'created'
+
+        # Record transaction
+        WAH4PCTransaction.objects.create(
+            transaction_id=txn_id,
+            type='receive_push',
+            status='COMPLETED',
+            patient_id=patient.id,
+            target_provider_id=sender_id,
+        )
+
+        return Response({
+            'message': f'Patient {action} successfully',
+            'patientId': patient.id,
+            'action': action
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        # Record failed transaction
+        WAH4PCTransaction.objects.create(
+            transaction_id=txn_id,
+            type='receive_push',
+            status='FAILED',
+            target_provider_id=sender_id,
+            error_message=str(e),
+        )
+
+        return Response(
+            {'error': f'Failed to process pushed patient: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+@api_view(['POST'])
 def webhook_process_query(request):
     """Process incoming query from another provider via WAH4PC gateway."""
+    import uuid
+
     gateway_key = os.getenv('GATEWAY_AUTH_KEY')
     auth_header = request.headers.get('X-Gateway-Auth')
     if not gateway_key or not auth_header or auth_header != gateway_key:
@@ -734,12 +818,16 @@ def webhook_process_query(request):
         if patient:
             break
 
+    # Generate idempotency key for the response
+    idempotency_key = str(uuid.uuid4())
+
     try:
         http_requests.post(
             return_url,
             headers={
                 "X-API-Key": os.getenv('WAH4PC_API_KEY'),
                 "X-Provider-ID": os.getenv('WAH4PC_PROVIDER_ID'),
+                "Idempotency-Key": idempotency_key,
             },
             json={
                 "transactionId": txn_id,

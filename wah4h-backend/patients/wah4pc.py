@@ -281,6 +281,80 @@ def _get_extension(extensions, url):
     return None
 
 
+def gateway_list_transactions(status_filter=None, limit=50):
+    """List transactions from WAH4PC gateway.
+
+    Args:
+        status_filter: Optional status filter (PENDING, COMPLETED, FAILED)
+        limit: Maximum number of transactions to return (default: 50)
+
+    Returns:
+        dict: Response with 'data' key containing transaction list, or 'error' and 'status_code' on failure
+    """
+    try:
+        params = {'limit': limit}
+        if status_filter:
+            params['status'] = status_filter
+
+        response = requests.get(
+            f"{URL}/api/v1/transactions",
+            headers={
+                "X-API-Key": API_KEY,
+                "X-Provider-ID": PROVIDER_ID,
+            },
+            params=params,
+        )
+
+        if response.status_code >= 400:
+            error_msg = response.json().get('error', 'Unknown error') if response.text else 'Unknown error'
+            return {
+                'error': error_msg,
+                'status_code': response.status_code
+            }
+
+        return response.json()
+
+    except requests.RequestException as e:
+        return {
+            'error': f'Network error: {str(e)}',
+            'status_code': 500
+        }
+
+
+def gateway_get_transaction(transaction_id):
+    """Get transaction details from WAH4PC gateway.
+
+    Args:
+        transaction_id: Transaction ID to retrieve
+
+    Returns:
+        dict: Response with transaction details, or 'error' and 'status_code' on failure
+    """
+    try:
+        response = requests.get(
+            f"{URL}/api/v1/transactions/{transaction_id}",
+            headers={
+                "X-API-Key": API_KEY,
+                "X-Provider-ID": PROVIDER_ID,
+            },
+        )
+
+        if response.status_code >= 400:
+            error_msg = response.json().get('error', 'Unknown error') if response.text else 'Unknown error'
+            return {
+                'error': error_msg,
+                'status_code': response.status_code
+            }
+
+        return response.json()
+
+    except requests.RequestException as e:
+        return {
+            'error': f'Network error: {str(e)}',
+            'status_code': 500
+        }
+
+
 def fhir_to_dict(fhir):
     """Convert PH Core FHIR Patient resource to local dict."""
     name = fhir.get("name", [{}])[0]
