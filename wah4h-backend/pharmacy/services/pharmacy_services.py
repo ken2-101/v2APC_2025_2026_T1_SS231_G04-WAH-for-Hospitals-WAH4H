@@ -30,7 +30,7 @@ from pharmacy.models import (
 # ACL Imports (Fortress Pattern - No direct model access)
 from patients.services.patient_acl import validate_patient_exists
 from admission.services.admission_acl import EncounterACL
-from accounts.services.accounts_acl import PractitionerACL
+from accounts.models import Practitioner
 
 
 class InventoryService:
@@ -204,14 +204,14 @@ class MedicationService:
                 raise ValidationError(f"Encounter with ID {data['encounter_id']} not found")
             
             # Validate Practitioner exists (ACL)
-            if not PractitionerACL.validate_practitioner_exists(data['requester_id']):
+            if not Practitioner.objects.filter(practitioner_id=data['requester_id']).exists():
                 raise ValidationError(f"Practitioner with ID {data['requester_id']} not found")
             
             # Validate optional practitioner references
-            if data.get('performer_id') and not PractitionerACL.validate_practitioner_exists(data['performer_id']):
+            if data.get('performer_id') and not Practitioner.objects.filter(practitioner_id=data['performer_id']).exists():
                 raise ValidationError(f"Performer practitioner with ID {data['performer_id']} not found")
             
-            if data.get('recorder_id') and not PractitionerACL.validate_practitioner_exists(data['recorder_id']):
+            if data.get('recorder_id') and not Practitioner.objects.filter(practitioner_id=data['recorder_id']).exists():
                 raise ValidationError(f"Recorder practitioner with ID {data['recorder_id']} not found")
             
             # Create MedicationRequest
@@ -382,7 +382,7 @@ class AdministrationService:
                 raise ValidationError(f"Encounter with ID {data['context_id']} not found")
             
             # Validate Practitioner (ACL)
-            if data.get('performer_actor_id') and not PractitionerACL.validate_practitioner_exists(data['performer_actor_id']):
+            if data.get('performer_actor_id') and not Practitioner.objects.filter(practitioner_id=data['performer_actor_id']).exists():
                 raise ValidationError(f"Practitioner with ID {data['performer_actor_id']} not found")
             
             # Validate MedicationRequest exists if linked

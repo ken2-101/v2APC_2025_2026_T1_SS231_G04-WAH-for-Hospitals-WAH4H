@@ -20,7 +20,7 @@ External Dependencies (Read-Only ACLs):
     - admission.services.admission_acl (EncounterService, PatientACL)
     - pharmacy.services.pharmacy_acl (MedicationRequestACL, InventoryACL)
     - laboratory.services.laboratory_acl (LabReportACL, LabCatalogACL)
-    - accounts.services.accounts_acl (OrganizationACL)
+    - accounts.models (Organization - direct model access)
 
 Context: Philippine LGU Hospital System
 Author: Senior Python Backend Architect
@@ -57,7 +57,7 @@ from admission.services.admission_acl import EncounterACL
 from patients.services.patient_acl import get_patient_summary
 from pharmacy.services.pharmacy_acl import MedicationRequestACL, InventoryACL
 from laboratory.services.laboratory_acl import LabReportACL, LabCatalogACL
-from accounts.services.accounts_acl import OrganizationACL
+from accounts.models import Organization
 
 
 class InvoiceOrchestrator:
@@ -130,7 +130,7 @@ class InvoiceOrchestrator:
         patient_id = encounter_data.get('subject_id')
         
         # Validate issuer organization exists
-        if not OrganizationACL.validate_organization_exists(issuer_id):
+        if not Organization.objects.filter(organization_id=issuer_id).exists():
             raise ValidationError(
                 f"Organization with id={issuer_id} does not exist"
             )
@@ -369,7 +369,7 @@ class AccountService:
         owner_id = data.get('owner_id')
         if owner_id:
             # Check if it's an organization
-            if not OrganizationACL.validate_organization_exists(owner_id):
+            if not Organization.objects.filter(organization_id=owner_id).exists():
                 pass  # Could also be practitioner - graceful validation
         
         # Create account
@@ -494,7 +494,7 @@ class InvoiceService:
         # Validate issuer if provided
         issuer_id = data.get('issuer_id')
         if issuer_id:
-            if not OrganizationACL.validate_organization_exists(issuer_id):
+            if not Organization.objects.filter(organization_id=issuer_id).exists():
                 raise ValidationError(f"Organization with id {issuer_id} does not exist")
         
         # Create invoice
@@ -667,13 +667,13 @@ class ClaimService:
             raise ValidationError(f"Patient with id {patient_id} does not exist")
         
         # Fortress Pattern: Validate insurer organization exists via ACL
-        if not OrganizationACL.validate_organization_exists(insurer_id):
+        if not Organization.objects.filter(organization_id=insurer_id).exists():
             raise ValidationError(f"Insurer organization with id {insurer_id} does not exist")
         
         # Validate provider if provided
         provider_id = data.get('provider_id')
         if provider_id:
-            if not OrganizationACL.validate_organization_exists(provider_id):
+            if not Organization.objects.filter(organization_id=provider_id).exists():
                 raise ValidationError(f"Provider organization with id {provider_id} does not exist")
         
         # Create claim header
@@ -893,7 +893,7 @@ class PaymentService:
         # Validate payment issuer if provided
         payment_issuer_id = data.get('paymentIssuer_id')
         if payment_issuer_id:
-            if not OrganizationACL.validate_organization_exists(payment_issuer_id):
+            if not Organization.objects.filter(organization_id=payment_issuer_id).exists():
                 raise ValidationError(f"Payment issuer organization with id {payment_issuer_id} does not exist")
         
         # Create payment reconciliation header

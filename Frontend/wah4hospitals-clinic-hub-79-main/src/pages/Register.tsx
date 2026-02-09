@@ -236,10 +236,10 @@ const Register = () => {
       const apiBase = import.meta.env.LOCAL_8000 || 'http://127.0.0.1:8000';
 
       // 2. Construct the full URL
-      // We assume the endpoint is at /accounts/organizations/
+      // We assume the endpoint is at /api/accounts/organizations/
       // Ensure there are no double slashes except after the protocol
       const normalizedBase = apiBase.endsWith('/') ? apiBase.slice(0, -1) : apiBase;
-      const url = `${normalizedBase}/accounts/organizations/`;
+      const url = `${normalizedBase}/api/accounts/organizations/`;
 
       console.log('Fetching hospitals from:', url);
 

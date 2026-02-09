@@ -18,7 +18,40 @@ from django.core.exceptions import ObjectDoesNotExist
 
 from admission.models import Encounter, Procedure, ProcedurePerformer
 from patients.services.patient_acl import get_patient_summary
-from accounts.services.accounts_acl import PractitionerACL, LocationACL
+from accounts.models import Practitioner, Location
+
+
+# Helper functions to replace ACL methods
+def get_practitioner_summary(practitioner_id: int) -> Optional[Dict[str, Any]]:
+    """Get practitioner summary data."""
+    try:
+        practitioner = Practitioner.objects.get(practitioner_id=practitioner_id)
+        return {
+            'practitioner_id': practitioner.practitioner_id,
+            'identifier': practitioner.identifier,
+            'first_name': practitioner.first_name,
+            'middle_name': practitioner.middle_name,
+            'last_name': practitioner.last_name,
+            'full_name': f"{practitioner.first_name} {practitioner.last_name}",
+            'active': practitioner.active,
+        }
+    except ObjectDoesNotExist:
+        return None
+
+
+def get_location_summary(location_id: int) -> Optional[Dict[str, Any]]:
+    """Get location summary data."""
+    try:
+        location = Location.objects.get(location_id=location_id)
+        return {
+            'location_id': location.location_id,
+            'identifier': location.identifier,
+            'name': location.name,
+            'status': location.status,
+            'type_code': location.type_code,
+        }
+    except ObjectDoesNotExist:
+        return None
 
 
 class EncounterACL:
@@ -117,12 +150,12 @@ class EncounterACL:
             # Enrich with location data via ACL
             location_summary = None
             if encounter.location_id:
-                location_summary = LocationACL.get_location_summary(encounter.location_id)
+                location_summary = get_location_summary(encounter.location_id)
             
             # Enrich with practitioner data via ACL
             practitioner_summary = None
             if encounter.participant_individual_id:
-                practitioner_summary = PractitionerACL.get_practitioner_summary(
+                practitioner_summary = get_practitioner_summary(
                     encounter.participant_individual_id
                 )
             
@@ -219,12 +252,12 @@ class EncounterACL:
         # Enrich with location data via ACL
         location_summary = None
         if encounter.location_id:
-            location_summary = LocationACL.get_location_summary(encounter.location_id)
+            location_summary = get_location_summary(encounter.location_id)
         
         # Enrich with practitioner data via ACL
         practitioner_summary = None
         if encounter.participant_individual_id:
-            practitioner_summary = PractitionerACL.get_practitioner_summary(
+            practitioner_summary = get_practitioner_summary(
                 encounter.participant_individual_id
             )
         
@@ -369,7 +402,7 @@ class ProcedureACL:
             for performer in performers:
                 practitioner_summary = None
                 if performer.performer_actor_id:
-                    practitioner_summary = PractitionerACL.get_practitioner_summary(
+                    practitioner_summary = get_practitioner_summary(
                         performer.performer_actor_id
                     )
                 

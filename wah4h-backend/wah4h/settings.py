@@ -30,7 +30,7 @@ INSTALLED_APPS = [
 
     # Apps
     "patients",
-    "admissions",
+    "admission",
     "monitoring",
     "discharge",
     "accounts",

@@ -19,7 +19,7 @@ from django.core.exceptions import ValidationError, ObjectDoesNotExist
 
 from admission.models import Encounter, Procedure, ProcedurePerformer
 from patients.services.patient_acl import validate_patient_exists, get_patient_summary
-from accounts.services.accounts_acl import PractitionerACL, LocationACL
+from accounts.models import Practitioner, Location
 
 
 class EncounterService:
@@ -67,13 +67,13 @@ class EncounterService:
         # Validate practitioner if provided
         participant_id = data.get('participant_individual_id')
         if participant_id:
-            if not PractitionerACL.validate_practitioner_exists(participant_id):
+            if not Practitioner.objects.filter(practitioner_id=participant_id).exists():
                 raise ValidationError(f"Practitioner with ID {participant_id} does not exist")
         
         # Validate location if provided
         location_id = data.get('location_id')
         if location_id:
-            if not LocationACL.validate_location_exists(location_id):
+            if not Location.objects.filter(location_id=location_id).exists():
                 raise ValidationError(f"Location with ID {location_id} does not exist")
         
         if not data.get('identifier'):
@@ -137,7 +137,7 @@ class EncounterService:
         # Validate discharge destination if provided
         discharge_destination_id = data.get('discharge_destination_id')
         if discharge_destination_id:
-            if not LocationACL.validate_location_exists(discharge_destination_id):
+            if not Location.objects.filter(location_id=discharge_destination_id).exists():
                 raise ValidationError(f"Discharge destination with ID {discharge_destination_id} does not exist")
         
         # Update encounter status to finished
@@ -183,12 +183,12 @@ class EncounterService:
             if field in data:
                 # Validate location if being updated
                 if field == 'location_id' and data[field]:
-                    if not LocationACL.validate_location_exists(data[field]):
+                    if not Location.objects.filter(location_id=data[field]).exists():
                         raise ValidationError(f"Location with ID {data[field]} does not exist")
                 
                 # Validate practitioner if being updated
                 if field == 'participant_individual_id' and data[field]:
-                    if not PractitionerACL.validate_practitioner_exists(data[field]):
+                    if not Practitioner.objects.filter(practitioner_id=data[field]).exists():
                         raise ValidationError(f"Practitioner with ID {data[field]} does not exist")
                 
                 setattr(encounter, field, data[field])
@@ -289,7 +289,7 @@ class ProcedureService:
             
             # Validate practitioner if provided
             if performer_actor_id:
-                if not PractitionerACL.validate_practitioner_exists(performer_actor_id):
+                if not Practitioner.objects.filter(practitioner_id=performer_actor_id).exists():
                     raise ValidationError(f"Practitioner with ID {performer_actor_id} does not exist")
             
             ProcedurePerformer.objects.create(

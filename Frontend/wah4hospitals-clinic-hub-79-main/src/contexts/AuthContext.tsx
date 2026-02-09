@@ -168,7 +168,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginInitiate = async (email: string, password: string): Promise<AuthResult> => {
     setIsLoading(true);
     try {
-      await axiosInstance.post('/accounts/login/initiate/', {
+      await axiosInstance.post('/api/accounts/login/initiate/', {
         email,
         password,
       });
@@ -249,7 +249,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const passwordResetInitiate = async (email: string): Promise<AuthResult> => {
     setIsLoading(true);
     try {
-      await axiosInstance.post('/accounts/password-reset/initiate/', {
+      await axiosInstance.post('/api/accounts/password-reset/initiate/', {
         email,
       });
 
@@ -285,7 +285,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   ): Promise<AuthResult> => {
     setIsLoading(true);
     try {
-      await axiosInstance.post('/accounts/password-reset/confirm/', {
+      await axiosInstance.post('/api/accounts/password-reset/confirm/', {
         email,
         otp,
         new_password: newPassword,
@@ -323,7 +323,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   ): Promise<AuthResult> => {
     setIsLoading(true);
     try {
-      await axiosInstance.post('/accounts/change-password/', {
+      await axiosInstance.post('/api/accounts/change-password/', {
         current_password: currentPassword,
         new_password: newPassword,
         confirm_password: confirmPassword,
@@ -360,7 +360,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   ): Promise<AuthResult> => {
     setIsLoading(true);
     try {
-      await axiosInstance.post('/accounts/change-password/initiate/', {
+      await axiosInstance.post('/api/accounts/change-password/initiate/', {
         current_password: currentPassword,
         new_password: newPassword,
         confirm_password: confirmPassword,
@@ -393,7 +393,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const changePasswordVerify = async (otp: string): Promise<AuthResult> => {
     setIsLoading(true);
     try {
-      await axiosInstance.post('/accounts/change-password/verify/', {
+      await axiosInstance.post('/api/accounts/change-password/verify/', {
         otp: otp,
       });
 
@@ -425,7 +425,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
 
     try {
-      await axiosInstance.post('/accounts/register/initiate/', {
+      await axiosInstance.post('/api/accounts/register/initiate/', {
         identifier: data.identifier,
         first_name: data.firstName,
         middle_name: data.middleName || '',
@@ -470,7 +470,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
 
     try {
-      const res = await axiosInstance.post('/accounts/register/verify/', {
+      const res = await axiosInstance.post('/api/accounts/register/verify/', {
         email,
         otp,
       });
@@ -521,7 +521,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
 
     try {
-      await axiosInstance.post('/accounts/register/', {
+      await axiosInstance.post('/api/accounts/register/', {
         first_name: data.firstName,
         last_name: data.lastName,
         email: data.email,

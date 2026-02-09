@@ -22,7 +22,7 @@ from discharge.models import Discharge, Procedure, ProcedurePerformer
 # ACL Imports (Fortress Pattern - No direct model imports from other apps)
 from admission.services.admission_acl import EncounterACL
 from patients.services.patient_acl import validate_patient_exists, get_patient_summary
-from accounts.services.accounts_acl import PractitionerACL
+from accounts.models import Practitioner
 
 # Mock billing ACL - assume this exists in billing app
 # from billing.services.billing_acl import BillingACL
@@ -93,7 +93,7 @@ class ProcedureService:
         performers_data = data.get('performers', [])
         for performer in performers_data:
             actor_id = performer.get('performer_actor_id')
-            if actor_id and not PractitionerACL.validate_practitioner_exists(actor_id):
+            if actor_id and not Practitioner.objects.filter(practitioner_id=actor_id).exists():
                 raise ValidationError(f"Practitioner with id {actor_id} does not exist")
         
         # Create Procedure
@@ -226,7 +226,7 @@ class DischargeWorkflowService:
         
         # Validate physician if provided
         physician_id = data.get('physician_id')
-        if physician_id and not PractitionerACL.validate_practitioner_exists(physician_id):
+        if physician_id and not Practitioner.objects.filter(practitioner_id=physician_id).exists():
             raise ValidationError(f"Physician with id {physician_id} does not exist")
         
         # Create Discharge record with status 'in-progress'

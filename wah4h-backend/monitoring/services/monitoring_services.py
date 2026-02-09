@@ -20,7 +20,7 @@ from django.core.exceptions import ValidationError
 from monitoring.models import Observation, ObservationComponent, ChargeItem
 from patients.services.patient_acl import validate_patient_exists
 from admission.services.admission_acl import EncounterACL
-from accounts.services.accounts_acl import PractitionerACL, OrganizationACL
+from accounts.models import Practitioner, Organization
 
 
 class ObservationService:
@@ -92,7 +92,7 @@ class ObservationService:
         
         # Optional: Validate performer if provided
         if data.get('performer_id'):
-            if not PractitionerACL.validate_practitioner_exists(data['performer_id']):
+            if not Practitioner.objects.filter(practitioner_id=data['performer_id']).exists():
                 raise ValidationError(f"Invalid performer_id: {data['performer_id']}")
         
         # Create Observation header
@@ -296,20 +296,20 @@ class ChargeItemService:
         
         # Optional: Validate organizations if provided
         if data.get('performing_organization_id'):
-            if not OrganizationACL.validate_organization_exists(data['performing_organization_id']):
+            if not Organization.objects.filter(organization_id=data['performing_organization_id']).exists():
                 raise ValidationError(f"Invalid performing_organization_id: {data['performing_organization_id']}")
         
         if data.get('requesting_organization_id'):
-            if not OrganizationACL.validate_organization_exists(data['requesting_organization_id']):
+            if not Organization.objects.filter(organization_id=data['requesting_organization_id']).exists():
                 raise ValidationError(f"Invalid requesting_organization_id: {data['requesting_organization_id']}")
         
         # Optional: Validate practitioners if provided
         if data.get('performer_actor_id'):
-            if not PractitionerACL.validate_practitioner_exists(data['performer_actor_id']):
+            if not Practitioner.objects.filter(practitioner_id=data['performer_actor_id']).exists():
                 raise ValidationError(f"Invalid performer_actor_id: {data['performer_actor_id']}")
         
         if data.get('enterer_id'):
-            if not PractitionerACL.validate_practitioner_exists(data['enterer_id']):
+            if not Practitioner.objects.filter(practitioner_id=data['enterer_id']).exists():
                 raise ValidationError(f"Invalid enterer_id: {data['enterer_id']}")
         
         # Create ChargeItem
