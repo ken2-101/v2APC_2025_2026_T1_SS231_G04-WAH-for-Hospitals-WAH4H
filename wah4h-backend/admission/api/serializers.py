@@ -124,6 +124,7 @@ class EncounterListOutputSerializer(serializers.Serializer):
     room = serializers.CharField(allow_null=True)
     bed = serializers.CharField(allow_null=True)
     practitioner_summary = serializers.DictField(allow_null=True)
+    admit_source = serializers.CharField(allow_null=True)
 
 
 # ============================================================================

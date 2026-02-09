@@ -17,6 +17,8 @@ export interface Admission {
     };
     location_ids?: (string | number)[];
     physician: string;
+    physicianId?: number;
+    participant_individual_id?: number;
     serviceType: string;
     admissionDate: string;
     admissionTime?: string;
@@ -24,7 +26,6 @@ export interface Admission {
     
     // UI Aligned Fields
     encounterType: 'IMP' | 'EMER' | 'AMB' | 'HH';
-    diagnosis: string;
     reasonForAdmission: string;
     admitSource: string;
     preAdmissionIdentifier?: string;
@@ -33,9 +34,14 @@ export interface Admission {
     specialArrangements: string[];
     specialCourtesy: string[];
     
+    // Technical/Admin Fields (connected to model)
+    type: string;
+    participant_type: string;
+    diagnosis_rank: string;
+    diagnosis_use: string;
+    
     // Backend Raw fields (optional)
     class_field?: string;
-    type?: string;
     reason_code?: string;
     admit_source?: string;
     discharge_disposition?: string;
@@ -57,9 +63,9 @@ export interface NewAdmission {
     patientId: string; // Internal Patient ID or Subject ID
     patientName: string;
     admissionDate: string;
-    physician: string; // Name or ID
+    physician: string; // Name
+    physicianId?: number;
     serviceType: string;
-    diagnosis: string;
     priority: 'routine' | 'urgent' | 'emergency';
     location: {
         building: string;
@@ -72,6 +78,12 @@ export interface NewAdmission {
     dietPreference: string[];
     specialArrangements: string[];
     specialCourtesy: string[];
+    
+    // Technical/Admin Fields
+    type: string;
+    participant_type: string;
+    diagnosis_rank: string;
+    diagnosis_use: string;
     
     // Expanded fields for UI match
     encounterType: 'IMP' | 'EMER' | 'AMB' | 'HH';

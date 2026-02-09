@@ -41,6 +41,7 @@ export const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({
   onUpdate,
   onDelete,
 }) => {
+  const [currentAdmission, setCurrentAdmission] = useState<Admission | null>(admission);
   const [mode, setMode] = useState<'view' | 'edit' | 'delete'>('view');
   const [editData, setEditData] = useState<Admission | null>(admission);
   const [confirmText, setConfirmText] = useState('');
@@ -50,30 +51,52 @@ export const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({
   const [activeTab, setActiveTab] = useState<'medical' | 'tracking' | 'timeline'>('medical');
 
   const [locations, setLocations] = useState<any>(null);
+  const [practitioners, setPractitioners] = useState<any[]>([]);
   const [allAdmissions, setAllAdmissions] = useState<any[]>([]);
+  const [physicianSearch, setPhysicianSearch] = useState('');
+  const [showPhysicianResults, setShowPhysicianResults] = useState(false);
 
-  // Only reset editData when the admission itself changes
+  // Fetch fresh data whenever the modal opens or admission changes
   useEffect(() => {
-    if (admission) {
-      const safeLocation = admission.location || { building: '', ward: '', room: '', bed: '' };
-      setEditData({ ...admission, location: safeLocation });
+    if (isOpen && admission?.id) {
+      const fetchFullDetails = async () => {
+        setIsLoading(true);
+        try {
+          const freshData = await admissionService.getById(Number(admission.id));
+          setCurrentAdmission(freshData);
+          setEditData({ 
+            ...freshData, 
+            location: freshData.location || { building: '', ward: '', room: '', bed: '' } 
+          });
+        } catch (err) {
+          console.error("Failed to fetch accurate admission details", err);
+          // Fallback to prop data if fetch fails
+          setCurrentAdmission(admission);
+          setEditData({ ...admission, location: admission.location || { building: '', ward: '', room: '', bed: '' } });
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      fetchFullDetails();
+      
+      // Fetch support data
+      admissionService.getLocations().then(setLocations);
+      admissionService.getAll().then(setAllAdmissions);
+      admissionService.getPractitioners().then(setPractitioners);
     } else {
       setEditData(null);
+      setCurrentAdmission(null);
     }
+    
     setMode('view');
     setConfirmText('');
     setErrors({});
-    setIsLoading(false);
     setActiveTab('medical');
+  }, [isOpen, admission?.id]);
 
-    // Fetch locations for editing
-    if (admission) {
-       admissionService.getLocations().then(setLocations);
-       admissionService.getAll().then(setAllAdmissions);
-    }
-  }, [admission]);
-
-  if (!admission) return null;
+  const data = currentAdmission || admission;
+  if (!data) return null;
 
   const handleLocationChange = (level: string, value: string) => {
     if (!editData) return;
@@ -97,8 +120,8 @@ export const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({
     });
   };
 
-  const initials = admission.patient_summary?.full_name
-    ? admission.patient_summary.full_name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
+  const initials = data.patient_summary?.full_name
+    ? data.patient_summary.full_name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
     : 'NA';
 
   const handleEditChange = (field: keyof Admission, value: any) => {
@@ -130,8 +153,8 @@ export const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({
     if (confirmText !== 'DELETE') return;
     setIsLoading(true);
     try {
-      await admissionService.delete(Number(admission.id));
-      onDelete?.(Number(admission.id));
+      await admissionService.delete(Number(data.id));
+      onDelete?.(Number(data.id));
       onClose();
       alert('✅ Admission deleted successfully!');
     } catch (err: any) {
@@ -157,24 +180,24 @@ export const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({
       <div className="flex justify-between items-start">
         <div className="pr-20"> {/* Give space for absolute buttons */}
           <div className="flex items-center gap-3 mb-2 flex-wrap">
-            <h2 className="text-2xl font-bold uppercase tracking-wide">{admission.patient_summary?.full_name || 'UNKNOWN PATIENT'}</h2>
+            <h2 className="text-2xl font-bold uppercase tracking-wide">{data.patient_summary?.full_name || 'UNKNOWN PATIENT'}</h2>
             <div className="flex gap-2">
-              <StatusBadge status={admission.status} />
+              <StatusBadge status={data.status} />
             </div>
           </div>
           <div className="flex gap-4 text-sm mt-1 opacity-90">
-            <span>Patient ID: {admission.patientId || 'N/A'}</span>
+            <span>Patient ID: {data.patientId || 'N/A'}</span>
             <span>Age: 41</span>
             <span>Sex: Male</span>
           </div>
           <div className="flex gap-6 mt-4 text-sm font-medium">
             <div className="flex items-center gap-2">
               <Calendar className="w-4 h-4 opacity-80" />
-              Admission: {admission.admissionDate || admission.period_start ? new Date(admission.admissionDate || admission.period_start!).toLocaleString() : 'N/A'}
+              Admission: {data.admissionDate || data.period_start ? new Date(data.admissionDate || data.period_start!).toLocaleString() : 'N/A'}
             </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 rounded-full border border-white/40 flex items-center justify-center text-[10px]">D</div>
-              Duration: {getDuration(admission.admissionDate || admission.period_start)}
+              Duration: {getDuration(data.admissionDate || data.period_start)}
             </div>
           </div>
         </div>
@@ -189,13 +212,33 @@ export const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({
       <section>
         <h3 className="text-sm font-bold text-slate-900 mb-3 uppercase tracking-wide">Encounter Classification</h3>
         <Card className="border-0 shadow-sm bg-slate-50">
-          <CardContent className="p-4 grid grid-cols-2 gap-y-4 gap-x-8">
-            <div><span className="block text-xs font-bold text-slate-500 mb-1">Encounter Type</span><span className="font-medium text-slate-900">{admission.encounterType || 'Inpatient (IMP)'}</span></div>
-            <div><span className="block text-xs font-bold text-slate-500 mb-1">Service Type</span><span className="font-medium text-slate-900">{admission.serviceType || 'General'}</span></div>
-            <div><span className="block text-xs font-bold text-slate-500 mb-1">Status</span><span className="font-medium text-slate-900 uppercase">{admission.status || 'In Progress'}</span></div>
+          <CardContent className="p-4 grid grid-cols-2 lg:grid-cols-4 gap-y-4 gap-x-8">
+            <div><span className="block text-xs font-bold text-slate-500 mb-1">Encounter Type</span><span className="font-medium text-slate-900">{data.encounterType || 'Inpatient (IMP)'}</span></div>
+            <div><span className="block text-xs font-bold text-slate-500 mb-1">Service Type</span><span className="font-medium text-slate-900">{data.serviceType || 'General'}</span></div>
+            <div><span className="block text-xs font-bold text-slate-500 mb-1">Priority</span><span className={`font-bold uppercase ${data.priority === 'emergency' ? 'text-red-600' : data.priority === 'urgent' ? 'text-amber-600' : 'text-blue-600'}`}>{data.priority || 'Routine'}</span></div>
+            <div><span className="block text-xs font-bold text-slate-500 mb-1">Status</span><span className="font-medium text-slate-900 uppercase">{data.status || 'In Progress'}</span></div>
           </CardContent>
         </Card>
       </section>
+
+      {/* Discharge Details (Only show if finished) */}
+      {data.status === 'finished' && (
+        <section>
+          <h3 className="text-sm font-bold text-slate-900 mb-3 uppercase tracking-wide">Discharge Details</h3>
+          <Card className="border-0 shadow-sm bg-blue-50/50 border-l-4 border-l-blue-500">
+            <CardContent className="p-4 grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8">
+              <div>
+                <span className="block text-xs font-bold text-blue-500 mb-1 uppercase">Discharge Date</span>
+                <span className="font-bold text-slate-900">{data.dischargeDate ? new Date(data.dischargeDate).toLocaleString() : 'N/A'}</span>
+              </div>
+              <div>
+                <span className="block text-xs font-bold text-blue-500 mb-1 uppercase">Disposition</span>
+                <span className="font-medium text-slate-900">{data.discharge_disposition || 'Not specified'}</span>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+      )}
 
       {/* Admission Details */}
       <section>
@@ -203,16 +246,12 @@ export const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({
         <Card className="border-0 shadow-sm bg-slate-50">
           <CardContent className="p-4 grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8">
             <div className="col-span-full">
-               <span className="block text-xs font-bold text-slate-500 mb-1">Admission Diagnosis (ICD-10)</span>
-               <span className="font-medium text-slate-900 block">{admission.diagnosis || 'N/A'}</span>
+               <span className="block text-xs font-bold text-slate-500 mb-1">Reason for Admission / Diagnosis</span>
+               <span className="font-medium text-slate-900 break-words">{data.reasonForAdmission || 'N/A'}</span> 
             </div>
-            <div className="col-span-full">
-               <span className="block text-xs font-bold text-slate-500 mb-1">Reason for Admission</span>
-               <span className="font-medium text-slate-900 italic break-words">{admission.reasonForAdmission || 'N/A'}</span> 
-            </div>
-            <div><span className="block text-xs font-bold text-slate-500 mb-1">Admit Source</span><span className="font-medium text-slate-900">{admission.admitSource || 'N/A'}</span></div>
-            <div><span className="block text-xs font-bold text-slate-500 mb-1">Pre-Admission ID</span><span className="font-medium text-slate-900">{admission.preAdmissionIdentifier || 'None'}</span></div>
-            <div><span className="block text-xs font-bold text-slate-500 mb-1">Re-admission</span><span className="font-medium text-slate-900">{admission.isReadmission ? 'Yes' : 'No'}</span></div>
+            <div><span className="block text-xs font-bold text-slate-500 mb-1">Admit Source</span><span className="font-medium text-slate-900">{data.admitSource || 'N/A'}</span></div>
+            <div><span className="block text-xs font-bold text-slate-500 mb-1">Pre-Admission ID</span><span className="font-medium text-slate-900">{data.preAdmissionIdentifier || 'None'}</span></div>
+            <div><span className="block text-xs font-bold text-slate-500 mb-1">Re-admission</span><span className="font-medium text-slate-900">{data.isReadmission ? 'Yes' : 'No'}</span></div>
           </CardContent>
         </Card>
       </section>
@@ -225,24 +264,24 @@ export const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({
              <div>
                 <span className="block text-xs font-bold text-slate-500 mb-2">Diet Preference</span>
                 <div className="flex flex-wrap gap-1">
-                   {admission.dietPreference && admission.dietPreference.length > 0 ? (
-                      admission.dietPreference.map(d => <Badge key={d} variant="secondary" className="bg-slate-200 text-slate-700 font-medium text-[10px]">{d}</Badge>)
+                   {data.dietPreference && data.dietPreference.length > 0 ? (
+                      data.dietPreference.map(d => <Badge key={d} variant="secondary" className="bg-slate-200 text-slate-700 font-medium text-[10px]">{d}</Badge>)
                    ) : <span className="text-slate-400 text-sm">None selected</span>}
                 </div>
              </div>
              <div>
                 <span className="block text-xs font-bold text-slate-500 mb-2">Special Arrangements</span>
                 <div className="flex flex-wrap gap-1">
-                   {admission.specialArrangements && admission.specialArrangements.length > 0 ? (
-                      admission.specialArrangements.map(a => <Badge key={a} variant="secondary" className="bg-emerald-100 text-emerald-700 font-medium text-[10px]">{a}</Badge>)
+                   {data.specialArrangements && data.specialArrangements.length > 0 ? (
+                      data.specialArrangements.map(a => <Badge key={a} variant="secondary" className="bg-emerald-100 text-emerald-700 font-medium text-[10px]">{a}</Badge>)
                    ) : <span className="text-slate-400 text-sm">None selected</span>}
                 </div>
              </div>
              <div>
                 <span className="block text-xs font-bold text-slate-500 mb-2">Special Courtesy</span>
                 <div className="flex flex-wrap gap-1">
-                   {admission.specialCourtesy && admission.specialCourtesy.length > 0 ? (
-                      admission.specialCourtesy.map(c => <Badge key={c} variant="secondary" className="bg-amber-100 text-amber-700 font-medium text-[10px]">{c}</Badge>)
+                   {data.specialCourtesy && data.specialCourtesy.length > 0 ? (
+                      data.specialCourtesy.map(c => <Badge key={c} variant="secondary" className="bg-amber-100 text-amber-700 font-medium text-[10px]">{c}</Badge>)
                    ) : <span className="text-slate-400 text-sm">None selected</span>}
                 </div>
              </div>
@@ -266,30 +305,30 @@ export const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({
                   <div>
                      <span className="block text-xs font-bold text-slate-500 mb-1">Building</span>
                      <span className="text-lg font-medium text-slate-900">
-                        {admission.location?.building || 'Not Defined'}
+                        {data.location?.building || 'Not Defined'}
                      </span>
                   </div>
                   <div>
                      <span className="block text-xs font-bold text-slate-500 mb-1">Ward</span>
                      <span className="text-lg font-medium text-slate-900">
-                        {admission.location?.ward || 'Unassigned'}
+                        {data.location?.ward || 'Unassigned'}
                      </span>
                   </div>
                   <div>
                      <span className="block text-xs font-bold text-slate-500 mb-1">Room</span>
                      <span className="text-lg font-medium text-slate-900">
-                        {admission.location?.room || 'Unassigned'}
+                        {data.location?.room || 'Unassigned'}
                      </span>
                   </div>
                   <div>
                      <span className="block text-xs font-bold text-slate-500 mb-1">Bed</span>
                      <span className="text-lg font-medium text-slate-900">
-                        {admission.location?.bed || 'None'}
+                        {data.location?.bed || 'None'}
                      </span>
                   </div>
                </div>
                <div className="pt-4 border-t border-slate-200 text-xs text-slate-500">
-                  <span className="font-medium text-slate-700">Status: {admission.status || 'Active'}</span> • Admitted: {admission.admissionDate ? new Date(admission.admissionDate).toLocaleString() : 'N/A'}
+                  <span className="font-medium text-slate-700">Status: {data.status || 'Active'}</span> • Admitted: {data.admissionDate ? new Date(data.admissionDate).toLocaleString() : 'N/A'}
                </div>
             </CardContent>
          </Card>
@@ -302,10 +341,10 @@ export const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({
             <CardContent className="p-6">
                <div className="mb-2">
                   <span className="block text-xs font-bold text-slate-500 mb-1">Primary Physician</span>
-                  <div className="text-lg font-bold text-slate-900">{admission.physician || 'Unassigned'} <span className="text-sm font-normal text-slate-500">(Specialist)</span></div>
+                  <div className="text-lg font-bold text-slate-900">{data.physician || 'Unassigned'} <span className="text-sm font-normal text-slate-500">(Specialist)</span></div>
                </div>
                <div className="text-xs text-slate-500">
-                  Role: Attending • Since: {admission.admissionDate ? new Date(admission.admissionDate).toLocaleString() : 'N/A'}
+                  Role: Attending • Since: {data.admissionDate ? new Date(data.admissionDate).toLocaleString() : 'N/A'}
                </div>
             </CardContent>
          </Card>
@@ -334,19 +373,42 @@ export const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({
              <h4 className="font-bold text-slate-800 flex items-center gap-2 tracking-tight">
                 <Users className="w-4 h-4 text-blue-500"/> Attending Staff
              </h4>
-             <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+             <div className="bg-slate-50 p-6 rounded-xl border border-slate-100">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
                    <div className="space-y-2">
                       <label className="text-xs font-bold text-slate-500 mb-1 block uppercase tracking-wider">Primary Physician</label>
-                      <Input 
-                        value={editData?.physician || ''} 
-                        onChange={e => handleEditChange('physician', e.target.value)} 
-                        placeholder="e.g. Dr. John Smith"
-                        className="bg-white border-slate-200"
-                      />
+                      <select 
+                         className="w-full p-2.5 bg-white border border-slate-200 rounded-md text-sm outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-700"
+                         value={editData?.physicianId || ''}
+                         onChange={e => {
+                            const id = Number(e.target.value);
+                            const p = practitioners.find(prac => prac.practitioner_id === id);
+                            if (p) {
+                               handleEditChange('physician', `${p.first_name} ${p.last_name}`);
+                               handleEditChange('physicianId', p.practitioner_id);
+                            }
+                         }}
+                      >
+                         <option value="" disabled>Select Physician</option>
+                         {practitioners.map(p => (
+                            <option key={p.practitioner_id} value={p.practitioner_id}>
+                               {p.first_name} {p.last_name} ({p.user_role || 'Staff'})
+                            </option>
+                         ))}
+                      </select>
                    </div>
-                   <div className="flex justify-end pb-1">
-                      <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-0 h-8 flex items-center px-4">Attending specialist</Badge>
+                   <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-500 mb-1 block uppercase tracking-wider">Participant Role</label>
+                      <select 
+                        className="w-full p-2 border border-slate-200 rounded-md text-sm bg-white"
+                        value={editData?.participant_type || 'Primary Performer'}
+                        onChange={e => handleEditChange('participant_type', e.target.value)}
+                      >
+                         <option value="Primary Performer">Primary Performer</option>
+                         <option value="Consultant">Consultant</option>
+                         <option value="Referring Physician">Referring Physician</option>
+                         <option value="Admitting Physician">Admitting Physician</option>
+                      </select>
                    </div>
                 </div>
              </div>
@@ -357,9 +419,9 @@ export const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({
              <h4 className="font-bold text-slate-800 flex items-center gap-2 tracking-tight">
                 <Stethoscope className="w-4 h-4 text-purple-500"/> Encounter Classification
              </h4>
-             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50 p-6 rounded-xl border border-slate-100">
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 bg-slate-50 p-6 rounded-xl border border-slate-100">
                 <div className="space-y-2">
-                   <label className="text-xs font-bold text-slate-500 mb-1 block uppercase tracking-wider">Encounter Type</label>
+                   <label className="text-xs font-bold text-slate-500 mb-1 block uppercase tracking-wider">Encounter Class</label>
                    <select 
                       className="w-full p-2 border border-slate-200 rounded-md text-sm bg-white"
                       value={editData?.encounterType || ''}
@@ -369,6 +431,19 @@ export const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({
                       <option value="EMER">Emergency (EMER)</option>
                       <option value="AMB">Ambulatory (AMB)</option>
                       <option value="HH">Home Health (HH)</option>
+                   </select>
+                </div>
+                <div className="space-y-2">
+                   <label className="text-xs font-bold text-slate-500 mb-1 block uppercase tracking-wider">Encounter Sub-Type</label>
+                   <select 
+                      className="w-full p-2 border border-slate-200 rounded-md text-sm bg-white"
+                      value={editData?.type || 'admission'}
+                      onChange={e => handleEditChange('type', e.target.value)}
+                   >
+                      <option value="admission">Admission</option>
+                      <option value="transfer">Transfer</option>
+                      <option value="visit">Visit</option>
+                      <option value="consultation">Consultation</option>
                    </select>
                 </div>
                 <div className="space-y-2">
@@ -382,6 +457,18 @@ export const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({
                       <option value="Cardiology">Cardiology</option>
                       <option value="Surgery">Surgery</option>
                       <option value="Pediatrics">Pediatrics</option>
+                   </select>
+                </div>
+                <div className="space-y-2">
+                   <label className="text-xs font-bold text-slate-500 mb-1 block uppercase tracking-wider">Priority</label>
+                   <select 
+                      className="w-full p-2 border border-slate-200 rounded-md text-sm bg-white"
+                      value={editData?.priority || 'routine'}
+                      onChange={e => handleEditChange('priority', e.target.value)}
+                   >
+                      <option value="routine">Routine (R)</option>
+                      <option value="urgent">Urgent (UR)</option>
+                      <option value="emergency">Emergency (EM)</option>
                    </select>
                 </div>
                 <div className="space-y-2">
@@ -401,12 +488,35 @@ export const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({
                 </h4>
                 <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 space-y-4">
                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-500 mb-1 block uppercase tracking-wider">Admission Diagnosis (ICD-10)</label>
-                      <Input value={editData?.diagnosis || ''} onChange={e => handleEditChange('diagnosis', e.target.value)} placeholder="Pending" />
+                      <label className="text-xs font-bold text-slate-500 mb-1 block uppercase tracking-wider">Reason for Admission / Diagnosis</label>
+                      <Textarea value={editData?.reasonForAdmission || ''} onChange={e => handleEditChange('reasonForAdmission', e.target.value)} className="h-32" placeholder="Describe the clinical reason for admission or primary diagnosis..." />
                    </div>
-                   <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-500 mb-1 block uppercase tracking-wider">Reason for Admission</label>
-                      <Textarea value={editData?.reasonForAdmission || ''} onChange={e => handleEditChange('reasonForAdmission', e.target.value)} className="h-24" placeholder="Pending" />
+                   
+                   <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                         <label className="text-xs font-bold text-slate-500 mb-1 block uppercase tracking-wider">Diagnosis Rank</label>
+                         <select 
+                            className="w-full p-2 border border-slate-200 rounded-md text-sm bg-white"
+                            value={editData?.diagnosis_rank || '1'}
+                            onChange={e => handleEditChange('diagnosis_rank', e.target.value)}
+                         >
+                            <option value="1">Primary (1)</option>
+                            <option value="2">Secondary (2)</option>
+                            <option value="3">Tertiary (3)</option>
+                         </select>
+                      </div>
+                      <div className="space-y-2">
+                         <label className="text-xs font-bold text-slate-500 mb-1 block uppercase tracking-wider">Diagnosis Use</label>
+                         <select 
+                            className="w-full p-2 border border-slate-200 rounded-md text-sm bg-white"
+                            value={editData?.diagnosis_use || 'admission'}
+                            onChange={e => handleEditChange('diagnosis_use', e.target.value)}
+                         >
+                            <option value="admission">Admission</option>
+                            <option value="discharge">Discharge</option>
+                            <option value="billing">Billing</option>
+                         </select>
+                      </div>
                    </div>
                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -571,7 +681,23 @@ export const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({
                 <>
                     {/* Header View Extra Controls */}
                     <div className="absolute top-6 right-6 flex gap-2">
-                        <Button size="sm" variant="secondary" className="bg-white/20 hover:bg-white/30 text-white border-0 h-9 px-4" onClick={() => setMode('edit')}>
+                        <Button 
+                            size="sm" 
+                            variant="secondary" 
+                            className="bg-white/20 hover:bg-white/30 text-white border-0 h-9 px-4" 
+                            onClick={() => {
+                                if (admission) {
+                                    const safeLocation = {
+                                        building: admission.location?.building || '',
+                                        ward: admission.location?.ward || '',
+                                        room: admission.location?.room || '',
+                                        bed: admission.location?.bed || ''
+                                    };
+                                    setEditData({ ...admission, location: safeLocation });
+                                }
+                                setMode('edit');
+                            }}
+                        >
                             <Edit className="w-4 h-4 mr-2"/> Edit
                         </Button>
                         <Button 

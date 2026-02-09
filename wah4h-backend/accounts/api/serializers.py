@@ -272,6 +272,7 @@ class PractitionerOutputSerializer(serializers.ModelSerializer):
     license_number = serializers.CharField(source='qualification_identifier', read_only=True)
     user_id = serializers.SerializerMethodField()
     user_username = serializers.SerializerMethodField()
+    user_role = serializers.SerializerMethodField()
     qualification_issuer_name = serializers.CharField(
         source='qualification_issuer.name',
         read_only=True,
@@ -301,6 +302,7 @@ class PractitionerOutputSerializer(serializers.ModelSerializer):
             'qualification_period_end',
             'user_id',
             'user_username',
+            'user_role',
             'created_at',
             'updated_at',
         ]
@@ -321,6 +323,13 @@ class PractitionerOutputSerializer(serializers.ModelSerializer):
         """Return linked user username if exists"""
         try:
             return obj.user.username if hasattr(obj, 'user') and obj.user else None
+        except Exception:
+            return None
+
+    def get_user_role(self, obj):
+        """Return linked user role if exists"""
+        try:
+            return obj.user.role if hasattr(obj, 'user') and obj.user else None
         except Exception:
             return None
 

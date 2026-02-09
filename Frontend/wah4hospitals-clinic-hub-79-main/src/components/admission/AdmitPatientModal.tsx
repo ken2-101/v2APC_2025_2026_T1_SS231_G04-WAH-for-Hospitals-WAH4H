@@ -22,7 +22,6 @@ const INITIAL_FORM: NewAdmission = {
   admissionTime: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
   physician: '',
   serviceType: 'Internal Medicine',
-  diagnosis: '',
   reasonForAdmission: '',
   priority: 'routine',
   encounterType: 'IMP',
@@ -33,15 +32,14 @@ const INITIAL_FORM: NewAdmission = {
   isReadmission: false,
   dietPreference: [],
   specialArrangements: [],
-  specialCourtesy: []
+  specialCourtesy: [],
+  type: 'admission',
+  participant_type: 'Primary Performer',
+  diagnosis_rank: '1',
+  diagnosis_use: 'admission'
 };
 
-const MOCK_PHYSICIANS = [
-  { id: 1, name: "Dr. Ana Cruz", license: "MD-12345", dept: "Internal Medicine" },
-  { id: 2, name: "Dr. John Smith", license: "MD-67890", dept: "Cardiology" },
-  { id: 3, name: "Dr. Sarah Lee", license: "MD-11111", dept: "Pediatrics" },
-  { id: 4, name: "Dr. Mark Santos", license: "MD-22222", dept: "Surgery" },
-];
+// Removed MOCK_PHYSICIANS as we now fetch from the backend
 
 const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const [step, setStep] = useState(1);
@@ -50,6 +48,7 @@ const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({ isOpen, onClose, 
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [locations, setLocations] = useState<any>(null);
+  const [practitioners, setPractitioners] = useState<any[]>([]);
   const [physicianSearch, setPhysicianSearch] = useState('');
   const [showPhysicianResults, setShowPhysicianResults] = useState(false);
 
@@ -59,13 +58,15 @@ const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({ isOpen, onClose, 
     if (isOpen) {
       setStep(1); setFormData(INITIAL_FORM); setSearchQuery(''); setSearchResults([]);
       
-      // Fetch Locations and Admissions for real-time availability
+      // Fetch Locations, Admissions, and Practitioners
       Promise.all([
         admissionService.getLocations(),
-        admissionService.getAll()
-      ]).then(([locData, admData]) => {
+        admissionService.getAll(),
+        admissionService.getPractitioners()
+      ]).then(([locData, admData, pracData]) => {
           if (locData && locData.buildings) setLocations(locData);
           if (admData) setAdmissions(admData);
+          if (pracData) setPractitioners(pracData);
       });
 
       // Load initial patients
@@ -163,7 +164,13 @@ const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({ isOpen, onClose, 
               </div>
               
               <div className="space-y-3">
-                {searchResults.map(p => (
+                {searchResults
+                  .filter(p => !admissions.some(a => {
+                    const isSamePatient = String(a.subject_id) === String(p.id) || String(a.patientId) === String(p.patientId);
+                    const isActive = a.status !== 'finished' && a.status !== 'discharged' && a.status !== 'cancelled' && a.status !== 'discharged_disposition';
+                    return isSamePatient && isActive;
+                  }))
+                  .map(p => (
                   <div key={p.id} onClick={() => selectPatient(p)} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:border-blue-500 hover:shadow-md cursor-pointer transition-all flex items-center gap-4 group">
                     <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center font-bold text-slate-500 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
                       {p.name.charAt(0)}
@@ -265,13 +272,27 @@ const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({ isOpen, onClose, 
                  </div>
 
                  <div className="space-y-2">
-                   <label className="text-sm font-semibold text-slate-700">Admission Diagnosis (ICD-10)</label>
-                   <Input placeholder="Search ICD-10 code or description..." value={formData.diagnosis} onChange={e => setFormData({...formData, diagnosis: e.target.value})} className="bg-white" />
+                   <label className="text-sm font-semibold text-slate-700">Reason for Admission / Diagnosis <span className="text-red-500">*</span></label>
+                   <textarea className="w-full p-3 bg-white border border-slate-200 rounded-md h-32 outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm" placeholder="Describe the primary clinical reason or diagnosis..." value={formData.reasonForAdmission} onChange={e => setFormData({...formData, reasonForAdmission: e.target.value})} />
                  </div>
 
-                 <div className="space-y-2">
-                   <label className="text-sm font-semibold text-slate-700">Reason for Admission</label>
-                   <textarea className="w-full p-3 bg-white border border-slate-200 rounded-md h-24 outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm" placeholder="Describe the reason for admission..." value={formData.reasonForAdmission} onChange={e => setFormData({...formData, reasonForAdmission: e.target.value})} />
+                 <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                       <label className="text-sm font-semibold text-slate-700 font-bold text-xs uppercase text-slate-500">Diagnosis Rank</label>
+                       <select className="w-full p-2 bg-slate-50 border border-slate-200 rounded-md text-sm" value={formData.diagnosis_rank} onChange={e => setFormData({...formData, diagnosis_rank: e.target.value})}>
+                          <option value="1">Primary (1)</option>
+                          <option value="2">Secondary (2)</option>
+                          <option value="3">Tertiary (3)</option>
+                       </select>
+                    </div>
+                    <div className="space-y-2">
+                       <label className="text-sm font-semibold text-slate-700 font-bold text-xs uppercase text-slate-500">Diagnosis Use</label>
+                       <select className="w-full p-2 bg-slate-50 border border-slate-200 rounded-md text-sm" value={formData.diagnosis_use} onChange={e => setFormData({...formData, diagnosis_use: e.target.value})}>
+                          <option value="admission">Admission</option>
+                          <option value="discharge">Discharge</option>
+                          <option value="billing">Billing</option>
+                       </select>
+                    </div>
                  </div>
 
                  <div className="space-y-2">
@@ -311,44 +332,39 @@ const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({ isOpen, onClose, 
                  
                  <div className="space-y-2 relative">
                    <label className="text-sm font-semibold text-slate-700">Attending Physician <span className="text-red-500">*</span></label>
-                   {!formData.physician ? (
-                      <div className="relative">
-                        <Input 
-                          placeholder="Search physician name..." 
-                          value={physicianSearch} 
-                          onChange={e => { setPhysicianSearch(e.target.value); setShowPhysicianResults(true); }}
-                          onFocus={() => setShowPhysicianResults(true)}
-                          className="bg-white"
-                        />
-                        {showPhysicianResults && physicianSearch && (
-                          <div className="absolute top-full left-0 right-0 bg-white border border-slate-200 shadow-lg rounded-md mt-1 z-20 max-h-48 overflow-y-auto">
-                             {MOCK_PHYSICIANS.filter(p => p.name.toLowerCase().includes(physicianSearch.toLowerCase())).map(p => (
-                               <div key={p.id} onClick={() => { setFormData({...formData, physician: p.name}); setPhysicianSearch(''); setShowPhysicianResults(false); }} className="p-3 hover:bg-blue-50 cursor-pointer border-b last:border-0">
-                                 <div className="font-bold text-slate-900">{p.name}</div>
-                                 <div className="text-xs text-slate-500">{p.license} • {p.dept}</div>
-                               </div>
-                             ))}
-                             {MOCK_PHYSICIANS.filter(p => p.name.toLowerCase().includes(physicianSearch.toLowerCase())).length === 0 && (
-                               <div className="p-3 text-slate-400 text-sm">No physicians found.</div>
-                             )}
-                          </div>
-                        )}
-                      </div>
-                   ) : (
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex justify-between items-center">
-                        <div>
-                          <div className="font-bold text-blue-900">{formData.physician}</div>
-                          <div className="text-xs text-blue-600">Primary Performer</div>
-                        </div>
-                        <button onClick={() => setFormData({...formData, physician: ''})} className="text-blue-400 hover:text-blue-600"><X className="w-4 h-4" /></button>
-                      </div>
-                   )}
+                    <select 
+                       className="w-full p-3 bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                       value={formData.physicianId || ''}
+                       onChange={e => {
+                          const id = Number(e.target.value);
+                          const p = practitioners.find(prac => prac.practitioner_id === id);
+                          if (p) {
+                             setFormData({
+                                ...formData, 
+                                physician: `${p.first_name} ${p.last_name}`, 
+                                physicianId: p.practitioner_id
+                             });
+                          }
+                       }}
+                    >
+                       <option value="" disabled>Select Attending Physician</option>
+                       {practitioners.map(p => (
+                          <option key={p.practitioner_id} value={p.practitioner_id}>
+                             {p.first_name} {p.last_name} ({p.user_role || 'Staff'})
+                          </option>
+                       ))}
+                    </select>
                  </div>
 
                  <div className="space-y-2">
                    <label className="text-sm font-semibold text-slate-700">Participant Type</label>
-                   <Input value="Primary Performer" disabled className="bg-slate-50 text-slate-500" />
-                   <div className="text-xs text-slate-400">Auto-filled based on role</div>
+                   <select className="w-full p-3 bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" value={formData.participant_type} onChange={e => setFormData({...formData, participant_type: e.target.value})}>
+                      <option value="Primary Performer">Primary Performer</option>
+                      <option value="Consultant">Consultant</option>
+                      <option value="Referring Physician">Referring Physician</option>
+                      <option value="Admitting Physician">Admitting Physician</option>
+                   </select>
+                   <div className="text-xs text-slate-400">Specify the role of {formData.physician || 'the physician'}</div>
                  </div>
 
                  <button className="w-full py-2 border-2 border-dashed border-slate-300 rounded-lg text-slate-500 hover:border-blue-400 hover:text-blue-500 transition-all text-sm font-bold flex items-center justify-center gap-2">

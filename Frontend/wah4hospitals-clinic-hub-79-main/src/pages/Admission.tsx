@@ -205,6 +205,7 @@ const AdmissionPage = () => {
                     <th className="px-6 py-4">Admission #</th>
                     <th className="px-6 py-4">Date/Time</th>
                     <th className="px-6 py-4">Physician</th>
+                    <th className="px-6 py-4">Source</th>
                     <th className="px-6 py-4">Room/Bed</th>
                     <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
@@ -240,6 +241,11 @@ const AdmissionPage = () => {
                           <td className="px-6 py-4 align-top">
                               <div className="font-medium text-slate-900 text-sm">{p.physician}</div>
                               <div className="text-xs text-slate-400 mt-1">Attending</div>
+                          </td>
+
+                          {/* Source */}
+                          <td className="px-6 py-4 align-top">
+                              <div className="text-sm font-medium text-slate-700">{p.admitSource || 'N/A'}</div>
                           </td>
 
                           {/* Room/Bed */}

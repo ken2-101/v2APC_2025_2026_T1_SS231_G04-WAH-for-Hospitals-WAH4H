@@ -5,6 +5,23 @@ import type { Admission, NewAdmission } from "@/types/admission";
 export const admissionService = {
     
     /**
+     * Get Practitioners (Physicians)
+     */
+    async getPractitioners() {
+        try {
+            const response = await api.get('/api/accounts/practitioners/');
+            let data = response.data;
+            if (data.results && Array.isArray(data.results)) {
+                data = data.results;
+            }
+            return data;
+        } catch (error) {
+            console.error("Failed to fetch practitioners", error);
+            return [];
+        }
+    },
+
+    /**
      * Get Location Hierarchy
      */
     async getLocations() {
@@ -46,8 +63,7 @@ export const admissionService = {
                     admissionTime: d.period_start?.split('T')[1]?.slice(0,5) || '',
                     physician: d.practitioner_summary?.full_name || d.participant_name || "Unassigned",
                     serviceType: d.service_type || "General",
-                    diagnosis: d.reason_code || "Pending",
-                    reasonForAdmission: d.reason_code || '',
+                    reasonForAdmission: d.reason_code || 'Pending',
                     priority: d.priority || 'routine',
                     encounterType: d.class_field || 'IMP',
                     status: d.status,
@@ -63,7 +79,14 @@ export const admissionService = {
                     dietPreference: d.diet_preference ? d.diet_preference.split(',').filter(Boolean) : [],
                     specialArrangements: d.special_arrangement ? d.special_arrangement.split(',').filter(Boolean) : [],
                     specialCourtesy: d.special_courtesy ? d.special_courtesy.split(',').filter(Boolean) : [],
-                    location_ids: d.location_ids || []
+                    type: d.type || 'admission',
+                    participant_type: d.participant_type || 'Primary Performer',
+                    diagnosis_rank: d.diagnosis_rank || '1',
+                    diagnosis_use: d.diagnosis_use || 'admission',
+                    location_ids: d.location_ids || [],
+                    physicianId: d.participant_individual_id,
+                    participant_individual_id: d.participant_individual_id,
+                    subject_id: d.subject_id
                 } as Admission;
             });
         } catch (error) {
@@ -92,13 +115,15 @@ export const admissionService = {
         const payload = {
             subject_id: admission.patientId,
             class_field: admission.encounterType,
-            type: 'admission',
+            type: admission.type || 'admission',
+            participant_type: admission.participant_type,
+            diagnosis_rank: admission.diagnosis_rank,
+            diagnosis_use: admission.diagnosis_use,
             service_type: admission.serviceType,
             priority: admission.priority,
             period_start: `${admission.admissionDate}T${admission.admissionTime}:00Z`,
-            reason_code: admission.diagnosis || admission.reasonForAdmission,
-            // Default or selected physician ID mapping needed in real app
-            participant_individual_id: 1, 
+            reason_code: admission.reasonForAdmission,
+            participant_individual_id: admission.physicianId || 1, 
             location_id: null, 
             location_ids: admission.location_ids,
             // Save standardized location string
@@ -142,8 +167,7 @@ export const admissionService = {
             serviceType: data.service_type || '',
             admissionDate: data.period_start?.split('T')[0] || '',
             admissionTime: data.period_start?.split('T')[1]?.slice(0,5) || '',
-            diagnosis: data.reason_code || '',
-            reasonForAdmission: data.reason_code || '',
+            reasonForAdmission: data.reason_code || 'Pending',
             encounterType: data.class_field || 'IMP',
             admitSource: data.admit_source || 'Physician Referral',
             preAdmissionIdentifier: data.pre_admission_identifier || '',
@@ -151,7 +175,14 @@ export const admissionService = {
             dietPreference: data.diet_preference ? data.diet_preference.split(',').filter(Boolean) : [],
             specialArrangements: data.special_arrangement ? data.special_arrangement.split(',').filter(Boolean) : [],
             specialCourtesy: data.special_courtesy ? data.special_courtesy.split(',').filter(Boolean) : [],
-            location_ids: data.location_ids || []
+            type: data.type || 'admission',
+            participant_type: data.participant_type || 'Primary Performer',
+            diagnosis_rank: data.diagnosis_rank || '1',
+            diagnosis_use: data.diagnosis_use || 'admission',
+            location_ids: data.location_ids || [],
+            physicianId: data.participant_individual_id,
+            participant_individual_id: data.participant_individual_id,
+            subject_id: data.subject_id
         } as Admission;
     },
 
@@ -169,8 +200,8 @@ export const admissionService = {
             if ('priority' in admission) payload.priority = admission.priority;
             if ('preAdmissionIdentifier' in admission) payload.pre_admission_identifier = admission.preAdmissionIdentifier;
             
-            if ('diagnosis' in admission || 'reasonForAdmission' in admission) {
-                payload.reason_code = admission.diagnosis || admission.reasonForAdmission;
+            if ('reasonForAdmission' in admission) {
+                payload.reason_code = admission.reasonForAdmission;
             }
             if ('isReadmission' in admission) payload.re_admission = admission.isReadmission;
             if ('dietPreference' in admission && Array.isArray(admission.dietPreference)) {
@@ -215,8 +246,7 @@ export const admissionService = {
                 serviceType: data.service_type || '',
                 admissionDate: data.period_start?.split('T')[0] || '',
                 admissionTime: data.period_start?.split('T')[1]?.slice(0,5) || '',
-                diagnosis: data.reason_code || '',
-                reasonForAdmission: data.reason_code || '',
+                reasonForAdmission: data.reason_code || 'Pending',
                 encounterType: data.class_field || 'IMP',
                 admitSource: data.admit_source || 'Physician Referral',
                 preAdmissionIdentifier: data.pre_admission_identifier || '',
@@ -224,7 +254,14 @@ export const admissionService = {
                 dietPreference: data.diet_preference ? data.diet_preference.split(',').filter(Boolean) : [],
                 specialArrangements: data.special_arrangement ? data.special_arrangement.split(',').filter(Boolean) : [],
                 specialCourtesy: data.special_courtesy ? data.special_courtesy.split(',').filter(Boolean) : [],
-                location_ids: data.location_ids || []
+                type: data.type || 'admission',
+                participant_type: data.participant_type || 'Primary Performer',
+                diagnosis_rank: data.diagnosis_rank || '1',
+                diagnosis_use: data.diagnosis_use || 'admission',
+                location_ids: data.location_ids || [],
+                physicianId: data.participant_individual_id,
+                participant_individual_id: data.participant_individual_id,
+                subject_id: data.subject_id
             } as Admission;
         } catch (error) {
             console.error("Error updating admission", error);
