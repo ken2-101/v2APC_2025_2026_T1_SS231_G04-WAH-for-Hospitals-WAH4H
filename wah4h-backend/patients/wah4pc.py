@@ -1,23 +1,76 @@
 import requests
 import os
+import uuid
 
 URL = "https://wah4pc.echosphere.cfd"
 API_KEY = os.getenv("WAH4PC_API_KEY")
 PROVIDER_ID = os.getenv("WAH4PC_PROVIDER_ID")
 
 
-def request_patient(target_id, philhealth_id):
-    return requests.post(
-        f"{URL}/api/v1/fhir/request/Patient",
-        headers={"X-API-Key": API_KEY, "X-Provider-ID": PROVIDER_ID},
-        json={
-            "requesterId": PROVIDER_ID,
-            "targetId": target_id,
-            "identifiers": [
-                {"system": "http://philhealth.gov.ph", "value": philhealth_id}
-            ],
-        },
-    ).json()
+def request_patient(target_id, philhealth_id, idempotency_key=None):
+    """Request patient data from another provider via WAH4PC gateway.
+
+    Args:
+        target_id: Target provider UUID
+        philhealth_id: PhilHealth ID to search for
+        idempotency_key: Optional idempotency key for retry safety (generated if not provided)
+
+    Returns:
+        dict: Response with 'data' key on success, or 'error' and 'status_code' on failure
+    """
+    if not idempotency_key:
+        idempotency_key = str(uuid.uuid4())
+
+    try:
+        response = requests.post(
+            f"{URL}/api/v1/fhir/request/Patient",
+            headers={
+                "X-API-Key": API_KEY,
+                "X-Provider-ID": PROVIDER_ID,
+                "Idempotency-Key": idempotency_key,
+            },
+            json={
+                "requesterId": PROVIDER_ID,
+                "targetId": target_id,
+                "identifiers": [
+                    {"system": "http://philhealth.gov.ph", "value": philhealth_id}
+                ],
+            },
+        )
+
+        # Handle specific error codes
+        if response.status_code == 409:
+            return {
+                'error': 'Request in progress, retry later',
+                'status_code': 409,
+                'idempotency_key': idempotency_key
+            }
+
+        if response.status_code == 429:
+            return {
+                'error': 'Rate limit exceeded or duplicate request',
+                'status_code': 429,
+                'idempotency_key': idempotency_key
+            }
+
+        if response.status_code >= 400:
+            error_msg = response.json().get('error', 'Unknown error') if response.text else 'Unknown error'
+            return {
+                'error': error_msg,
+                'status_code': response.status_code,
+                'idempotency_key': idempotency_key
+            }
+
+        result = response.json()
+        result['idempotency_key'] = idempotency_key
+        return result
+
+    except requests.RequestException as e:
+        return {
+            'error': f'Network error: {str(e)}',
+            'status_code': 500,
+            'idempotency_key': idempotency_key
+        }
 
 
 def patient_to_fhir(patient):
@@ -151,17 +204,69 @@ def patient_to_fhir(patient):
     return {k: v for k, v in fhir.items() if v is not None}
 
 
-def push_patient(target_id, patient):
-    return requests.post(
-        f"{URL}/api/v1/fhir/push/Patient",
-        headers={"X-API-Key": API_KEY, "X-Provider-ID": PROVIDER_ID},
-        json={
-            "senderId": PROVIDER_ID,
-            "targetId": target_id,
-            "resourceType": "Patient",
-            "data": patient_to_fhir(patient),
-        },
-    ).json()
+def push_patient(target_id, patient, idempotency_key=None):
+    """Push patient data to another provider via WAH4PC gateway.
+
+    Args:
+        target_id: Target provider UUID
+        patient: Patient model instance
+        idempotency_key: Optional idempotency key for retry safety (generated if not provided)
+
+    Returns:
+        dict: Response with transaction data on success, or 'error' and 'status_code' on failure
+    """
+    if not idempotency_key:
+        idempotency_key = str(uuid.uuid4())
+
+    try:
+        response = requests.post(
+            f"{URL}/api/v1/fhir/push/Patient",
+            headers={
+                "X-API-Key": API_KEY,
+                "X-Provider-ID": PROVIDER_ID,
+                "Idempotency-Key": idempotency_key,
+            },
+            json={
+                "senderId": PROVIDER_ID,
+                "targetId": target_id,
+                "resourceType": "Patient",
+                "data": patient_to_fhir(patient),
+            },
+        )
+
+        # Handle specific error codes
+        if response.status_code == 409:
+            return {
+                'error': 'Request in progress, retry later',
+                'status_code': 409,
+                'idempotency_key': idempotency_key
+            }
+
+        if response.status_code == 429:
+            return {
+                'error': 'Rate limit exceeded or duplicate request',
+                'status_code': 429,
+                'idempotency_key': idempotency_key
+            }
+
+        if response.status_code >= 400:
+            error_msg = response.json().get('error', 'Unknown error') if response.text else 'Unknown error'
+            return {
+                'error': error_msg,
+                'status_code': response.status_code,
+                'idempotency_key': idempotency_key
+            }
+
+        result = response.json()
+        result['idempotency_key'] = idempotency_key
+        return result
+
+    except requests.RequestException as e:
+        return {
+            'error': f'Network error: {str(e)}',
+            'status_code': 500,
+            'idempotency_key': idempotency_key
+        }
 
 
 def _get_extension(extensions, url):

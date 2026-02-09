@@ -618,15 +618,28 @@ def fetch_wah4pc(request):
             {'error': 'targetProviderId and philHealthId are required'},
             status=status.HTTP_400_BAD_REQUEST,
         )
+
     result = request_patient(target_id, philhealth_id)
-    txn_id = result.get('id')
+
+    # Handle error responses
+    if 'error' in result:
+        return Response(
+            {'error': result['error']},
+            status=result.get('status_code', 500)
+        )
+
+    txn_id = result.get('data', {}).get('id') if 'data' in result else result.get('id')
+    idempotency_key = result.get('idempotency_key')
+
     if txn_id:
         WAH4PCTransaction.objects.create(
             transaction_id=txn_id,
             type='fetch',
             status='PENDING',
             target_provider_id=target_id,
+            idempotency_key=idempotency_key,
         )
+
     return Response(result, status=status.HTTP_202_ACCEPTED)
 
 
@@ -670,16 +683,29 @@ def send_to_wah4pc(request):
         patient = Patient.objects.get(id=patient_id)
     except Patient.DoesNotExist:
         return Response({'error': 'Patient not found'}, status=status.HTTP_404_NOT_FOUND)
+
     result = push_patient(target_id, patient)
+
+    # Handle error responses
+    if 'error' in result:
+        return Response(
+            {'error': result['error']},
+            status=result.get('status_code', 500)
+        )
+
     txn_id = result.get('id')
+    idempotency_key = result.get('idempotency_key')
+
     if txn_id:
         WAH4PCTransaction.objects.create(
             transaction_id=txn_id,
             type='send',
-            status='PENDING',
+            status=result.get('status', 'PENDING'),
             patient_id=patient.id,
             target_provider_id=target_id,
+            idempotency_key=idempotency_key,
         )
+
     return Response(result, status=status.HTTP_202_ACCEPTED)
 
 
@@ -732,11 +758,28 @@ def webhook_process_query(request):
 
 @api_view(['GET'])
 def list_transactions(request):
-    """List WAH4PC transactions, optionally filtered by patient_id."""
-    patient_id = request.query_params.get('patient_id')
+    """List WAH4PC transactions with optional filters.
+
+    Query params:
+        patient_id: Filter by patient ID
+        status: Filter by transaction status (PENDING, COMPLETED, FAILED, etc.)
+        type: Filter by transaction type (fetch, send)
+    """
     txns = WAH4PCTransaction.objects.all().order_by('-created_at')
+
+    # Apply filters
+    patient_id = request.query_params.get('patient_id')
     if patient_id:
         txns = txns.filter(patient_id=patient_id)
+
+    status_filter = request.query_params.get('status')
+    if status_filter:
+        txns = txns.filter(status=status_filter)
+
+    type_filter = request.query_params.get('type')
+    if type_filter:
+        txns = txns.filter(type=type_filter)
+
     return Response([
         {
             'id': t.transaction_id,
@@ -744,8 +787,40 @@ def list_transactions(request):
             'status': t.status,
             'patientId': t.patient_id,
             'targetProviderId': t.target_provider_id,
-            'errorMessage': t.error_message,
+            'error': t.error_message,
             'createdAt': t.created_at,
+            'updatedAt': t.updated_at,
         }
         for t in txns
     ])
+
+
+@api_view(['GET'])
+def get_transaction(request, transaction_id):
+    """Get detailed information about a specific WAH4PC transaction.
+
+    Args:
+        transaction_id: The transaction ID to retrieve
+
+    Returns:
+        Transaction details including idempotency key
+    """
+    try:
+        txn = WAH4PCTransaction.objects.get(transaction_id=transaction_id)
+    except WAH4PCTransaction.DoesNotExist:
+        return Response(
+            {'error': 'Transaction not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    return Response({
+        'id': txn.transaction_id,
+        'type': txn.type,
+        'status': txn.status,
+        'patientId': txn.patient_id,
+        'targetProviderId': txn.target_provider_id,
+        'error': txn.error_message,
+        'idempotencyKey': txn.idempotency_key,
+        'createdAt': txn.created_at,
+        'updatedAt': txn.updated_at,
+    })

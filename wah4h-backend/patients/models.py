@@ -353,6 +353,7 @@ class WAH4PCTransaction(TimeStampedModel):
     patient_id = models.IntegerField(null=True, blank=True)
     target_provider_id = models.CharField(max_length=255, null=True, blank=True)
     error_message = models.TextField(null=True, blank=True)
+    idempotency_key = models.CharField(max_length=255, null=True, blank=True, db_index=True)
 
     class Meta:
         db_table = 'wah4pc_transaction'
