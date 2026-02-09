@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import {
   Card,
   CardContent,
@@ -19,22 +18,19 @@ import {
 } from '@/components/ui/select';
 import { AlertCircle, Utensils, Activity, Edit } from 'lucide-react';
 import { DietaryOrder } from '../../types/monitoring';
+import monitoringService from '../../services/monitoringService';
+import { toast } from 'sonner';
 
 interface DietaryTabProps {
   admissionId: string;
+  patientId: number; // Added for service call
   order?: DietaryOrder;
   onSaved?: (order: DietaryOrder) => void;
 }
 
-const API_BASE =
-  import.meta.env.BACKEND_MONITORING_8000
-    ? `${import.meta.env.BACKEND_MONITORING_8000}monitoring/dietary-orders/`
-    : import.meta.env.LOCAL_8000
-      ? `${import.meta.env.LOCAL_8000}/api/monitoring/dietary-orders/`
-      : `${import.meta.env.BACKEND_MONITORING}monitoring/dietary-orders/`;
-
 export const DietaryTab: React.FC<DietaryTabProps> = ({
   admissionId,
+  patientId,
   order: initialOrder,
   onSaved,
 }) => {
@@ -53,26 +49,13 @@ export const DietaryTab: React.FC<DietaryTabProps> = ({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Helper: convert backend response to frontend format
-  const mapBackendOrder = (data: any): DietaryOrder => ({
-    id: data.id,
-    admissionId: data.admission,
-    dietType: data.diet_type,
-    allergies: data.allergies,
-    npoResponse: data.npo_response,
-    activityLevel: data.activity_level,
-    orderedBy: data.ordered_by,
-    lastUpdated: data.last_updated,
-  });
-
-  // Always fetch latest order from backend
+  // Fetch latest order from backend using service
   useEffect(() => {
     const fetchOrder = async () => {
       setLoading(true);
       try {
-        const res = await axios.get(`${API_BASE}?admission=${admissionId}`);
-        if (res.data.length > 0) {
-          const orderData = mapBackendOrder(res.data[0]);
+        const orderData = await monitoringService.getDietary(Number(admissionId));
+        if (orderData) {
           setCurrentOrder(orderData);
           setDietType(orderData.dietType);
           setAllergies(orderData.allergies.join(', '));
@@ -86,6 +69,7 @@ export const DietaryTab: React.FC<DietaryTabProps> = ({
         }
       } catch (err) {
         console.error('Failed to fetch dietary order:', err);
+        toast.error('Failed to load dietary order');
       } finally {
         setLoading(false);
       }
@@ -95,42 +79,30 @@ export const DietaryTab: React.FC<DietaryTabProps> = ({
   }, [admissionId]);
 
   const handleSave = async () => {
-    const payload = {
-      admission: Number(admissionId),
-      diet_type: dietType,
+    const orderData: DietaryOrder = {
+      id: currentOrder?.id,
+      admissionId,
+      dietType,
       allergies: allergies
         ? allergies.split(',').map(a => a.trim()).filter(Boolean)
         : [],
-      npo_response: isNPO,
-      activity_level: activityLevel,
-      ordered_by: 'Dr. Current User',
+      npoResponse: isNPO,
+      activityLevel,
+      orderedBy: 'Dr. Current User', // TODO: Get from auth context
+      lastUpdated: new Date().toISOString(),
     };
 
     try {
       setSaving(true);
-      let res;
-      if (currentOrder?.id) {
-        res = await axios.put(`${API_BASE}${currentOrder.id}/`, payload);
-      } else {
-        res = await axios.post(API_BASE, payload);
-      }
-
-      const updatedOrder = mapBackendOrder(res.data);
-      setCurrentOrder(updatedOrder);
-      setDietType(updatedOrder.dietType);
-      setAllergies(updatedOrder.allergies.join(', '));
-      setIsNPO(updatedOrder.npoResponse);
-      setActivityLevel(updatedOrder.activityLevel);
-      setOrderedBy(updatedOrder.orderedBy);
-      setLastUpdated(updatedOrder.lastUpdated);
-      onSaved?.(updatedOrder);
+      await monitoringService.saveDietary(orderData, patientId);
+      
+      setCurrentOrder(orderData);
+      onSaved?.(orderData);
       setIsEditing(false);
+      toast.success('Dietary order saved successfully');
     } catch (err: any) {
-      console.error('Dietary save failed:', err.response?.data);
-      alert(
-        'Failed to save dietary order:\n' +
-        JSON.stringify(err.response?.data, null, 2)
-      );
+      console.error('Dietary save failed:', err);
+      toast.error('Failed to save dietary order. Please try again.');
     } finally {
       setSaving(false);
     }

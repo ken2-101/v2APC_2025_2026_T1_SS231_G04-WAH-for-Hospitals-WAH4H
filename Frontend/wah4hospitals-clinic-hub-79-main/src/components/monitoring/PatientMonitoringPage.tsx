@@ -144,6 +144,7 @@ export const PatientMonitoringPage: React.FC<PatientMonitoringPageProps> = ({
                 <TabsContent value="notes" className="mt-6">
                     <ClinicalNotesTab
                         admissionId={patient.id.toString()}
+                        patientId={patient.patientId}
                         notes={notes}
                         onAddNote={onAddNote}
                     />
@@ -152,13 +153,14 @@ export const PatientMonitoringPage: React.FC<PatientMonitoringPageProps> = ({
                 <TabsContent value="dietary" className="mt-6">
                     <DietaryTab
                         admissionId={patient.id.toString()}
+                        patientId={patient.patientId}
                         order={dietaryOrder ?? defaultDietaryOrder}
                         onSaved={onUpdateDietary}
                     />
                 </TabsContent>
 
                 <TabsContent value="medication" className="mt-6">
-                    <MedicationRequestTab admissionId={patient.id.toString()} />
+                    <MedicationRequestTab admissionId={patient.id.toString()} patientId={patient.patientId.toString()} />
                 </TabsContent>
 
                 <TabsContent value="history" className="mt-6">

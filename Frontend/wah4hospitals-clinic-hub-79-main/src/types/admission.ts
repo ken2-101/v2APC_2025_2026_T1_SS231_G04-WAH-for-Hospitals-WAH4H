@@ -1,40 +1,76 @@
 // src/types/admission.ts
 
+/**
+ * Matches EncounterOutputSerializer in backend
+ * Represents a read-only View/DTO of an admission.
+ */
 export interface Admission {
-    id: string; // database ID
-    admission_id: string; // pre-generated ID from backend
-    patient: string; // ID of the patient
-    patient_details?: any; // optional nested patient info
-    admission_date: string;
-    attending_physician: string;
-    assigned_nurse: string; // added since backend provides this
-    ward: string;
-    room: string;
-    bed: string;
-    status: 'Active' | 'Discharged' | 'Transferred';
-    encounter_type: string; // can be 'Inpatient' or ICD-10 etc.
-    admitting_diagnosis: string;
-    reason_for_admission: string;
-    admission_category: 'Emergency' | 'Regular';
-    mode_of_arrival: 'Walk-in' | 'Ambulance' | 'Referral';
-    created_at?: string;
-    updated_at?: string;
+    encounter_id: number;
+    identifier: string;
+    status: string;
+    class_field: string;
+    type?: string | null;
+    service_type?: string | null;
+    priority?: string | null;
+    
+    subject_id: number;
+    patient_summary?: {
+        id?: number;
+        patient_id?: string;
+        full_name?: string;
+        first_name?: string;
+        last_name?: string;
+        gender?: string;
+        birthdate?: string;
+        [key: string]: any;
+    } | null;
+    
+    period_start?: string | null;
+    period_end?: string | null;
+    
+    reason_code?: string | null;
+    admit_source?: string | null;
+    discharge_disposition?: string | null;
+    
+    location_id?: number | null;
+    location_summary?: {
+        id?: number;
+        name?: string;
+        [key: string]: any;
+    } | null;
+    
+    participant_individual_id?: number | null;
+    practitioner_summary?: {
+        id?: number;
+        full_name?: string;
+        name?: string;
+        [key: string]: any;
+    } | null;
+    
+    created_at?: string | null;
+    updated_at?: string | null;
 }
 
-// Type used when creating a new admission (id and patient_details are not needed)
-export type NewAdmission = Omit<Admission, 'id' | 'patient_details' | 'admission_id'>;
-
-export interface Bed {
-    id: string;
-    number: string;
-    isOccupied: boolean;
+/**
+ * Matches EncounterInputSerializer in backend
+ * Payload for creating a new admission.
+ */
+export interface NewAdmission {
+    subject_id: number;
+    class_field?: string;
+    type?: string | null;
+    service_type?: string | null;
+    priority?: string | null;
+    reason_code?: string | null;
+    
+    period_start?: string | null;
+    location_id?: number | null;
+    participant_individual_id?: number | null;
+    participant_type?: string | null;
+    
+    admit_source?: string | null;
+    account_id?: number | null;
+    pre_admission_identifier?: string | null;
+    location_status?: string | null;
 }
 
-export interface Room {
-    id: string;
-    number: string;
-    ward: string;
-    capacity: number;
-    occupied: number;
-    beds: Bed[];
-}

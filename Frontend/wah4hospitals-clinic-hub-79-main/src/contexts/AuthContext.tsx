@@ -119,7 +119,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const refreshToken = localStorage.getItem('refreshToken');
         if (refreshToken) {
           try {
-            const response = await axios.post(`${API_BASE_URL}/accounts/token/refresh/`, {
+            const response = await axios.post(`${API_BASE_URL}/api/accounts/token/refresh/`, {
               refresh: refreshToken,
             });
 

@@ -1,240 +1,671 @@
 from django.db import models
-from django.utils import timezone
-from django.core.exceptions import ValidationError
-from patients.models import Patient
-from admissions.models import Admission
+from core.models import FHIRResourceModel
 
 
-class BillingRecord(models.Model):
-    """Main billing record for a patient admission"""
-    patient = models.ForeignKey(
-        Patient,
-        on_delete=models.CASCADE,
-        related_name='billing_records'
-    )
-    admission = models.ForeignKey(
-        Admission,
-        on_delete=models.CASCADE,
-        related_name='billing_records',
-        null=True,
-        blank=True
-    )
-    
-    # Patient Information
-    patient_name = models.CharField(max_length=200)
-    hospital_id = models.CharField(max_length=50)
-    admission_date = models.DateField()
-    discharge_date = models.DateField()
-    room_ward = models.CharField(max_length=100)
-    
-    # Room Charges
-    room_type = models.CharField(max_length=50)
-    number_of_days = models.IntegerField(default=0)
-    rate_per_day = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    
-    # Professional Fees
-    attending_physician_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    specialist_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    surgeon_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    other_professional_fees = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    
-    # Dietary Charges
-    diet_type = models.CharField(max_length=100, blank=True)
-    meals_per_day = models.IntegerField(default=0)
-    diet_duration = models.IntegerField(default=0)
-    cost_per_meal = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    
-    # Other Charges
-    supplies_charge = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    procedure_charge = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    nursing_charge = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    miscellaneous_charge = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    
-    # Discounts
-    discount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    philhealth_coverage = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    
-    # Discount Flags
-    is_senior = models.BooleanField(default=False)
-    is_pwd = models.BooleanField(default=False)
-    is_philhealth_member = models.BooleanField(default=False)
-    
-    # Status
-    is_finalized = models.BooleanField(default=False)
-    finalized_date = models.DateTimeField(null=True, blank=True)
-    
-    # Metadata
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    def __str__(self):
-        return f"Billing Record {self.id} - {self.patient_name}"
-    
-    def clean(self):
-        """Validate that only one discount flag is set at a time"""
-        super().clean()
-        discount_flags = [self.is_senior, self.is_pwd, self.is_philhealth_member]
-        active_discounts = sum(1 for flag in discount_flags if flag)
-        
-        if active_discounts > 1:
-            raise ValidationError(
-                'Only one discount type can be selected at a time. '
-                'Please choose either Senior Citizen, PWD, or PhilHealth Member.'
-            )
-    
-    def save(self, *args, **kwargs):
-        """Override save to run validation"""
-        self.full_clean()
-        super().save(*args, **kwargs)
-    
-    @property
-    def total_room_charge(self):
-        return self.number_of_days * self.rate_per_day
-    
-    @property
-    def total_professional_fees(self):
-        return (
-            self.attending_physician_fee +
-            self.specialist_fee +
-            self.surgeon_fee +
-            self.other_professional_fees
-        )
-    
-    @property
-    def total_dietary_charge(self):
-        return self.meals_per_day * self.diet_duration * self.cost_per_meal
-    
-    @property
-    def subtotal(self):
-        medicine_total = sum(m.total_cost for m in self.medicines.all())
-        diagnostic_total = sum(d.cost for d in self.diagnostics.all())
-        
-        return (
-            self.total_room_charge +
-            self.total_professional_fees +
-            medicine_total +
-            self.total_dietary_charge +
-            diagnostic_total +
-            self.supplies_charge +
-            self.procedure_charge +
-            self.nursing_charge +
-            self.miscellaneous_charge
-        )
-    
-    @property
-    def total_amount(self):
-        return self.subtotal - self.discount - self.philhealth_coverage
-    
-    @property
-    def running_balance(self):
-        """Calculate running balance after payments"""
-        total_paid = sum(p.amount for p in self.payments.all())
-        balance = self.total_amount - total_paid
-        # Prevent negative balance (overpayment results in 0 balance)
-        return max(0, balance)
-    
-    @property
-    def payment_status(self):
-        """Determine payment status based on payments"""
-        balance = self.running_balance
-        if balance <= 0:
-            return 'Paid'
-        elif balance < self.total_amount:
-            return 'Partial'
-        else:
-            return 'Pending'
+# ============================================================================
+# FHIR BILLING RESOURCES - NORMALIZED SCHEMA
+# ============================================================================
 
 
-class MedicineItem(models.Model):
-    """Medicine items for a billing record"""
-    billing_record = models.ForeignKey(
-        BillingRecord,
-        on_delete=models.CASCADE,
-        related_name='medicines'
-    )
-    name = models.CharField(max_length=200)
-    dosage = models.CharField(max_length=100)
-    quantity = models.IntegerField(default=1)
-    unit_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    
-    created_at = models.DateTimeField(default=timezone.now)
-    
-    def __str__(self):
-        return f"{self.name} - {self.dosage}"
-    
-    @property
-    def total_cost(self):
-        return self.quantity * self.unit_price
-
-
-class DiagnosticItem(models.Model):
-    """Diagnostic/Laboratory items for a billing record"""
-    billing_record = models.ForeignKey(
-        BillingRecord,
-        on_delete=models.CASCADE,
-        related_name='diagnostics'
-    )
-    name = models.CharField(max_length=200)
-    cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    
-    created_at = models.DateTimeField(default=timezone.now)
-    
-    def __str__(self):
-        return self.name
-
-
-class Payment(models.Model):
-    """Payment records for billing"""
-    PAYMENT_METHOD_CHOICES = [
-        ('Cash', 'Cash'),
-        ('Credit Card', 'Credit Card'),
-        ('Debit Card', 'Debit Card'),
-        ('Bank Transfer', 'Bank Transfer'),
-        ('Check', 'Check'),
-        ('PhilHealth', 'PhilHealth'),
-        ('HMO', 'HMO'),
-    ]
-    
-    billing_record = models.ForeignKey(
-        BillingRecord,
-        on_delete=models.CASCADE,
-        related_name='payments'
-    )
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
-    payment_method = models.CharField(max_length=50, choices=PAYMENT_METHOD_CHOICES)
-    or_number = models.CharField(max_length=50, unique=True, editable=False)
-    cashier = models.CharField(max_length=100)
-    payment_date = models.DateField()
-    
-    created_at = models.DateTimeField(default=timezone.now)
-    
-    def save(self, *args, **kwargs):
-        if not self.or_number:
-            # Auto-generate OR number: OR-YYYYMMDD-XXXX
-            from django.db.models import Max
-            today = timezone.now().strftime('%Y%m%d')
-            prefix = f'OR-{today}-'
-            
-            # Get the last OR number for today
-            last_payment = Payment.objects.filter(
-                or_number__startswith=prefix
-            ).aggregate(Max('or_number'))
-            
-            last_or = last_payment['or_number__max']
-            if last_or:
-                # Extract the sequence number and increment
-                last_seq = int(last_or.split('-')[-1])
-                next_seq = last_seq + 1
-            else:
-                # First OR for today
-                next_seq = 1
-            
-            self.or_number = f'{prefix}{str(next_seq).zfill(4)}'
-        
-        super().save(*args, **kwargs)
-    
-    def __str__(self):
-        return f"Payment {self.or_number} - {self.amount}"
+class Account(FHIRResourceModel):
+    """
+    FHIR Account Resource - Billing account for healthcare services
+    Inherits: identifier, status, created_at, updated_at from FHIRResourceModel
+    """
+    account_id = models.AutoField(primary_key=True)
+    type = models.CharField(max_length=100, null=True, blank=True)
+    name = models.CharField(max_length=255, null=True, blank=True)
+    subject_id = models.BigIntegerField()  # Patient or Organization
+    servicePeriod_start = models.DateField(null=True, blank=True)
+    servicePeriod_end = models.DateField(null=True, blank=True)
+    coverage_reference_id = models.BigIntegerField(null=True, blank=True)
+    coverage_priority = models.CharField(max_length=255, null=True, blank=True)
+    owner_id = models.BigIntegerField(null=True, blank=True)
+    description = models.TextField(null=True, blank=True)
+    guarantor_party_id = models.BigIntegerField(null=True, blank=True)
+    guarantor_onHold = models.CharField(max_length=255, null=True, blank=True)
+    guarantor_period_start = models.DateField(null=True, blank=True)
+    guarantor_period_end = models.DateField(null=True, blank=True)
+    partOf_id = models.BigIntegerField(null=True, blank=True)
     
     class Meta:
-        ordering = ['-payment_date', '-created_at']
+        db_table = 'account'
+        indexes = [
+            models.Index(fields=['subject_id']),
+            models.Index(fields=['status']),
+        ]
+
+
+class Claim(FHIRResourceModel):
+    """
+    FHIR Claim Resource - HEADER LEVEL (Normalized)
+    Inherits: identifier, status, created_at, updated_at from FHIRResourceModel
+    Note: 'created' is a distinct FHIR field, separate from inherited 'created_at' audit field
+    
+    Related Line Items: ClaimItem, ClaimDiagnosis, ClaimProcedure, ClaimCareTeam, ClaimSupportingInfo
+    """
+    claim_id = models.AutoField(primary_key=True)
+    type = models.CharField(max_length=100, null=True, blank=True)
+    subType = models.CharField(max_length=100, null=True, blank=True)
+    use = models.CharField(max_length=255, null=True, blank=True)
+    
+    # Fortress Pattern: Cross-app references
+    patient_id = models.BigIntegerField()
+    enterer_id = models.BigIntegerField(null=True, blank=True)
+    insurer_id = models.BigIntegerField(null=True, blank=True)
+    provider_id = models.BigIntegerField(null=True, blank=True)
+    facility_id = models.BigIntegerField(null=True, blank=True)
+    prescription_id = models.BigIntegerField(null=True, blank=True)
+    originalPrescription_id = models.BigIntegerField(null=True, blank=True)
+    referral_id = models.BigIntegerField(null=True, blank=True)
+    
+    # Billable period
+    billablePeriod_start = models.DateField(null=True, blank=True)
+    billablePeriod_end = models.DateField(null=True, blank=True)
+    created = models.DateTimeField(null=True, blank=True)  # FHIR creation datetime
+    
+    # Claim metadata
+    priority = models.CharField(max_length=255, null=True, blank=True)
+    fundsReserve = models.CharField(max_length=255, null=True, blank=True)
+    
+    # Related claim
+    related_claim_id = models.BigIntegerField(null=True, blank=True)
+    related_reference = models.CharField(max_length=255, null=True, blank=True)
+    related_relationship = models.CharField(max_length=255, null=True, blank=True)
+    
+    # Payee
+    payee_type = models.CharField(max_length=100, null=True, blank=True)
+    payee_party_id = models.BigIntegerField(null=True, blank=True)
+    
+    # Accident information
+    accident_date = models.DateField(null=True, blank=True)
+    accident_type = models.CharField(max_length=100, null=True, blank=True)
+    accident_location_address = models.CharField(max_length=255, null=True, blank=True)
+    accident_location_reference = models.CharField(max_length=255, null=True, blank=True)
+    
+    # Totals
+    total = models.CharField(max_length=255, null=True, blank=True)
+    
+    class Meta:
+        db_table = 'billing_claim'
+        indexes = [
+            models.Index(fields=['patient_id']),
+            models.Index(fields=['status']),
+            models.Index(fields=['created']),
+        ]
+
+
+class ClaimCareTeam(models.Model):
+    """
+    Claim CareTeam members - Normalized relationship
+    """
+    claim = models.ForeignKey(Claim, on_delete=models.CASCADE, related_name='care_team')
+    sequence = models.CharField(max_length=255, null=True, blank=True)
+    provider_id = models.BigIntegerField(null=True, blank=True)
+    responsible = models.CharField(max_length=255, null=True, blank=True)
+    role = models.CharField(max_length=255, null=True, blank=True)
+    qualification = models.CharField(max_length=255, null=True, blank=True)
+    
+    class Meta:
+        db_table = 'billing_claim_care_team'
+        indexes = [
+            models.Index(fields=['claim']),
+        ]
+
+
+class ClaimSupportingInfo(models.Model):
+    """
+    Claim Supporting Information - Normalized relationship
+    """
+    claim = models.ForeignKey(Claim, on_delete=models.CASCADE, related_name='supporting_info')
+    sequence = models.CharField(max_length=255, null=True, blank=True)
+    category = models.CharField(max_length=255, null=True, blank=True)
+    code = models.CharField(max_length=100, null=True, blank=True)
+    timing_date = models.DateField(null=True, blank=True)
+    timing_period_start = models.DateField(null=True, blank=True)
+    timing_period_end = models.DateField(null=True, blank=True)
+    value_boolean = models.BooleanField(null=True, blank=True)
+    value_string = models.CharField(max_length=255, null=True, blank=True)
+    value_quantity = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    value_attachment = models.CharField(max_length=255, null=True, blank=True)
+    value_reference = models.CharField(max_length=255, null=True, blank=True)
+    reason = models.CharField(max_length=255, null=True, blank=True)
+    
+    class Meta:
+        db_table = 'billing_claim_supporting_info'
+        indexes = [
+            models.Index(fields=['claim']),
+        ]
+
+
+class ClaimDiagnosis(models.Model):
+    """
+    Claim Diagnosis - Normalized relationship
+    """
+    claim = models.ForeignKey(Claim, on_delete=models.CASCADE, related_name='diagnoses')
+    sequence = models.CharField(max_length=255, null=True, blank=True)
+    diagnosisCodeableConcept = models.CharField(max_length=100, null=True, blank=True)
+    diagnosisReference = models.CharField(max_length=255, null=True, blank=True)
+    type = models.CharField(max_length=100, null=True, blank=True)
+    onAdmission = models.CharField(max_length=255, null=True, blank=True)
+    packageCode = models.CharField(max_length=100, null=True, blank=True)
+    
+    class Meta:
+        db_table = 'billing_claim_diagnosis'
+        indexes = [
+            models.Index(fields=['claim']),
+        ]
+
+
+class ClaimProcedure(models.Model):
+    """
+    Claim Procedure - Normalized relationship
+    """
+    claim = models.ForeignKey(Claim, on_delete=models.CASCADE, related_name='procedures')
+    sequence = models.CharField(max_length=255, null=True, blank=True)
+    type = models.CharField(max_length=100, null=True, blank=True)
+    procedureCodeableConcept = models.CharField(max_length=100, null=True, blank=True)
+    procedureReference = models.CharField(max_length=255, null=True, blank=True)
+    udi = models.CharField(max_length=255, null=True, blank=True)
+    
+    class Meta:
+        db_table = 'billing_claim_procedure'
+        indexes = [
+            models.Index(fields=['claim']),
+        ]
+
+
+class ClaimItem(models.Model):
+    """
+    Claim Line Item - Normalized relationship (replaces flattened item_* fields)
+    """
+    claim = models.ForeignKey(Claim, on_delete=models.CASCADE, related_name='items')
+    sequence = models.CharField(max_length=255, null=True, blank=True)
+    careTeamSequence = models.CharField(max_length=255, null=True, blank=True)
+    diagnosisSequence = models.CharField(max_length=255, null=True, blank=True)
+    procedureSequence = models.CharField(max_length=255, null=True, blank=True)
+    informationSequence = models.CharField(max_length=255, null=True, blank=True)
+    revenue = models.CharField(max_length=255, null=True, blank=True)
+    category = models.CharField(max_length=255, null=True, blank=True)
+    productOrService = models.CharField(max_length=255, null=True, blank=True)
+    modifier = models.CharField(max_length=255, null=True, blank=True)
+    programCode = models.CharField(max_length=100, null=True, blank=True)
+    
+    # Service date/period
+    servicedDate = models.CharField(max_length=255, null=True, blank=True)
+    servicedPeriod_start = models.DateField(null=True, blank=True)
+    servicedPeriod_end = models.DateField(null=True, blank=True)
+    
+    # Location
+    locationCodeableConcept = models.CharField(max_length=100, null=True, blank=True)
+    locationAddress = models.CharField(max_length=255, null=True, blank=True)
+    locationReference = models.CharField(max_length=255, null=True, blank=True)
+    
+    # Pricing
+    quantity = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    unitPrice = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    factor = models.CharField(max_length=255, null=True, blank=True)
+    net = models.CharField(max_length=255, null=True, blank=True)
+    
+    # Body site
+    bodySite = models.CharField(max_length=255, null=True, blank=True)
+    subSite = models.CharField(max_length=255, null=True, blank=True)
+    udi = models.CharField(max_length=255, null=True, blank=True)
+    
+    class Meta:
+        db_table = 'billing_claim_item'
+        indexes = [
+            models.Index(fields=['claim']),
+        ]
+
+
+class ClaimItemDetail(models.Model):
+    """
+    Claim Item Detail - Normalized sub-line item
+    """
+    claim_item = models.ForeignKey(ClaimItem, on_delete=models.CASCADE, related_name='details')
+    sequence = models.CharField(max_length=255, null=True, blank=True)
+    revenue = models.CharField(max_length=255, null=True, blank=True)
+    category = models.CharField(max_length=255, null=True, blank=True)
+    productOrService = models.CharField(max_length=255, null=True, blank=True)
+    modifier = models.CharField(max_length=255, null=True, blank=True)
+    programCode = models.CharField(max_length=100, null=True, blank=True)
+    quantity = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    unitPrice = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    factor = models.CharField(max_length=255, null=True, blank=True)
+    net = models.CharField(max_length=255, null=True, blank=True)
+    udi = models.CharField(max_length=255, null=True, blank=True)
+    
+    class Meta:
+        db_table = 'billing_claim_item_detail'
+        indexes = [
+            models.Index(fields=['claim_item']),
+        ]
+
+
+class ClaimItemDetailSubDetail(models.Model):
+    """
+    Claim Item Detail SubDetail - Normalized sub-sub-line item
+    """
+    detail = models.ForeignKey(ClaimItemDetail, on_delete=models.CASCADE, related_name='sub_details')
+    sequence = models.CharField(max_length=255, null=True, blank=True)
+    revenue = models.CharField(max_length=255, null=True, blank=True)
+    category = models.CharField(max_length=255, null=True, blank=True)
+    productOrService = models.CharField(max_length=255, null=True, blank=True)
+    modifier = models.CharField(max_length=255, null=True, blank=True)
+    programCode = models.CharField(max_length=100, null=True, blank=True)
+    quantity = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    unitPrice = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    factor = models.CharField(max_length=255, null=True, blank=True)
+    net = models.CharField(max_length=255, null=True, blank=True)
+    udi = models.CharField(max_length=255, null=True, blank=True)
+    
+    class Meta:
+        db_table = 'claim_item_detail_sub_detail'
+        indexes = [
+            models.Index(fields=['detail']),
+        ]
+
+
+class ClaimResponse(FHIRResourceModel):
+    """
+    FHIR ClaimResponse Resource - HEADER LEVEL (Normalized)
+    Inherits: identifier, status, created_at, updated_at from FHIRResourceModel
+    Note: 'created' is a distinct FHIR field, separate from inherited 'created_at' audit field
+    
+    Related Line Items: ClaimResponseItem, ClaimResponseAddItem, ClaimResponseError
+    """
+    claimResponse_id = models.AutoField(primary_key=True)
+    type = models.CharField(max_length=100, null=True, blank=True)
+    subType = models.CharField(max_length=100, null=True, blank=True)
+    use = models.CharField(max_length=255, null=True, blank=True)
+    
+    # Fortress Pattern: Cross-app references
+    patient_id = models.BigIntegerField()
+    insurer_id = models.BigIntegerField(null=True, blank=True)
+    requestor_id = models.BigIntegerField(null=True, blank=True)
+    request_id = models.BigIntegerField(null=True, blank=True)
+    
+    created = models.DateTimeField(null=True, blank=True)  # FHIR creation datetime
+    outcome = models.CharField(max_length=255, null=True, blank=True)
+    disposition = models.TextField(null=True, blank=True)
+    
+    # Pre-authorization
+    preAuthRef = models.CharField(max_length=255, null=True, blank=True)
+    preAuthPeriod_start = models.DateField(null=True, blank=True)
+    preAuthPeriod_end = models.DateField(null=True, blank=True)
+    
+    payeeType = models.CharField(max_length=100, null=True, blank=True)
+    
+    # Payment information
+    payment_type = models.CharField(max_length=100, null=True, blank=True)
+    payment_adjustment = models.CharField(max_length=255, null=True, blank=True)
+    payment_adjustmentReason = models.CharField(max_length=255, null=True, blank=True)
+    payment_date = models.DateTimeField(null=True, blank=True)
+    
+    # Other
+    fundsReserve = models.CharField(max_length=255, null=True, blank=True)
+    formCode = models.CharField(max_length=100, null=True, blank=True)
+    form = models.CharField(max_length=255, null=True, blank=True)
+    
+    class Meta:
+        db_table = 'billing_claim_response'
+        indexes = [
+            models.Index(fields=['patient_id']),
+            models.Index(fields=['status']),
+            models.Index(fields=['request_id']),
+        ]
+
+
+class ClaimResponseItem(models.Model):
+    """
+    ClaimResponse Item Adjudication - Normalized relationship
+    """
+    claim_response = models.ForeignKey(ClaimResponse, on_delete=models.CASCADE, related_name='items')
+    sequence = models.CharField(max_length=255, null=True, blank=True)
+    noteNumbers = models.TextField(null=True, blank=True)
+    adjudication_category = models.CharField(max_length=255, null=True, blank=True)
+    adjudication_reason = models.CharField(max_length=255, null=True, blank=True)
+    adjudication_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    adjudication_value = models.CharField(max_length=255, null=True, blank=True)
+    
+    class Meta:
+        db_table = 'billing_claim_response_item'
+        indexes = [
+            models.Index(fields=['claim_response']),
+        ]
+
+
+class ClaimResponseItemDetail(models.Model):
+    """
+    ClaimResponse Item Detail Adjudication - Normalized relationship
+    """
+    claim_response_item = models.ForeignKey(ClaimResponseItem, on_delete=models.CASCADE, related_name='details')
+    sequence = models.CharField(max_length=255, null=True, blank=True)
+    noteNumbers = models.TextField(null=True, blank=True)
+    adjudication_category = models.CharField(max_length=255, null=True, blank=True)
+    adjudication_reason = models.CharField(max_length=255, null=True, blank=True)
+    adjudication_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    adjudication_value = models.CharField(max_length=255, null=True, blank=True)
+    
+    class Meta:
+        db_table = 'billing_claim_response_item_detail'
+        indexes = [
+            models.Index(fields=['claim_response_item']),
+        ]
+
+
+class ClaimResponseItemSubDetail(models.Model):
+    """
+    ClaimResponse Item SubDetail Adjudication - Normalized relationship
+    """
+    detail = models.ForeignKey(ClaimResponseItemDetail, on_delete=models.CASCADE, related_name='sub_details')
+    sequence = models.CharField(max_length=255, null=True, blank=True)
+    noteNumbers = models.TextField(null=True, blank=True)
+    adjudication_category = models.CharField(max_length=255, null=True, blank=True)
+    adjudication_reason = models.CharField(max_length=255, null=True, blank=True)
+    adjudication_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    adjudication_value = models.CharField(max_length=255, null=True, blank=True)
+    
+    class Meta:
+        db_table = 'billing_claim_response_item_sub_detail'
+        indexes = [
+            models.Index(fields=['detail']),
+        ]
+
+
+class ClaimResponseAddItem(models.Model):
+    """
+    ClaimResponse Additional Item - Normalized relationship
+    """
+    claim_response = models.ForeignKey(ClaimResponse, on_delete=models.CASCADE, related_name='add_items')
+    itemSequence = models.CharField(max_length=255, null=True, blank=True)
+    detailSequence = models.CharField(max_length=255, null=True, blank=True)
+    subDetailSequence = models.CharField(max_length=255, null=True, blank=True)
+    provider = models.CharField(max_length=255, null=True, blank=True)
+    productOrService = models.CharField(max_length=255, null=True, blank=True)
+    modifier = models.CharField(max_length=255, null=True, blank=True)
+    programCode = models.CharField(max_length=100, null=True, blank=True)
+    servicedDate = models.CharField(max_length=255, null=True, blank=True)
+    servicedPeriod_start = models.DateField(null=True, blank=True)
+    servicedPeriod_end = models.DateField(null=True, blank=True)
+    location_codeableConcept = models.CharField(max_length=100, null=True, blank=True)
+    location_address = models.CharField(max_length=255, null=True, blank=True)
+    location_reference = models.CharField(max_length=255, null=True, blank=True)
+    quantity = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    unitPrice = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    factor = models.CharField(max_length=255, null=True, blank=True)
+    net = models.CharField(max_length=255, null=True, blank=True)
+    bodySite = models.CharField(max_length=255, null=True, blank=True)
+    subSite = models.CharField(max_length=255, null=True, blank=True)
+    detail_productOrService = models.CharField(max_length=255, null=True, blank=True)
+    detail_modifier = models.CharField(max_length=255, null=True, blank=True)
+    detail_subDetail_productOrService = models.CharField(max_length=255, null=True, blank=True)
+    detail_subDetail_modifier = models.CharField(max_length=255, null=True, blank=True)
+    
+    class Meta:
+        db_table = 'billing_claim_response_add_item'
+        indexes = [
+            models.Index(fields=['claim_response']),
+        ]
+
+
+class ClaimResponseTotal(models.Model):
+    """
+    ClaimResponse Total - Normalized relationship
+    """
+    claim_response = models.ForeignKey(ClaimResponse, on_delete=models.CASCADE, related_name='totals')
+    category = models.CharField(max_length=255, null=True, blank=True)
+    amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    
+    class Meta:
+        db_table = 'billing_claim_response_total'
+        indexes = [
+            models.Index(fields=['claim_response']),
+        ]
+
+
+class ClaimResponseProcessNote(models.Model):
+    """
+    ClaimResponse Process Note - Normalized relationship
+    """
+    claim_response = models.ForeignKey(ClaimResponse, on_delete=models.CASCADE, related_name='process_notes')
+    number = models.TextField(null=True, blank=True)
+    type = models.TextField(null=True, blank=True)
+    text = models.TextField(null=True, blank=True)
+    language = models.TextField(null=True, blank=True)
+    
+    class Meta:
+        db_table = 'billing_claim_response_process_note'
+        indexes = [
+            models.Index(fields=['claim_response']),
+        ]
+
+
+class ClaimResponseError(models.Model):
+    """
+    ClaimResponse Error - Normalized relationship
+    """
+    claim_response = models.ForeignKey(ClaimResponse, on_delete=models.CASCADE, related_name='errors')
+    itemSequence = models.CharField(max_length=255, null=True, blank=True)
+    detailSequence = models.CharField(max_length=255, null=True, blank=True)
+    subDetailSequence = models.CharField(max_length=255, null=True, blank=True)
+    code = models.CharField(max_length=100, null=True, blank=True)
+    
+    class Meta:
+        db_table = 'billing_claim_response_error'
+        indexes = [
+            models.Index(fields=['claim_response']),
+        ]
+
+
+class Invoice(FHIRResourceModel):
+    """
+    FHIR Invoice Resource - HEADER LEVEL (Normalized)
+    Inherits: identifier, status, created_at, updated_at from FHIRResourceModel
+    Note: 'invoice_datetime' is a distinct FHIR field, separate from inherited 'created_at' audit field
+    
+    Related Line Items: InvoiceLineItem
+    """
+    invoice_id = models.AutoField(primary_key=True)
+    cancelled_reason = models.CharField(max_length=255, null=True, blank=True)
+    type = models.CharField(max_length=100, null=True, blank=True)
+    
+    # Fortress Pattern: Cross-app references
+    subject_id = models.BigIntegerField()  # Patient
+    recipient_id = models.BigIntegerField(null=True, blank=True)
+    issuer_id = models.BigIntegerField(null=True, blank=True)
+    account_id = models.BigIntegerField(null=True, blank=True)
+    participant_actor_id = models.BigIntegerField(null=True, blank=True)
+    
+    invoice_datetime = models.DateTimeField(null=True, blank=True)  # FHIR invoice datetime
+    participant_role = models.CharField(max_length=255, null=True, blank=True)
+    
+    # Totals - Corrected currency fields
+    total_net_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    total_net_currency = models.CharField(max_length=3, null=True, blank=True)  # ISO 4217: PHP, USD
+    total_gross_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    total_gross_currency = models.CharField(max_length=3, null=True, blank=True)  # ISO 4217: PHP, USD
+    
+    payment_terms = models.CharField(max_length=255, null=True, blank=True)
+    note = models.TextField(null=True, blank=True)
+    
+    class Meta:
+        db_table = 'billing_invoice'
+        indexes = [
+            models.Index(fields=['subject_id']),
+            models.Index(fields=['status']),
+            models.Index(fields=['invoice_datetime']),
+        ]
+
+
+class InvoiceLineItem(models.Model):
+    """
+    Invoice Line Item - Normalized relationship
+    """
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='line_items')
+    sequence = models.CharField(max_length=255, null=True, blank=True)
+    chargeitem_reference_id = models.BigIntegerField(null=True, blank=True)
+    chargeitem_code = models.CharField(max_length=100, null=True, blank=True)
+    
+    class Meta:
+        db_table = 'billing_invoice_line_item'
+        indexes = [
+            models.Index(fields=['invoice']),
+        ]
+
+
+class InvoiceLineItemPriceComponent(models.Model):
+    """
+    Invoice Line Item Price Component - Normalized relationship
+    """
+    line_item = models.ForeignKey(InvoiceLineItem, on_delete=models.CASCADE, related_name='price_components')
+    type = models.CharField(max_length=100, null=True, blank=True)
+    code = models.CharField(max_length=100, null=True, blank=True)
+    factor = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    amount_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    amount_currency = models.CharField(max_length=3, null=True, blank=True)  # ISO 4217: PHP, USD
+    
+    class Meta:
+        db_table = 'billing_invoice_line_item_price_component'
+        indexes = [
+            models.Index(fields=['line_item']),
+        ]
+
+
+class InvoiceTotalPriceComponent(models.Model):
+    """
+    Invoice Total Price Component - Normalized relationship
+    """
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='total_price_components')
+    type = models.CharField(max_length=100, null=True, blank=True)
+    code = models.CharField(max_length=100, null=True, blank=True)
+    factor = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    amount_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    amount_currency = models.CharField(max_length=3, null=True, blank=True)  # ISO 4217: PHP, USD
+    
+    class Meta:
+        db_table = 'billing_invoice_total_price_component'
+        indexes = [
+            models.Index(fields=['invoice']),
+        ]
+
+
+class PaymentReconciliation(FHIRResourceModel):
+    """
+    FHIR PaymentReconciliation Resource - HEADER LEVEL (Normalized)
+    Inherits: identifier, status, created_at, updated_at from FHIRResourceModel
+    Note: 'created_datetime' is a distinct FHIR field, separate from inherited 'created_at' audit field
+    
+    Related Line Items: PaymentReconciliationDetail
+    """
+    payment_reconciliation_id = models.AutoField(primary_key=True)
+    period_start = models.DateField(null=True, blank=True)
+    period_end = models.DateField(null=True, blank=True)
+    created_datetime = models.DateTimeField(null=True, blank=True)  # FHIR creation datetime
+    
+    # Fortress Pattern: Cross-app references
+    payment_issuer_id = models.BigIntegerField(null=True, blank=True)
+    request_task_id = models.BigIntegerField(null=True, blank=True)
+    requestor_id = models.BigIntegerField(null=True, blank=True)
+    
+    outcome = models.CharField(max_length=255, null=True, blank=True)
+    disposition = models.TextField(null=True, blank=True)
+    
+    # Payment information - Corrected currency field
+    payment_date = models.DateTimeField(null=True, blank=True)
+    payment_amount_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    payment_amount_currency = models.CharField(max_length=3, null=True, blank=True)  # ISO 4217: PHP, USD
+    payment_identifier = models.CharField(max_length=100, null=True, blank=True)
+    
+    form_code = models.CharField(max_length=100, null=True, blank=True)
+    
+    class Meta:
+        db_table = 'billing_payment_reconciliation'
+        indexes = [
+            models.Index(fields=['status']),
+            models.Index(fields=['payment_date']),
+        ]
+
+
+class PaymentReconciliationDetail(models.Model):
+    """
+    PaymentReconciliation Detail - Normalized relationship
+    """
+    payment_reconciliation = models.ForeignKey(
+        PaymentReconciliation, 
+        on_delete=models.CASCADE, 
+        related_name='details'
+    )
+    identifier = models.CharField(max_length=100, null=True, blank=True)
+    predecessor_identifier = models.CharField(max_length=100, null=True, blank=True)
+    type = models.CharField(max_length=100, null=True, blank=True)
+    
+    # Fortress Pattern: Cross-app references
+    request_id = models.BigIntegerField(null=True, blank=True)
+    submitter_id = models.BigIntegerField(null=True, blank=True)
+    response_id = models.BigIntegerField(null=True, blank=True)
+    responsible_id = models.BigIntegerField(null=True, blank=True)
+    payee_id = models.BigIntegerField(null=True, blank=True)
+    
+    date = models.DateField(null=True, blank=True)
+    
+    # Amount - Corrected currency field
+    amount_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    amount_currency = models.CharField(max_length=3, null=True, blank=True)  # ISO 4217: PHP, USD
+    
+    class Meta:
+        db_table = 'billing_payment_reconciliation_detail'
+        indexes = [
+            models.Index(fields=['payment_reconciliation']),
+        ]
+
+
+class PaymentReconciliationProcessNote(models.Model):
+    """
+    PaymentReconciliation Process Note - Normalized relationship
+    """
+    payment_reconciliation = models.ForeignKey(
+        PaymentReconciliation, 
+        on_delete=models.CASCADE, 
+        related_name='process_notes'
+    )
+    type = models.TextField(null=True, blank=True)
+    text = models.TextField(null=True, blank=True)
+    
+    class Meta:
+        db_table = 'billing_payment_reconciliation_process_note'
+        indexes = [
+            models.Index(fields=['payment_reconciliation']),
+        ]
+
+
+class PaymentNotice(FHIRResourceModel):
+    """
+    FHIR PaymentNotice Resource
+    Inherits: identifier, status, created_at, updated_at from FHIRResourceModel
+    """
+    payment_notice_id = models.AutoField(primary_key=True)
+    created_datetime = models.DateTimeField(null=True, blank=True)
+    
+    # Fortress Pattern: Cross-app references
+    request_reference_id = models.BigIntegerField(null=True, blank=True)
+    response_reference_id = models.BigIntegerField(null=True, blank=True)
+    provider_id = models.BigIntegerField(null=True, blank=True)
+    payment_reconciliation_id = models.BigIntegerField(null=True, blank=True)
+    payee_id = models.BigIntegerField(null=True, blank=True)
+    recipient_id = models.BigIntegerField(null=True, blank=True)
+    
+    payment_date = models.DateTimeField(null=True, blank=True)
+    payment_status = models.CharField(max_length=100, null=True, blank=True)
+    
+    # Amount - Corrected currency field
+    amount_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    amount_currency = models.CharField(max_length=3, null=True, blank=True)  # ISO 4217: PHP, USD
+    
+    class Meta:
+        db_table = 'billing_payment_notice'
+        indexes = [
+            models.Index(fields=['status']),
+            models.Index(fields=['payment_date']),
+        ]

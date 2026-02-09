@@ -42,7 +42,7 @@ INSTALLED_APPS = [
     # Third-party
     "rest_framework",
     "corsheaders",
-    "django_filters",  # ← Add this line
+    "django_filters",
 ]
 
 MIDDLEWARE = [
@@ -131,8 +131,6 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.AllowAny",
     ),
-
-    # Add these lines:
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend",
         "rest_framework.filters.SearchFilter",

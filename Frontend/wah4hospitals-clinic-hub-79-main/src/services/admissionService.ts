@@ -1,65 +1,60 @@
 // src/services/admissionService.ts
-import axios, { AxiosInstance } from "axios";
-import type { Admission, NewAdmission } from "@/types/admission"; // <- import NewAdmission
-
-// Create an Axios instance
-const api: AxiosInstance = axios.create({
-  baseURL:
-    import.meta.env.BACKEND_ADMISSIONS_8000 ||
-    import.meta.env.BACKEND_ADMISSIONS,
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
-
-const handleError = (error: any) => {
-  console.error("AdmissionService error:", error);
-  throw error;
-};
+import api from "./api"; // Shared Axios instance
+import type { Admission, NewAdmission } from "@/types/admission";
 
 export const admissionService = {
+  /**
+   * List all encounters (admissions)
+   */
   getAll: async (): Promise<Admission[]> => {
-    try {
-      const { data } = await api.get<Admission[]>("");
-      return data;
-    } catch (error) {
-      handleError(error);
+    const { data } = await api.get<any>("/api/admission/encounters/");
+    // Handle DRF pagination
+    if (data && typeof data === 'object' && 'results' in data && Array.isArray(data.results)) {
+      return data.results;
     }
+    // Handle non-paginated list
+    if (Array.isArray(data)) {
+      return data;
+    }
+    return [];
   },
 
+  /**
+   * Get single encounter details
+   */
   getById: async (id: number): Promise<Admission> => {
-    try {
-      const { data } = await api.get<Admission>(`${id}/`);
-      return data;
-    } catch (error) {
-      handleError(error);
-    }
+    const { data } = await api.get<Admission>(`/api/admission/encounters/${id}/`);
+    return data;
   },
 
-  // Use NewAdmission here so id is not required
+  /**
+   * Admit a patient (Create Encounter)
+   */
   create: async (admission: NewAdmission): Promise<Admission> => {
-    try {
-      const { data } = await api.post<Admission>("", admission);
-      return data;
-    } catch (error) {
-      handleError(error);
-    }
+    const { data } = await api.post<Admission>("/api/admission/encounters/", admission);
+    return data;
   },
 
-  update: async (id: number, admission: Admission): Promise<Admission> => {
-    try {
-      const { data } = await api.put<Admission>(`${id}/`, admission);
-      return data;
-    } catch (error) {
-      handleError(error);
-    }
+  /**
+   * Update encounter details
+   */
+  update: async (id: number, admission: Partial<Admission>): Promise<Admission> => {
+    const { data } = await api.put<Admission>(`/api/admission/encounters/${id}/`, admission);
+    return data;
   },
 
+  /**
+   * Discharge patient
+   */
+  discharge: async (id: number, dischargeData: { period_end: string; discharge_disposition?: string; discharge_destination_id?: number }): Promise<Admission> => {
+    const { data } = await api.post<Admission>(`/api/admission/encounters/${id}/discharge/`, dischargeData);
+    return data;
+  },
+
+  /**
+   * Delete encounter (if needed/allowed)
+   */
   delete: async (id: number): Promise<void> => {
-    try {
-      await api.delete(`${id}/`);
-    } catch (error) {
-      handleError(error);
-    }
+    await api.delete(`/api/admission/encounters/${id}/`);
   },
 };

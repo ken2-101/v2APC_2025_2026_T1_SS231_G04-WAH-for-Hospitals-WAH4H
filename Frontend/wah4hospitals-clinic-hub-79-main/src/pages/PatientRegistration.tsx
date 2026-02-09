@@ -3,7 +3,8 @@ import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { UserPlus, Search } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { UserPlus, Search, Download } from 'lucide-react';
 import { PatientDetailsModal } from '@/components/patients/PatientDetailsModal';
 import { PatientRegistrationModal } from '@/components/patients/PatientRegistrationModal';
 import { PatientTable } from '@/components/patients/PatientTable';
@@ -13,11 +14,8 @@ import { DeletePatientModal } from '@/components/patients/DeletePatientModal';
 import type { Patient, PatientFormData } from '../types/patient';
 import axios from 'axios';
 
-const API_URL =
-  import.meta.env.BACKEND_PATIENTS_8000 ||
-    import.meta.env.LOCAL_8000
-    ? `${import.meta.env.LOCAL_8000}/api/patients/`
-    : import.meta.env.BACKEND_PATIENTS;
+// NOTE: Ensure trailing slash for Django
+const API_URL = 'http://127.0.0.1:8000/api/patients/';
 
 export const PatientRegistration: React.FC = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -30,32 +28,76 @@ export const PatientRegistration: React.FC = () => {
   const [deletePatient, setDeletePatient] = useState<Patient | null>(null);
 
   const initialFormData: Omit<PatientFormData, 'patient_id'> = {
-    philhealth_id: '',
-    national_id: '',
-    last_name: '',
     first_name: '',
+    last_name: '',
     middle_name: '',
-    suffix: '',
-    sex: 'M',
-    date_of_birth: '',
+    suffix_name: '',
+    gender: 'M',
+    birthdate: '',
     civil_status: '',
     nationality: '',
-    mobile_number: '',
-    telephone: '',
-    email: '',
-    region: '',
-    province: '',
-    city_municipality: '',
-    barangay: '',
-    house_no_street: '',
-    status: 'Active',
+    religion: '',
+    philhealth_id: '',
+    blood_type: '',
+    pwd_type: '',
     occupation: '',
+    education: '',
+    mobile_number: '',
+    address_line: '',
+    address_city: '',
+    address_district: '',
+    address_state: '',
+    address_postal_code: '',
+    address_country: 'Philippines', // Default
+    contact_first_name: '',
+    contact_last_name: '',
+    contact_mobile_number: '',
+    contact_relationship: '',
+    indigenous_flag: false,
+    indigenous_group: '',
+    consent_flag: true
   };
 
   const [formData, setFormData] = useState({ ...initialFormData });
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
+  // WAH4PC integration state
+  const [philHealthId, setPhilHealthId] = useState('');
+  const [targetProvider, setTargetProvider] = useState('');
+  const [providers, setProviders] = useState<Array<{id: string; name: string; type: string; isActive: boolean}>>([]);
+  const [wah4pcLoading, setWah4pcLoading] = useState(false);
+
+  // Fetch providers from WAH4PC gateway
+  useEffect(() => {
+    const fetchProviders = async () => {
+      try {
+        const res = await axios.get(`${API_URL}wah4pc/providers/`);
+        setProviders(Array.isArray(res.data) ? res.data : []);
+      } catch (err) {
+        console.error('Failed to load WAH4PC providers:', err);
+        setProviders([]);
+      }
+    };
+    fetchProviders();
+  }, []);
+
+  const fetchFromWAH4PC = async () => {
+    setWah4pcLoading(true);
+    try {
+      await axios.post(`${API_URL}wah4pc/fetch`, {
+        targetProviderId: targetProvider,
+        philHealthId,
+      });
+      alert('Request sent to WAH4PC. You will receive the data via webhook.');
+    } catch (err) {
+      console.error('WAH4PC fetch error:', err);
+      alert('Failed to send WAH4PC request.');
+    } finally {
+      setWah4pcLoading(false);
+    }
+  };
+
   const [activeFilters, setActiveFilters] = useState({
     status: [] as string[],
     gender: [] as string[],
@@ -80,15 +122,20 @@ export const PatientRegistration: React.FC = () => {
   // Filter & search
   useEffect(() => {
     let temp = [...patients];
-    if (activeFilters.status.length) temp = temp.filter(p => activeFilters.status.includes(p.status));
-    if (activeFilters.gender.length) temp = temp.filter(p => activeFilters.gender.includes(p.sex));
+    if (activeFilters.status.length) {
+      temp = temp.filter(p => {
+        const status = p.active ? 'Active' : 'Inactive';
+        return activeFilters.status.includes(status);
+      });
+    }
+    if (activeFilters.gender.length) temp = temp.filter(p => activeFilters.gender.includes(p.gender));
     if (activeFilters.civilStatus.length) temp = temp.filter(p => activeFilters.civilStatus.includes(p.civil_status));
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       temp = temp.filter(
         p => `${p.last_name} ${p.first_name} ${p.middle_name || ''}`.toLowerCase().includes(q) ||
-          p.patient_id.toLowerCase().includes(q) ||
-          p.mobile_number.includes(searchQuery)
+          (p.patient_id && p.patient_id.toLowerCase().includes(q)) ||
+          (p.mobile_number && p.mobile_number.includes(searchQuery))
       );
     }
     setFilteredPatients(temp);
@@ -100,25 +147,33 @@ export const PatientRegistration: React.FC = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleRegisterPatient = async (e: FormEvent) => {
-    e.preventDefault();
-    setFormLoading(true); setFormError(''); setFormSuccess('');
+  const handleRegisterPatient = async (patientData: PatientFormData) => {
+    setFormLoading(true);
+    setFormError('');
+    setFormSuccess('');
     try {
-      const res = await axios.post(API_URL, formData);
+      const res = await axios.post(API_URL, patientData);
       const registeredPatient: Patient = res.data;
       setFormSuccess(`Patient registered successfully! ID: ${registeredPatient.patient_id}`);
-      setShowRegistrationModal(false);
-      setFormData({ ...initialFormData });
+      // Don't close modal here - let modal close itself on success
       fetchPatients();
+      // Return success - modal will close after this resolves
     } catch (err: any) {
       console.error('Full Axios error:', err);
+      console.error('Error response data:', err.response?.data);
       if (err.response) {
         const messages = typeof err.response.data === 'object'
           ? Object.entries(err.response.data).map(([f, m]) => Array.isArray(m) ? `${f}: ${m.join(', ')}` : `${f}: ${m}`).join('\n')
           : err.response.data;
         setFormError(messages);
-      } else { setFormError(err.message || 'Failed to register patient'); }
-    } finally { setFormLoading(false); }
+      } else {
+        setFormError(err.message || 'Failed to register patient');
+      }
+      // Re-throw error so modal knows to stay open
+      throw err;
+    } finally {
+      setFormLoading(false);
+    }
   };
 
   const handleFilterChange = (filterType: string, value: string) => {
@@ -160,6 +215,41 @@ export const PatientRegistration: React.FC = () => {
             </Button>
           </div>
 
+          {/* WAH4PC Fetch Section */}
+          <div className="flex flex-col md:flex-row gap-2 mb-4 p-3 border rounded-lg bg-gray-50">
+            <Input
+              value={philHealthId}
+              onChange={e => setPhilHealthId(e.target.value)}
+              placeholder="PhilHealth ID"
+              className="max-w-xs"
+            />
+            <Select value={targetProvider} onValueChange={setTargetProvider}>
+              <SelectTrigger className="max-w-xs">
+                <SelectValue placeholder="Select Target Provider" />
+              </SelectTrigger>
+              <SelectContent>
+                {providers.length === 0 ? (
+                  <SelectItem value="loading" disabled>Loading providers...</SelectItem>
+                ) : (
+                  providers.map(p => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name} ({p.type})
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+            <Button
+              onClick={fetchFromWAH4PC}
+              disabled={wah4pcLoading || !philHealthId || !targetProvider}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              {wah4pcLoading ? 'Fetching...' : 'Fetch from WAH4PC'}
+            </Button>
+          </div>
+
           <PatientFilters
             activeFilters={activeFilters}
             handleFilterChange={handleFilterChange}
@@ -179,12 +269,9 @@ export const PatientRegistration: React.FC = () => {
       <PatientRegistrationModal
         isOpen={showRegistrationModal}
         onClose={() => setShowRegistrationModal(false)}
-        formData={formData}
-        handleFormChange={handleFormChange}
-        handleRegisterPatient={handleRegisterPatient}
-        formLoading={formLoading}
-        success={formSuccess}
-        formError={formError}
+        onSuccess={handleRegisterPatient}
+        isLoading={formLoading}
+        error={formError}
       />
 
       {selectedPatient && (

@@ -2,8 +2,19 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Search, Printer, CreditCard } from 'lucide-react';
+import { Search, Printer, CreditCard, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from '@/hooks/use-toast';
 
 interface BillingPatient {
     id: number;
@@ -19,10 +30,13 @@ interface BillingDashboardProps {
     patients: BillingPatient[];
     onSelectPatient: (id: number) => void;
     onQuickPay: (patient: BillingPatient) => void;
+    onDeletePatient?: (id: number) => Promise<void>;
 }
 
-export const BillingDashboard: React.FC<BillingDashboardProps> = ({ patients, onSelectPatient, onQuickPay }) => {
+export const BillingDashboard: React.FC<BillingDashboardProps> = ({ patients, onSelectPatient, onQuickPay, onDeletePatient }) => {
     const [searchTerm, setSearchTerm] = React.useState('');
+    const [deleteId, setDeleteId] = React.useState<number | null>(null);
+    const { toast } = useToast();
 
     const filteredPatients = patients.filter(p =>
         (p.patientName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
@@ -39,6 +53,32 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ patients, on
 
     const formatCurrency = (val: number) =>
         new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(val);
+
+    const handleDeleteClick = (e: React.MouseEvent, id: number) => {
+        e.stopPropagation();
+        setDeleteId(id);
+    };
+
+    const confirmDelete = async () => {
+        if (deleteId && onDeletePatient) {
+            try {
+                await onDeletePatient(deleteId);
+                toast({
+                    title: "Bill Deleted",
+                    description: "The billing record currently selected has been successfully deleted.",
+                });
+            } catch (error) {
+                console.error("Failed to delete bill:", error);
+                toast({
+                    title: "Error",
+                    description: "Failed to delete billing record.",
+                    variant: "destructive"
+                });
+            } finally {
+                setDeleteId(null);
+            }
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -92,9 +132,18 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ patients, on
                                             <Button size="sm" variant="outline" onClick={() => onSelectPatient(patient.id)}>
                                                 View Bill
                                             </Button>
-                                            <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={(e) => { e.stopPropagation(); onQuickPay(patient); }}>
-                                                <CreditCard className="w-4 h-4 mr-1" /> Pay
-                                            </Button>
+                                            {patient.paymentStatus !== 'Paid' && (
+                                                <>
+                                                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={(e) => { e.stopPropagation(); onQuickPay(patient); }}>
+                                                        <CreditCard className="w-4 h-4 mr-1" /> Pay
+                                                    </Button>
+                                                    {onDeletePatient && (
+                                                        <Button size="sm" variant="destructive" onClick={(e) => handleDeleteClick(e, patient.id)}>
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </Button>
+                                                    )}
+                                                </>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}
@@ -108,6 +157,21 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ patients, on
                     </div>
                 </CardContent>
             </Card>
+
+            <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the billing record.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 };

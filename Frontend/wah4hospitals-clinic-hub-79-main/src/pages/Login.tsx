@@ -70,7 +70,7 @@ const Login = () => {
   const handleDemoLogin = async () => {
     if (isLoading) return;
     const demoEmail = 'doctor@gmail.com';
-    const demoPassword = 'Doctor123';
+    const demoPassword = 'password123';
     setEmail(demoEmail);
     setPassword(demoPassword);
     const result = await loginInitiate(demoEmail, demoPassword);

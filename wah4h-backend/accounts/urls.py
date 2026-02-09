@@ -100,3 +100,4 @@ urlpatterns = [
 
     path('organizations/', OrganizationListAPIView.as_view(), name='organization-list'),
 ]
+

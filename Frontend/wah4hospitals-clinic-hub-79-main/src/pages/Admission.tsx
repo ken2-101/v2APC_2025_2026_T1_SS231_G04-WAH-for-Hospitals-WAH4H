@@ -56,45 +56,41 @@ const Admission: React.FC<AdmissionProps> = ({ onNavigate }) => {
   };
 
   // -------------------- Admit patient handler --------------------
-  const handleAdmitPatient = async (data: any) => {
+  // -------------------- Admit patient handler --------------------
+  const handleAdmitPatient = async (data: NewAdmission) => {
     try {
-      const payload: NewAdmission = {
-        patient: data.patientId,
-        admission_date: data.admissionDate,
-        attending_physician: data.attendingPhysician,
-        ward: data.ward,
-        room: data.room,
-        bed: data.bed,
-        assigned_nurse: data.assignedNurse ?? '', // safely include assigned_nurse
-        status: 'Active',
-        encounter_type: 'Inpatient',
-        admitting_diagnosis: data.admittingDiagnosis,
-        reason_for_admission: data.reasonForAdmission,
-        admission_category: data.admissionCategory as 'Emergency' | 'Regular',
-        mode_of_arrival: data.modeOfArrival as 'Walk-in' | 'Ambulance' | 'Referral',
-      };
-
-      await admissionService.create(payload);
+      // Data is already formatted as NewAdmission by the modal
+      await admissionService.create(data);
       await fetchAdmissions();
       setIsAdmitModalOpen(false);
     } catch (err) {
       console.error('Error admitting patient:', err);
+      // Re-throw so the modal can handle it (display error)
+      throw err;
     }
   };
 
   // -------------------- Filtered admissions --------------------
   const filteredAdmissions = admissions.filter(admission => {
-    const patientName = admission.patient_details
-      ? `${admission.patient_details.last_name}, ${admission.patient_details.first_name}`.toLowerCase()
+    // Access patient name from patient_summary
+    const summary = admission.patient_summary;
+    const patientName = summary
+      ? (summary.full_name || `${summary.last_name}, ${summary.first_name}`).toLowerCase()
       : '';
 
     const matchesSearch =
       patientName.includes(searchTerm.toLowerCase()) ||
-      (admission.admission_id && admission.admission_id.toLowerCase().includes(searchTerm.toLowerCase()));
+      (admission.identifier && admission.identifier.toLowerCase().includes(searchTerm.toLowerCase()));
 
-    const matchesWard = !activeFilters.ward || admission.ward === activeFilters.ward;
+    // Note: 'ward' and 'attending_physician' are not top-level fields on Admission interface currently
+    // They are inside location_summary and practitioner_summary
+    // We'll map them loosely for now to prevent crashes
+    const locationName = admission.location_summary?.name || '';
+    const doctorName = admission.practitioner_summary?.full_name || admission.practitioner_summary?.name || '';
+
+    const matchesWard = !activeFilters.ward || locationName === activeFilters.ward;
     const matchesStatus = !activeFilters.status || admission.status === activeFilters.status;
-    const matchesDoctor = !activeFilters.doctor || admission.attending_physician === activeFilters.doctor;
+    const matchesDoctor = !activeFilters.doctor || doctorName === activeFilters.doctor;
 
     return matchesSearch && matchesWard && matchesStatus && matchesDoctor;
   });
@@ -176,11 +172,11 @@ const Admission: React.FC<AdmissionProps> = ({ onNavigate }) => {
         onUpdate={async (updatedAdmission) => {
           // update in frontend state
           setAdmissions(prev =>
-            prev.map(a => (a.id === updatedAdmission.id ? updatedAdmission : a))
+            prev.map(a => (a.encounter_id === updatedAdmission.encounter_id ? updatedAdmission : a))
           );
         }}
         onDelete={async (id) => {
-          setAdmissions(prev => prev.filter(a => a.id !== id));
+          setAdmissions(prev => prev.filter(a => a.encounter_id !== id));
         }}
       />
     </div>

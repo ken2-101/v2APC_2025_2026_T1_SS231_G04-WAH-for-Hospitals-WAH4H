@@ -7,6 +7,7 @@ import { PackagePlus } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { InventoryItem } from '@/types/pharmacy';
+import pharmacyService from '@/services/pharmacyService';
 
 interface RestockModalProps {
   isOpen: boolean;
@@ -57,8 +58,7 @@ export const RestockModal: React.FC<RestockModalProps> = ({
     }
 
     try {
-      // Call backend to add stock
-      const payload = {
+      const newItem = await pharmacyService.addInventoryItem({
         generic_name: itemData.generic_name,
         brand_name: itemData.brand_name,
         description: itemData.description,
@@ -68,12 +68,10 @@ export const RestockModal: React.FC<RestockModalProps> = ({
         batch_number: itemData.batch_number,
         expiry_date: itemData.expiry_date,
         manufacturer: itemData.manufacturer,
-      };
-
-      const res = await axios.post<InventoryItem>(`${API_BASE}/inventory/`, payload);
+      });
 
       // Notify parent to update inventory state
-      onInventoryUpdate(res.data);
+      onInventoryUpdate(newItem);
 
       toast.success('Stock added successfully');
       setItemData({

@@ -1,50 +1,6 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-
-interface MedicineItem {
-  id: number;
-  name: string;
-  dosage: string;
-  quantity: number;
-  unitPrice: number;
-}
-
-interface DiagnosticItem {
-  id: number;
-  name: string;
-  cost: number;
-}
-
-interface BillingRecord {
-  id: number;
-  patientId: number;
-  isFinalized: boolean;
-  finalizedDate?: string;
-  patientName: string;
-  hospitalId: string;
-  admissionDate: string;
-  dischargeDate: string;
-  roomWard: string;
-  roomType: string;
-  numberOfDays: number;
-  ratePerDay: number;
-  attendingPhysicianFee: number;
-  specialistFee: number;
-  surgeonFee: number;
-  otherProfessionalFees: number;
-  medicines: MedicineItem[];
-  dietType: string;
-  mealsPerDay: number;
-  dietDuration: number;
-  costPerMeal: number;
-  diagnostics: DiagnosticItem[];
-  suppliesCharge: number;
-  procedureCharge: number;
-  nursingCharge: number;
-  miscellaneousCharge: number;
-  discount: number;
-  philhealthCoverage: number;
-}
+import { BillingRecord } from './types';
 
 interface PatientBillPrintProps {
   billingRecord: BillingRecord;

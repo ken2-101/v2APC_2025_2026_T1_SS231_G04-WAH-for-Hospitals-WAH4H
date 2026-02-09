@@ -7,7 +7,7 @@ export interface MedicineItem {
   name: string;
   dosage: string;
   quantity: number;
-  unit_price: string | number;
+  unitPrice: string | number;
   total_cost?: string | number;
 }
 

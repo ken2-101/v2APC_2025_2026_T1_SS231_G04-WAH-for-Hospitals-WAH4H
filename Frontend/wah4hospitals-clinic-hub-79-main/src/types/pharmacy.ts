@@ -1,6 +1,7 @@
 export interface InventoryItem {
   id: number;
   generic_name: string;
+  item_code?: string;
   brand_name: string;
   description?: string;
   quantity: number;
@@ -36,7 +37,7 @@ export interface MedicationRequest {
   inventory_item: number; // ID only
   inventory_item_detail?: InventoryItem; // full inventory info, read-only
   quantity: number;
-  status: 'pending' | 'approved' | 'denied' | 'dispensed';
+  status: 'pending' | 'approved' | 'denied' | 'dispensed' | 'cancelled' | 'completed';
   notes?: string;
   requested_by?: string;
   approved_by?: string;

@@ -1,15 +1,30 @@
+"""
+laboratory/urls.py
+
+URL Configuration for Laboratory Module.
+Registers ViewSets for laboratory test definitions (catalog) and diagnostic reports (results).
+
+Routes:
+- /api/laboratory/tests/
+- /api/laboratory/reports/
+"""
+
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import LabRequestViewSet, LabResultViewSet, TestParameterViewSet
 
-# Create a router and register viewsets
+from laboratory.api.views import (
+    LabTestDefinitionViewSet,
+    DiagnosticReportViewSet,
+)
+
+# Initialize router
 router = DefaultRouter()
-router.register(r'requests', LabRequestViewSet, basename='lab-request')
-router.register(r'results', LabResultViewSet, basename='lab-result')
-router.register(r'parameters', TestParameterViewSet, basename='test-parameter')
 
-app_name = 'laboratory'
+# Register ViewSets with specific route prefixes
+router.register(r'tests', LabTestDefinitionViewSet, basename='lab-test-definition')
+router.register(r'reports', DiagnosticReportViewSet, basename='diagnostic-report')
 
+# URL patterns
 urlpatterns = [
     path('', include(router.urls)),
 ]
