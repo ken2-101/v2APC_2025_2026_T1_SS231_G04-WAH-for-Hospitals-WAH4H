@@ -161,6 +161,9 @@ SIMPLE_JWT = {
     'USER_ID_CLAIM': 'user_id',
 }
 
+# Feature flags
+# Set to False to disable OTP for login flow only (easy to re-enable)
+LOGIN_USE_OTP = False
 # ============================================================================
 # EMAIL CONFIGURATION (Console Backend for Development)
 # ============================================================================

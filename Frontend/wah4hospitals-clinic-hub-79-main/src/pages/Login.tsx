@@ -40,6 +40,12 @@ const Login = () => {
 
     const result = await loginInitiate(email, password);
     if (result.ok) {
+      // If OTP is disabled on backend, loginInitiate already completed auth
+      if ((result as any).otpDisabled) {
+        navigate('/dashboard');
+        return;
+      }
+
       setStep('otp');
       return;
     }
@@ -75,6 +81,11 @@ const Login = () => {
     setPassword(demoPassword);
     const result = await loginInitiate(demoEmail, demoPassword);
     if (result.ok) {
+      if ((result as any).otpDisabled) {
+        navigate('/dashboard');
+        return;
+      }
+
       setStep('otp');
       return;
     }

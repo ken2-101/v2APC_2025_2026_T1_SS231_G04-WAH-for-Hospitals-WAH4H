@@ -52,6 +52,7 @@ interface RegisterData {
 type AuthResult = {
   ok: boolean;
   error?: any;
+  otpDisabled?: boolean;
 };
 
 interface AuthContextType {
@@ -171,11 +172,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginInitiate = async (email: string, password: string): Promise<AuthResult> => {
     setIsLoading(true);
     try {
-      await axiosInstance.post('/api/accounts/login/initiate/', {
+      const res = await axiosInstance.post('/api/accounts/login/initiate/', {
         email,
         password,
       });
 
+      // If backend returned tokens (OTP disabled), perform auto-login client-side
+      const tokens = res?.data?.data?.tokens;
+      const rawUser = res?.data?.data?.user;
+
+      if (tokens && rawUser) {
+        // Store tokens
+        localStorage.setItem('accessToken', tokens.access);
+        localStorage.setItem('refreshToken', tokens.refresh);
+
+        const userObj: User = {
+          id: String(rawUser.id),
+          email: rawUser.email,
+          firstName: rawUser.first_name || rawUser.firstName || '',
+          lastName: rawUser.last_name || rawUser.lastName || '',
+          role: rawUser.role as UserRole,
+        };
+
+        setUser(userObj);
+
+        toast({
+          title: 'Welcome back!',
+          description: `Logged in as ${userObj.firstName} ${userObj.lastName} (${userObj.role})`,
+        });
+
+        return { ok: true, otpDisabled: true };
+      }
+
+      // Default OTP flow
       toast({
         title: 'Verification code sent',
         description: 'Please check your email for the login code.',

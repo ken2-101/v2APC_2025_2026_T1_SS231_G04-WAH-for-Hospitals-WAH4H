@@ -324,7 +324,26 @@ class LoginInitiateAPIView(APIView):
         try:
             serializer.is_valid(raise_exception=True)
             user = serializer.save()
-            
+            # If OTP for login is disabled via settings, short-circuit and return tokens
+            if not getattr(settings, 'LOGIN_USE_OTP', True):
+                tokens = get_jwt_tokens(user)
+                return success_response(
+                    message='Login successful (OTP disabled).',
+                    data={
+                        'user': {
+                            'id': user.practitioner.practitioner_id,
+                            'username': user.username,
+                            'email': user.email,
+                            'first_name': user.first_name,
+                            'last_name': user.last_name,
+                            'role': user.role
+                        },
+                        'tokens': tokens,
+                        'otp_sent': False,
+                        'otp_disabled': True
+                    }
+                )
+
             # Send OTP via email using spam-proof HTML template
             send_otp_email(
                 user_email=user.email,
@@ -422,15 +441,51 @@ class LoginVerifyAPIView(APIView):
     permission_classes = [AllowAny]
     
     def post(self, request):
+        # If OTP for login is disabled, accept email and return tokens directly
+        if not getattr(settings, 'LOGIN_USE_OTP', True):
+            email = request.data.get('email')
+            if not email:
+                return error_response(
+                    message='Email is required when OTP is disabled.',
+                    errors={'email': 'Missing email parameter.'}
+                )
+
+            User = get_user_model()
+            try:
+                user = User.objects.get(email__iexact=email)
+            except User.DoesNotExist:
+                return error_response(
+                    message='User not found.',
+                    errors={'email': 'No user with this email.'},
+                    http_status=status.HTTP_404_NOT_FOUND
+                )
+
+            tokens = get_jwt_tokens(user)
+            return success_response(
+                message='Login successful (OTP disabled).',
+                data={
+                    'user': {
+                        'id': user.practitioner.practitioner_id,
+                        'username': user.username,
+                        'email': user.email,
+                        'first_name': user.first_name,
+                        'last_name': user.last_name,
+                        'role': user.role
+                    },
+                    'tokens': tokens,
+                    'otp_disabled': True
+                }
+            )
+
         serializer = LoginStepTwoSerializer(data=request.data)
-        
+
         try:
             serializer.is_valid(raise_exception=True)
             user = serializer.save()
-            
+
             # Generate JWT tokens
             tokens = get_jwt_tokens(user)
-            
+
             return success_response(
                 message='Login successful.',
                 data={
@@ -445,7 +500,7 @@ class LoginVerifyAPIView(APIView):
                     'tokens': tokens
                 }
             )
-        
+
         except Exception as e:
             return error_response(
                 message='OTP verification failed.',
