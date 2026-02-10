@@ -15,7 +15,7 @@ const SessionTimeout: React.FC<SessionTimeoutProps> = ({ children }) => {
   const [countdown, setCountdown] = useState(30);
 
 // Timeout Configuration
-  const TIMEOUT = 1 * 60 * 1000;      // 1 minute total (60,000 ms)
+  const TIMEOUT = 15 * 60 * 1000;      // 15 minutes total (900,000 ms)
   const WARNING_TIME = 30 * 1000;     // Show warning after 30 seconds (leaves 30s to react)
 
   const handleOnIdle = () => {

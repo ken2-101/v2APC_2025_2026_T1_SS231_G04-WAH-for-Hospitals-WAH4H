@@ -115,10 +115,12 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader className="flex items-center justify-between">
-          <DialogTitle>Edit Patient - {patient.patient_id}</DialogTitle>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            <X className="w-5 h-5" />
-          </Button>
+          <DialogTitle>Edit Patient - {String(patient.patient_id || '').toUpperCase()}</DialogTitle>
+          <DialogClose asChild>
+            <Button variant="ghost" size="sm" aria-label="Close">
+              <X className="w-5 h-5" />
+            </Button>
+          </DialogClose>
         </DialogHeader>
 
         {/* Error Message */}
@@ -212,7 +214,22 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
             <FormField
               label="Mobile Number"
               error={errors.mobile_number}
-              {...register('mobile_number')}
+              inputMode="tel"
+              pattern="^(?:\\+63\\d{10}|0\\d{10})$"
+              maxLength={13}
+              {...register('mobile_number', {
+                onChange: (e: any) => {
+                  const raw = e.target.value || '';
+                  const hadPlus = raw.startsWith('+');
+                  const digits = raw.replace(/\D/g, '');
+                  if (hadPlus) {
+                    const trimmed = digits.slice(0, 12);
+                    e.target.value = '+' + trimmed;
+                  } else {
+                    e.target.value = digits.slice(0, 11);
+                  }
+                },
+              })}
               placeholder="e.g., 09123456789"
             />
 
@@ -285,7 +302,15 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
                 <FormField
                   label="Postal Code"
                   error={errors.address_postal_code}
-                  {...register('address_postal_code')}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={4}
+                  {...register('address_postal_code', {
+                    onChange: (e: any) => {
+                      const v = (e.target.value || '').replace(/\D/g, '').slice(0, 4);
+                      e.target.value = v;
+                    },
+                  })}
                   placeholder="e.g., 1234"
                 />
                 <FormField
@@ -304,7 +329,15 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
             <FormField
               label="PhilHealth ID"
               error={errors.philhealth_id}
-              {...register('philhealth_id')}
+              inputMode="text"
+              pattern="^[A-Z0-9-]{3,20}$"
+              maxLength={20}
+              {...register('philhealth_id', {
+                onChange: (e: any) => {
+                  const v = (e.target.value || '').toUpperCase().replace(/\s+/g, '').replace(/[^A-Z0-9-]/g, '').slice(0, 20);
+                  e.target.value = v;
+                },
+              })}
               placeholder="e.g., PH-123456-789"
             />
 

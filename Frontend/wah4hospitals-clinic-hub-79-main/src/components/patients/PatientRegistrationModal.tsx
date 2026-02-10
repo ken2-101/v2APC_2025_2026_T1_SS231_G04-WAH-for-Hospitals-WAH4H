@@ -203,11 +203,9 @@ export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> =
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
-      console.log('[PatientRegistrationModal] Dialog onOpenChange called, open:', open, 'currentStep:', currentStep);
+      // Ensure explicit close triggers the modal cleanup
       if (!open) {
-        console.warn('[PatientRegistrationModal] Dialog trying to close on step:', currentStep);
-        // Only allow close from handleClose() function, not from dialog internal events
-        // onClose();
+        handleClose();
       }
     }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" onPointerDownOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
@@ -312,13 +310,15 @@ const Step1Form = ({ form }: { form: any }) => {
       {/* Name Fields */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <FormField
-          label="Last Name *"
+          label="Last Name"
+          required
           error={errors.last_name}
           {...register('last_name')}
           placeholder="e.g., Dela Cruz"
         />
         <FormField
-          label="First Name *"
+          label="First Name"
+          required
           error={errors.first_name}
           {...register('first_name')}
           placeholder="e.g., Juan"
@@ -340,13 +340,15 @@ const Step1Form = ({ form }: { form: any }) => {
       {/* Demographics */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <FormField
-          label="Date of Birth *"
+          label="Date of Birth"
+          required
           type="date"
           error={errors.birthdate}
           {...register('birthdate')}
         />
         <SelectField
-          label="Gender *"
+          label="Gender"
+          required
           error={errors.gender}
           {...register('gender')}
           options={[{ value: '', label: 'Select Gender' }, ...GENDER_OPTIONS]}
@@ -425,7 +427,15 @@ const Step1Form = ({ form }: { form: any }) => {
       <FormField
         label="PhilHealth ID"
         error={errors.philhealth_id}
-        {...register('philhealth_id')}
+        inputMode="text"
+        pattern="^[A-Z0-9-]{3,20}$"
+        maxLength={20}
+        {...register('philhealth_id', {
+          onChange: (e: any) => {
+            const v = (e.target.value || '').toUpperCase().replace(/\s+/g, '').replace(/[^A-Z0-9-]/g, '').slice(0, 20);
+            e.target.value = v;
+          },
+        })}
         placeholder="e.g., PH-123456-789"
       />
 
@@ -462,9 +472,27 @@ const Step2Form = ({ form }: { form: any }) => {
   return (
     <div className="space-y-4">
       <FormField
-        label="Mobile Number *"
+        label="Mobile Number"
+        required
         error={errors.mobile_number}
-        {...register('mobile_number')}
+        inputMode="tel"
+        pattern="^(?:\\+63\\d{10}|0\\d{10})$"
+        maxLength={13}
+        {...register('mobile_number', {
+          onChange: (e: any) => {
+            const raw = e.target.value || '';
+            const hadPlus = raw.startsWith('+');
+            const digits = raw.replace(/\D/g, '');
+            if (hadPlus) {
+              // keep leading + and limit to country code + 10 digits (e.g. +639XXXXXXXXX)
+              const trimmed = digits.slice(0, 12); // '63' + 10 digits = 12
+              e.target.value = '+' + trimmed;
+            } else {
+              // local format: limit to 11 digits (e.g. 09123456789)
+              e.target.value = digits.slice(0, 11);
+            }
+          },
+        })}
         placeholder="e.g., 09123456789"
       />
 
@@ -522,7 +550,8 @@ const Step2Form = ({ form }: { form: any }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {hasCities ? (
             <SelectField
-              label="City/Municipality *"
+              label="City/Municipality"
+              required
               error={errors.address_city}
               {...register('address_city', {
                 onChange: () => {
@@ -539,7 +568,8 @@ const Step2Form = ({ form }: { form: any }) => {
             />
           ) : (
             <FormField
-              label="City/Municipality *"
+              label="City/Municipality"
+              required
               error={errors.address_city}
               {...register('address_city')}
               placeholder="Enter city/municipality name"
@@ -548,7 +578,8 @@ const Step2Form = ({ form }: { form: any }) => {
           )}
           {hasBarangays ? (
             <SelectField
-              label="Barangay *"
+              label="Barangay"
+              required
               error={errors.address_line}
               {...register('address_line')}
               options={[
@@ -561,7 +592,8 @@ const Step2Form = ({ form }: { form: any }) => {
             />
           ) : (
             <FormField
-              label="Barangay *"
+              label="Barangay"
+              required
               error={errors.address_line}
               {...register('address_line')}
               placeholder="Enter barangay name"
@@ -575,7 +607,15 @@ const Step2Form = ({ form }: { form: any }) => {
         <FormField
           label="Postal Code"
           error={errors.address_postal_code}
-          {...register('address_postal_code')}
+          inputMode="numeric"
+          pattern="[0-9]*"
+          maxLength={4}
+          {...register('address_postal_code', {
+            onChange: (e: any) => {
+              const v = (e.target.value || '').replace(/\D/g, '').slice(0, 4);
+              e.target.value = v;
+            },
+          })}
           placeholder="e.g., 1234"
         />
         <FormField
@@ -633,10 +673,12 @@ const Step3Form = ({ form }: { form: any }) => {
             type="checkbox"
             id="consent_flag"
             {...register('consent_flag')}
+            required
             className="w-4 h-4 mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           />
           <label htmlFor="consent_flag" className="text-sm text-gray-700 flex-1">
             <span className="font-semibold">I consent to the collection and processing of my personal health data</span>
+            <span className="text-red-500 ml-1">*</span>
             {' '}in accordance with the Data Privacy Act of 2012 (Republic Act No. 10173) and its implementing rules and regulations.
           </label>
         </div>
@@ -661,12 +703,16 @@ const Step3Form = ({ form }: { form: any }) => {
 const FormField = React.forwardRef<
   HTMLInputElement,
   React.InputHTMLAttributes<HTMLInputElement> & { label: string; error?: any }
->(({ label, error, className, ...props }, ref) => (
+>(({ label, error, className, required, ...props }, ref) => (
   <div className="space-y-1">
-    <label className="block text-sm font-medium text-gray-700">{label}</label>
+    <label className="block text-sm font-medium text-gray-700">
+      {label}
+      {required && <span className="text-red-500 ml-1">*</span>}
+    </label>
     <Input
       ref={ref}
       className={error ? 'border-red-500' : ''}
+      required={required}
       {...props}
     />
     {error && <p className="text-xs text-red-500">{error.message}</p>}
@@ -681,14 +727,18 @@ const SelectField = React.forwardRef<
     error?: any;
     options: Array<{ value: string; label: string }>;
   }
->(({ label, error, options, className, ...props }, ref) => (
+>(({ label, error, options, className, required, ...props }, ref) => (
   <div className="space-y-1">
-    <label className="block text-sm font-medium text-gray-700">{label}</label>
+    <label className="block text-sm font-medium text-gray-700">
+      {label}
+      {required && <span className="text-red-500 ml-1">*</span>}
+    </label>
     <select
       ref={ref}
       className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
         error ? 'border-red-500' : 'border-gray-300'
       }`}
+      required={required}
       {...props}
     >
       {options.map(opt => (
@@ -703,15 +753,19 @@ SelectField.displayName = 'SelectField';
 const CheckboxField = React.forwardRef<
   HTMLInputElement,
   React.InputHTMLAttributes<HTMLInputElement> & { label: string; error?: any }
->(({ label, error, ...props }, ref) => (
+>(({ label, error, required, ...props }, ref) => (
   <div className="flex items-center space-x-2">
     <input
       ref={ref}
       type="checkbox"
       className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+      required={required}
       {...props}
     />
-    <label className="text-sm font-medium text-gray-700">{label}</label>
+    <label className="text-sm font-medium text-gray-700">
+      {label}
+      {required && <span className="text-red-500 ml-1">*</span>}
+    </label>
     {error && <p className="text-xs text-red-500">{error.message}</p>}
   </div>
 ));

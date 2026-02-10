@@ -41,12 +41,19 @@ export const ConditionModal: React.FC<ConditionModalProps> = ({
   const [error, setError] = useState('');
   const isEditing = !!condition;
 
+  type ExtendedConditionForm = ConditionFormData & {
+    selected_code?: string;
+    custom_code?: string;
+  };
+
   const {
     register,
     handleSubmit,
     formState: { errors },
     reset,
-  } = useForm<ConditionFormData>({
+    watch,
+    setValue,
+  } = useForm<ExtendedConditionForm>({
     resolver: zodResolver(conditionFormSchema),
     defaultValues: condition
       ? {
@@ -56,6 +63,8 @@ export const ConditionModal: React.FC<ConditionModalProps> = ({
           category: condition.category || '',
           severity: condition.severity || '',
           code: condition.code || '',
+          selected_code: condition.code || '',
+          custom_code: '',
           patient: patientId,
           encounter_id: encounterId,
           body_site: condition.body_site || '',
@@ -67,6 +76,8 @@ export const ConditionModal: React.FC<ConditionModalProps> = ({
           identifier: `COND-${Date.now()}`,
           patient: patientId,
           encounter_id: encounterId,
+          selected_code: '',
+          custom_code: '',
         },
   });
 
@@ -76,6 +87,17 @@ export const ConditionModal: React.FC<ConditionModalProps> = ({
       setError('');
     }
   }, [isOpen, reset]);
+
+  // Keep canonical `code` field in sync with selected or custom inputs
+  useEffect(() => {
+    const subscription = watch((value) => {
+      const selected = (value as any).selected_code || '';
+      const custom = (value as any).custom_code || '';
+      const final = (custom || selected || '').trim();
+      setValue('code' as any, final, { shouldValidate: true, shouldDirty: true });
+    });
+    return () => subscription.unsubscribe();
+  }, [watch, setValue]);
 
   const onSubmit = async (data: ConditionFormData) => {
     setIsLoading(true);
@@ -126,7 +148,7 @@ export const ConditionModal: React.FC<ConditionModalProps> = ({
           <div className="space-y-1">
             <label className="block text-sm font-medium text-gray-700">Condition Code *</label>
             <select
-              {...register('code')}
+              {...register('selected_code')}
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 errors.code ? 'border-red-500' : 'border-gray-300'
               }`}
@@ -141,10 +163,12 @@ export const ConditionModal: React.FC<ConditionModalProps> = ({
             {errors.code && <p className="text-xs text-red-500">{errors.code.message}</p>}
             <p className="text-xs text-gray-500">Or enter custom ICD-10 code</p>
             <Input
-              {...register('code')}
+              {...register('custom_code')}
               placeholder="Custom ICD-10 code (e.g., E11.9)"
               className={errors.code ? 'border-red-500' : ''}
             />
+            {/* Hidden canonical field synced from selected/custom */}
+            <input type="hidden" {...register('code')} />
           </div>
 
           {/* Status Fields */}
