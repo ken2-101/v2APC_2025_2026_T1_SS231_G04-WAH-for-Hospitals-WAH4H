@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 import { useToast } from '@/hooks/use-toast';
 import { UserRole } from './RoleContext';
@@ -84,6 +84,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+
+  // Restore user from localStorage on mount so SPA refresh doesn't log out
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('currentUser');
+      if (raw) {
+        const parsed: User = JSON.parse(raw);
+        setUser(parsed);
+      }
+    } catch (err) {
+      // If parsing fails, clear inconsistent storage
+      localStorage.removeItem('currentUser');
+    }
+  }, []);
 
   // Create axios instance with base configuration
   const axiosInstance = axios.create({
@@ -195,6 +209,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
 
         setUser(userObj);
+        // Persist minimal user info so page refresh can restore session state
+        try {
+          localStorage.setItem('currentUser', JSON.stringify(userObj));
+          localStorage.setItem('userRole', String(userObj.role));
+        } catch (err) {
+          console.warn('Failed to persist currentUser to localStorage', err);
+        }
 
         toast({
           title: 'Welcome back!',
@@ -253,6 +274,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
 
       setUser(userObj);
+      // Persist minimal user info so page refresh can restore session state
+      try {
+        localStorage.setItem('currentUser', JSON.stringify(userObj));
+        localStorage.setItem('userRole', String(userObj.role));
+      } catch (err) {
+        console.warn('Failed to persist currentUser to localStorage', err);
+      }
 
       toast({
         title: 'Welcome back!',
@@ -523,6 +551,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
 
       setUser(userObj);
+      // Persist minimal user info so page refresh can restore session state
+      try {
+        localStorage.setItem('currentUser', JSON.stringify(userObj));
+        localStorage.setItem('userRole', String(userObj.role));
+      } catch (err) {
+        console.warn('Failed to persist currentUser to localStorage', err);
+      }
 
       toast({
         title: 'Welcome!',

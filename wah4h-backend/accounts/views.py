@@ -121,8 +121,48 @@ class RegisterInitiateAPIView(APIView):
         
         try:
             serializer.is_valid(raise_exception=True)
-            
-            # Generate OTP
+
+            # If registration OTP is disabled, create account immediately and return tokens
+            if not getattr(settings, 'REGISTER_USE_OTP', True):
+                try:
+                    from .serializers import VerifyAccountSerializer
+                    # Prepare data for account creation
+                    create_data = serializer.validated_data.copy()
+                    # Remove confirm_password
+                    create_data.pop('confirm_password', None)
+
+                    # Ensure birth_date is a date object (it already should be from serializer)
+                    with transaction.atomic():
+                        verifier = VerifyAccountSerializer()
+                        user = verifier.create_account(create_data)
+
+                        # Generate JWT tokens for immediate login
+                        tokens = get_jwt_tokens(user)
+
+                    return success_response(
+                        message='Account created successfully. You are now logged in.',
+                        data={
+                            'user': {
+                                'id': user.practitioner.practitioner_id,
+                                'username': user.username,
+                                'email': user.email,
+                                'first_name': user.first_name,
+                                'last_name': user.last_name,
+                                'role': user.role
+                            },
+                            'tokens': tokens,
+                            'otp_disabled': True
+                        },
+                        http_status=status.HTTP_201_CREATED
+                    )
+                except Exception as e:
+                    return error_response(
+                        message='Account creation failed.',
+                        errors={'detail': str(e)},
+                        http_status=status.HTTP_400_BAD_REQUEST
+                    )
+
+            # Generate OTP (normal flow)
             otp = generate_otp()
             
             # Prepare data for caching
@@ -145,7 +185,7 @@ class RegisterInitiateAPIView(APIView):
                 user_firstname=cache_data.get('first_name', 'User'),
                 otp_code=otp
             )
-            
+
             return success_response(
                 message='Registration initiated. Please check your email for the verification code.',
                 data={
