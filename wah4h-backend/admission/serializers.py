@@ -5,7 +5,7 @@ from django.utils import timezone
 from datetime import date
 from admission.models import Encounter, Procedure, ProcedurePerformer
 from patients.services.patient_acl import validate_patient_exists, get_patient_summary
-from accounts.services.accounts_acl import PractitionerACL, LocationACL
+from accounts.models import Practitioner, Location
 import random
 
 # ============================================================================
