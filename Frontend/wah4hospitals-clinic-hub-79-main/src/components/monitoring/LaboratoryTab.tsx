@@ -7,8 +7,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, FileText, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { Plus, FileText, AlertCircle, CheckCircle, Clock, Zap } from 'lucide-react';
 import { LabRequest, LabResult } from '../../types/monitoring';
+
+// Debug mode - only visible in development
+const DEBUG_MODE = import.meta.env.DEV || process.env.NODE_ENV === 'development';
 
 interface LaboratoryTabProps {
     labRequests: LabRequest[];
@@ -110,6 +113,25 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
             reportedBy: '',
             reportedAt: new Date().toISOString(),
         });
+    };
+
+    // DEBUG: Simulate lab completion (temporary until Lab Module is implemented)
+    const handleDebugCompleteTest = (request: LabRequest) => {
+        if (!DEBUG_MODE) return;
+
+        const mockResult: LabResult = {
+            findings: `[DEBUG] Mock laboratory findings for ${request.testName}. All values within normal ranges.`,
+            values: [
+                { parameter: 'WBC', value: '7.5', reference: '4.0-11.0 x10^9/L' },
+                { parameter: 'RBC', value: '4.8', reference: '4.5-5.5 x10^12/L' },
+                { parameter: 'Hemoglobin', value: '14.2', reference: '13.0-17.0 g/dL' },
+            ],
+            interpretation: '[DEBUG] Results are within normal limits. No abnormal findings detected. This is simulated data for testing.',
+            reportedBy: 'Lab Debug System',
+            reportedAt: new Date().toISOString(),
+        };
+
+        onUpdateResult?.(request.id, mockResult);
     };
 
     const openResultModal = (request: LabRequest) => {
@@ -224,6 +246,18 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
                                             className="bg-green-600 hover:bg-green-700 text-white"
                                         >
                                             Enter Results
+                                        </Button>
+                                    )}
+                                    {/* DEBUG ONLY: Simulate lab completion */}
+                                    {DEBUG_MODE && request.lifecycleStatus !== 'completed' && (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => handleDebugCompleteTest(request)}
+                                            className="bg-orange-50 hover:bg-orange-100 border-orange-300 text-orange-700"
+                                        >
+                                            <Zap className="w-3.5 h-3.5 mr-1" />
+                                            [DEBUG] Complete
                                         </Button>
                                     )}
                                 </div>

@@ -15,8 +15,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from '@/components/ui/badge';
-import { Plus, Pill, Trash2 } from 'lucide-react';
+import { Plus, Pill, Trash2, Zap } from 'lucide-react';
 import { toast } from 'sonner';
+
+// Debug mode - only visible in development
+const DEBUG_MODE = import.meta.env.DEV || process.env.NODE_ENV === 'development';
 
 import { InventoryItem, MedicationRequest } from '@/types/pharmacy';
 import pharmacyService from '@/services/pharmacyService';
@@ -133,6 +136,24 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
     }
   };
 
+  // DEBUG: Simulate pharmacy dispensing (temporary until Pharmacy Module is implemented)
+  const handleDebugDispense = async (requestId: number) => {
+    if (!DEBUG_MODE) return;
+
+    try {
+      // Update request status to 'dispensed' via API
+      await pharmacyService.updateRequestStatus(requestId, 'dispensed');
+
+      // Refresh the requests list to reflect the change
+      await fetchRequests();
+
+      toast.success('[DEBUG] Medication dispensed successfully');
+    } catch (err: any) {
+      console.error('Debug dispense failed:', err);
+      toast.error('Failed to dispense: ' + (err.message || 'Unknown error'));
+    }
+  };
+
   const getStatusBadge = (status: MedicationRequest['status']) => {
     if (status === 'dispensed' || status === 'completed') {
       return (
@@ -177,24 +198,24 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
     <div className="space-y-6">
       {/* Header and Controls */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Label className="text-sm font-medium text-gray-700">Filter Status:</Label>
-            <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="border border-gray-300 rounded-md text-sm p-2 focus:ring-2 focus:ring-purple-500 hover:border-purple-400 transition-colors"
-                style={{ minWidth: '140px' }}
-            >
-                <option value="all">All Requests</option>
-                <option value="pending">Pending</option>
-                <option value="approved">Approved</option>
-                <option value="dispensed">Dispensed</option>
-                <option value="denied">Denied</option>
-            </select>
-          </div>
-          <Button onClick={() => setIsModalOpen(true)} className="bg-purple-600 hover:bg-purple-700 shadow-md transition-all">
-            <Plus className="w-4 h-4 mr-2" /> Request Medication
-          </Button>
+        <div className="flex items-center gap-2">
+          <Label className="text-sm font-medium text-gray-700">Filter Status:</Label>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="border border-gray-300 rounded-md text-sm p-2 focus:ring-2 focus:ring-purple-500 hover:border-purple-400 transition-colors"
+            style={{ minWidth: '140px' }}
+          >
+            <option value="all">All Requests</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="dispensed">Dispensed</option>
+            <option value="denied">Denied</option>
+          </select>
+        </div>
+        <Button onClick={() => setIsModalOpen(true)} className="bg-purple-600 hover:bg-purple-700 shadow-md transition-all">
+          <Plus className="w-4 h-4 mr-2" /> Request Medication
+        </Button>
       </div>
 
       {/* Empty state */}
@@ -205,81 +226,91 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
           </div>
           <h3 className="text-md font-semibold text-gray-900 mb-1">No Requests Found</h3>
           <p className="text-sm text-gray-500 text-center max-w-sm">
-             Start by requesting a medication for this patient.
+            Start by requesting a medication for this patient.
           </p>
         </div>
       )}
 
       {/* Filtered Empty State */}
       {requests.length > 0 && filteredRequests.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-12 text-gray-500">
-              <p>No requests match the selected filter.</p>
-              <Button variant="link" onClick={() => setStatusFilter('all')}>Clear Filter</Button>
-          </div>
+        <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+          <p>No requests match the selected filter.</p>
+          <Button variant="link" onClick={() => setStatusFilter('all')}>Clear Filter</Button>
+        </div>
       )}
 
       {/* Requests list */}
       <div className="space-y-3">
         {filteredRequests.map((req) => (
-            <Card key={req.id} className={`shadow-sm hover:shadow-md transition-all border-l-4 ${
-                req.status === 'cancelled' || req.status === 'denied' ? 'border-l-red-500' :
-                req.status === 'completed' || req.status === 'dispensed' ? 'border-l-green-500' :
+          <Card key={req.id} className={`shadow-sm hover:shadow-md transition-all border-l-4 ${req.status === 'cancelled' || req.status === 'denied' ? 'border-l-red-500' :
+              req.status === 'completed' || req.status === 'dispensed' ? 'border-l-green-500' :
                 req.status === 'approved' ? 'border-l-blue-500' :
-                'border-l-yellow-500'
+                  'border-l-yellow-500'
             }`}>
             <CardHeader className="pb-3 bg-gradient-to-r from-gray-50/50 to-transparent">
-                <div className="flex justify-between items-start">
+              <div className="flex justify-between items-start">
                 <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-1">
-                    <Pill className={`w-5 h-5 ${
-                         req.status === 'cancelled' ? 'text-red-500' : 'text-purple-600'
-                    }`} />
+                  <div className="flex items-center gap-3 mb-1">
+                    <Pill className={`w-5 h-5 ${req.status === 'cancelled' ? 'text-red-500' : 'text-purple-600'
+                      }`} />
                     <CardTitle className="text-md font-bold text-gray-900">
-                        {req.inventory_item_detail?.generic_name || 'Unknown Medication'}
+                      {req.inventory_item_detail?.generic_name || 'Unknown Medication'}
                     </CardTitle>
-                    </div>
-                    {req.inventory_item_detail?.brand_name && (
+                  </div>
+                  {req.inventory_item_detail?.brand_name && (
                     <p className="text-xs text-gray-600 ml-8 font-medium">
-                        Brand: {req.inventory_item_detail.brand_name}
+                      Brand: {req.inventory_item_detail.brand_name}
                     </p>
-                    )}
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
-                    {getStatusBadge(req.status)}
-                    <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8 text-gray-400 hover:text-red-600 hover:bg-red-50"
-                        onClick={() => setRequestToDelete(req.id)}
-                        title="Delete Request"
+                  {getStatusBadge(req.status)}
+                  {/* DEBUG ONLY: Simulate pharmacy dispensing */}
+                  {DEBUG_MODE && req.status !== 'dispensed' && req.status !== 'completed' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleDebugDispense(req.id)}
+                      className="bg-orange-50 hover:bg-orange-100 border-orange-300 text-orange-700 text-xs"
                     >
-                        <Trash2 className="w-4 h-4" />
+                      <Zap className="w-3 h-3 mr-1" />
+                      [DEBUG] Dispense
                     </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                    onClick={() => setRequestToDelete(req.id)}
+                    title="Delete Request"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
                 </div>
-                </div>
+              </div>
             </CardHeader>
             <CardContent className="space-y-3 pt-2">
-                <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="bg-gray-50 rounded p-2">
-                    <span className="text-[10px] text-gray-500 uppercase tracking-wide font-bold">Quantity</span>
-                    <p className="text-sm font-semibold text-gray-900">{req.quantity}</p>
+                  <span className="text-[10px] text-gray-500 uppercase tracking-wide font-bold">Quantity</span>
+                  <p className="text-sm font-semibold text-gray-900">{req.quantity}</p>
                 </div>
                 <div className="bg-gray-50 rounded p-2">
-                    <span className="text-[10px] text-gray-500 uppercase tracking-wide font-bold">Request ID</span>
-                    <p className="text-sm font-mono text-gray-900">#{req.id}</p>
+                  <span className="text-[10px] text-gray-500 uppercase tracking-wide font-bold">Request ID</span>
+                  <p className="text-sm font-mono text-gray-900">#{req.id}</p>
                 </div>
-                </div>
-                {req.notes && (
+              </div>
+              {req.notes && (
                 <div className="bg-blue-50 rounded p-3 border-l-2 border-blue-300 text-xs">
-                    <span className="font-bold text-blue-700 block mb-1">Notes:</span>
-                    <p className="text-gray-700">{req.notes}</p>
+                  <span className="font-bold text-blue-700 block mb-1">Notes:</span>
+                  <p className="text-gray-700">{req.notes}</p>
                 </div>
-                )}
+              )}
             </CardContent>
             <CardFooter className="pt-2 pb-2 bg-gray-50/80 text-[10px] text-center text-gray-400">
-                Requested on {new Date(req.requested_at || '').toLocaleDateString()}
+              Requested on {new Date(req.requested_at || '').toLocaleDateString()}
             </CardFooter>
-            </Card>
+          </Card>
         ))}
       </div>
 
