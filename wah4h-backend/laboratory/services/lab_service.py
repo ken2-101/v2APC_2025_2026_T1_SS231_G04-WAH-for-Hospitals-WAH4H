@@ -24,7 +24,7 @@ from laboratory.models import (
 
 # ACL Imports for validation
 from patients.services.patient_acl import validate_patient_exists
-from admission.services.admission_acl import EncounterACL
+from admission.serializers import EncounterACL
 
 
 class LabCatalogService:

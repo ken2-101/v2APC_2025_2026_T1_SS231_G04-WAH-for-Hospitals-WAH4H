@@ -148,7 +148,7 @@ class DiagnosticReportInputSerializer(serializers.Serializer):
 
     def validate_encounter_id(self, value):
         """Validate encounter exists."""
-        from admission.services.admission_acl import EncounterACL
+        from admission.serializers import EncounterACL
         if not EncounterACL.validate_encounter_exists(value):
             raise serializers.ValidationError(f"Encounter with ID {value} does not exist")
         return value
@@ -157,7 +157,7 @@ class DiagnosticReportInputSerializer(serializers.Serializer):
         """Cross-field validation."""
         # Ensure encounter belongs to patient
         if 'subject_id' in data and 'encounter_id' in data:
-            from admission.services.admission_acl import EncounterACL
+            from admission.serializers import EncounterACL
             encounter_details = EncounterACL.get_encounter_details(data['encounter_id'])
             if encounter_details and encounter_details.get('subject_id') != data['subject_id']:
                 raise serializers.ValidationError(
@@ -223,7 +223,7 @@ class DiagnosticReportOutputSerializer(serializers.ModelSerializer):
 
     def get_encounter_summary(self, obj):
         """Enrich with encounter data from AdmissionACL."""
-        from admission.services.admission_acl import EncounterACL
+        from admission.serializers import EncounterACL
         if obj.encounter_id:
             encounter = EncounterACL.get_encounter_details(obj.encounter_id)
             if encounter:

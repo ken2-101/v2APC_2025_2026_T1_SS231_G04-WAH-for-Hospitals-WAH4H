@@ -12,12 +12,12 @@ Purpose:
 
 Architecture Pattern: Fortress Pattern (Read-Only ACL Consumer)
     - IMPORTS: Only from billing.models + external ACLs (NOT direct app models)
-    - ORCHESTRATION: Calls EncounterService, LabCatalogACL, InventoryACL, MedicationRequestACL
+    - ORCHESTRATION: Calls EncounterACL, LabCatalogACL, InventoryACL, MedicationRequestACL
     - TRANSACTIONS: Atomic invoice creation with line items and pricing components
     - RESILIENCE: Gracefully handles missing prices (defaults to 0.00)
 
 External Dependencies (Read-Only ACLs):
-    - admission.services.admission_acl (EncounterService, PatientACL)
+    - admission.serializers.EncounterACL (Encounter lookup, Patient summary)
     - pharmacy.services.pharmacy_acl (MedicationRequestACL, InventoryACL)
     - laboratory.services.laboratory_acl (LabReportACL, LabCatalogACL)
     - accounts.models (Organization - direct model access)
@@ -53,7 +53,7 @@ from billing.models import (
 )
 
 # FORTRESS PATTERN: Import ACLs from external apps (NOT direct models)
-from admission.services.admission_acl import EncounterACL
+from admission.serializers import EncounterACL
 from patients.services.patient_acl import get_patient_summary
 from pharmacy.services.pharmacy_acl import MedicationRequestACL, InventoryACL
 from laboratory.services.laboratory_acl import LabReportACL, LabCatalogACL

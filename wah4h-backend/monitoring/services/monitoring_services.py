@@ -19,7 +19,7 @@ from django.core.exceptions import ValidationError
 
 from monitoring.models import Observation, ObservationComponent, ChargeItem
 from patients.services.patient_acl import validate_patient_exists
-from admission.services.admission_acl import EncounterACL
+from admission.serializers import EncounterACL
 from accounts.models import Practitioner, Organization
 
 
