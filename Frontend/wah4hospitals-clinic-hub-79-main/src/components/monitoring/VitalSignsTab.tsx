@@ -14,9 +14,10 @@ interface VitalSignsTabProps {
     vitals: any[]; // raw API response
     onAddVital: (vital: Omit<VitalSign, 'id'>) => void;
     patientId: string;
+    userRole?: string; // Role-based permissions
 }
 
-export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital, patientId }) => {
+export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital, patientId, userRole }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [viewMode, setViewMode] = useState<'table' | 'graph'>('graph');
 
@@ -91,15 +92,15 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
             {/* Controls */}
             <div className="flex justify-between items-center flex-wrap gap-4">
                 <div className="flex gap-2">
-                    <Button 
-                        variant={viewMode === 'graph' ? 'default' : 'outline'} 
+                    <Button
+                        variant={viewMode === 'graph' ? 'default' : 'outline'}
                         onClick={() => setViewMode('graph')}
                         className={viewMode === 'graph' ? 'bg-blue-600 hover:bg-blue-700' : ''}
                     >
                         Graph View
                     </Button>
-                    <Button 
-                        variant={viewMode === 'table' ? 'default' : 'outline'} 
+                    <Button
+                        variant={viewMode === 'table' ? 'default' : 'outline'}
                         onClick={() => setViewMode('table')}
                         className={viewMode === 'table' ? 'bg-blue-600 hover:bg-blue-700' : ''}
                     >
@@ -111,10 +112,13 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
                         <Printer className="w-4 h-4 mr-2" />
                         Print
                     </Button>
-                    <Button onClick={() => setIsModalOpen(true)} className="bg-green-600 hover:bg-green-700">
-                        <Plus className="w-4 h-4 mr-2" />
-                        Record Vitals
-                    </Button>
+                    {/* Role-based permission: Only Doctors and Nurses can record vitals */}
+                    {(userRole?.toLowerCase() === 'doctor' || userRole?.toLowerCase() === 'nurse') && (
+                        <Button onClick={() => setIsModalOpen(true)} className="bg-green-600 hover:bg-green-700">
+                            <Plus className="w-4 h-4 mr-2" />
+                            Record Vitals
+                        </Button>
+                    )}
                 </div>
             </div>
 
@@ -135,7 +139,7 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
                     <AlertTriangle className="h-5 w-5 animate-pulse" />
                     <AlertTitle className="font-bold text-lg">⚠️ Critical Vital Signs Alert</AlertTitle>
                     <AlertDescription className="text-base">
-                        Latest vitals indicate: <strong>{checkAlerts(mappedVitals[mappedVitals.length - 1]).join(', ')}</strong>. 
+                        Latest vitals indicate: <strong>{checkAlerts(mappedVitals[mappedVitals.length - 1]).join(', ')}</strong>.
                         Immediate attention required.
                     </AlertDescription>
                 </Alert>
@@ -278,11 +282,11 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
                                         return (
                                             <TableRow key={v.id} className={alerts.length > 0 ? 'bg-red-50' : ''}>
                                                 <TableCell className="font-medium">
-                                                    {new Date(v.dateTime).toLocaleString('en-PH', { 
-                                                        month: 'short', 
-                                                        day: 'numeric', 
-                                                        hour: '2-digit', 
-                                                        minute: '2-digit' 
+                                                    {new Date(v.dateTime).toLocaleString('en-PH', {
+                                                        month: 'short',
+                                                        day: 'numeric',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit'
                                                     })}
                                                 </TableCell>
                                                 <TableCell className="font-semibold">{v.bloodPressure}</TableCell>
@@ -310,9 +314,9 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
                     <div className="grid grid-cols-2 gap-6 py-6">
                         <div className="space-y-2">
                             <Label className="text-sm font-semibold text-gray-700">Systolic BP (mmHg)</Label>
-                            <Input 
-                                type="number" 
-                                value={bpSys} 
+                            <Input
+                                type="number"
+                                value={bpSys}
                                 onChange={e => setBpSys(e.target.value)}
                                 placeholder="120"
                                 className="text-lg"
@@ -320,9 +324,9 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
                         </div>
                         <div className="space-y-2">
                             <Label className="text-sm font-semibold text-gray-700">Diastolic BP (mmHg)</Label>
-                            <Input 
-                                type="number" 
-                                value={bpDia} 
+                            <Input
+                                type="number"
+                                value={bpDia}
                                 onChange={e => setBpDia(e.target.value)}
                                 placeholder="80"
                                 className="text-lg"
@@ -330,9 +334,9 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
                         </div>
                         <div className="space-y-2">
                             <Label className="text-sm font-semibold text-gray-700">Heart Rate (bpm)</Label>
-                            <Input 
-                                type="number" 
-                                value={hr} 
+                            <Input
+                                type="number"
+                                value={hr}
                                 onChange={e => setHr(e.target.value)}
                                 placeholder="72"
                                 className="text-lg"
@@ -340,9 +344,9 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
                         </div>
                         <div className="space-y-2">
                             <Label className="text-sm font-semibold text-gray-700">Respiratory Rate</Label>
-                            <Input 
-                                type="number" 
-                                value={rr} 
+                            <Input
+                                type="number"
+                                value={rr}
                                 onChange={e => setRr(e.target.value)}
                                 placeholder="16"
                                 className="text-lg"
@@ -350,10 +354,10 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
                         </div>
                         <div className="space-y-2">
                             <Label className="text-sm font-semibold text-gray-700">Temperature (°C)</Label>
-                            <Input 
-                                type="number" 
-                                step="0.1" 
-                                value={temp} 
+                            <Input
+                                type="number"
+                                step="0.1"
+                                value={temp}
                                 onChange={e => setTemp(e.target.value)}
                                 placeholder="36.5"
                                 className="text-lg"
@@ -361,9 +365,9 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
                         </div>
                         <div className="space-y-2">
                             <Label className="text-sm font-semibold text-gray-700">O₂ Saturation (%)</Label>
-                            <Input 
-                                type="number" 
-                                value={o2} 
+                            <Input
+                                type="number"
+                                value={o2}
                                 onChange={e => setO2(e.target.value)}
                                 placeholder="98"
                                 className="text-lg"
@@ -382,5 +386,4 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
             </Dialog>
         </div>
     );
-};   
- 
+};

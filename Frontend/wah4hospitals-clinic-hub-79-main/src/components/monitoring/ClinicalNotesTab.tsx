@@ -16,6 +16,7 @@ interface ClinicalNotesTabProps {
     admissionId: string;
     patientId: number; // Added to get subject_id for service
     onAddNote: (note: ClinicalNote) => void;
+    userRole?: string; // Role-based permissions
 }
 
 export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({
@@ -23,6 +24,7 @@ export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({
     admissionId,
     patientId,
     onAddNote,
+    userRole,
 }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [type, setType] = useState<'SOAP' | 'Progress'>('SOAP');
@@ -65,11 +67,22 @@ export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-end">
-                <Button onClick={() => setIsModalOpen(true)} className="bg-blue-600 hover:bg-blue-700">
-                    <Plus className="w-4 h-4 mr-2" /> Add Clinical Note
-                </Button>
-            </div>
+            {/* Role-based permission: Only Doctors can add clinical notes */}
+            {userRole?.toLowerCase() === 'doctor' && (
+                <div className="flex justify-end">
+                    <Button onClick={() => setIsModalOpen(true)} className="bg-blue-600 hover:bg-blue-700">
+                        <Plus className="w-4 h-4 mr-2" /> Add Clinical Note
+                    </Button>
+                </div>
+            )}
+
+            {userRole?.toLowerCase() !== 'doctor' && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                    <p className="text-sm text-amber-800">
+                        👨‍⚕️ <strong>Read-Only Mode:</strong> Only doctors can add clinical notes.
+                    </p>
+                </div>
+            )}
 
             <div className="space-y-4">
                 {notes.length === 0 && (

@@ -9,12 +9,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, FileText, AlertCircle, CheckCircle, Clock } from 'lucide-react';
 import { LabRequest, LabResult } from '../../types/monitoring';
-import { useRole } from '@/contexts/RoleContext';
 
 interface LaboratoryTabProps {
     labRequests: LabRequest[];
     onAddRequest?: (request: Omit<LabRequest, 'id'>) => void;
     onUpdateResult?: (requestId: string, result: LabResult) => void;
+    userRole?: string; // Role-based permissions
+    admissionId?: string; // For creating requests
 }
 
 const COMMON_LAB_TESTS = [
@@ -39,9 +40,9 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
     labRequests,
     onAddRequest,
     onUpdateResult,
+    userRole,
+    admissionId,
 }) => {
-    const { currentRole, canModify } = useRole();
-
     const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
     const [isResultModalOpen, setIsResultModalOpen] = useState(false);
     const [selectedRequest, setSelectedRequest] = useState<LabRequest | null>(null);
@@ -63,10 +64,11 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
         reportedAt: new Date().toISOString(),
     });
 
-    // Permissions
-    const canOrderLabs = canModify('lab-orders'); // Doctor
-    const canEnterResults = canModify('lab-results'); // Lab Technician
-    const canViewLabs = currentRole === 'doctor' || currentRole === 'nurse' || currentRole === 'lab_technician';
+    // Role-based permissions
+    const normalizedRole = userRole?.toLowerCase() || '';
+    const canOrderLabs = normalizedRole === 'doctor'; // Only doctors can order labs
+    const canEnterResults = normalizedRole === 'laboratory'; // Only laboratory staff can enter results
+    const canViewLabs = ['doctor', 'nurse', 'laboratory'].includes(normalizedRole); // All clinical staff can view
 
     const handleOrderSubmit = () => {
         if (!orderForm.testCode || !orderForm.testName) {
@@ -75,13 +77,13 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
         }
 
         const newRequest: Omit<LabRequest, 'id'> = {
-            admissionId: '', // Will be set by parent
+            admissionId: admissionId || '', // Use passed admissionId
             testCode: orderForm.testCode,
             testName: orderForm.testName,
             priority: orderForm.priority,
             notes: orderForm.notes,
             lifecycleStatus: 'ordered',
-            orderedBy: currentRole,
+            orderedBy: userRole || 'Unknown',
             orderedAt: new Date().toISOString(),
         };
 

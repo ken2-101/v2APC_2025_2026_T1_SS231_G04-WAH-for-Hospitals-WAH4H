@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
@@ -16,8 +17,14 @@ import { MonitoringDashboard } from '@/components/monitoring/MonitoringDashboard
 import { Activity, Users, AlertTriangle, Heart } from 'lucide-react';
 import { admissionService } from '@/services/admissionService';
 import monitoringService from '@/services/monitoringService';
+import { useAuth } from '@/contexts/AuthContext';
+import { RoleBadge } from '@/components/monitoring/RoleBadge';
 
 const Monitoring: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const { user } = useAuth();
+  const userRole = user?.role || 'doctor';
+
   const [currentView, setCurrentView] = useState<'dashboard' | 'patient'>('dashboard');
   const [admissions, setAdmissions] = useState<MonitoringAdmission[]>([]);
   const [selectedAdmission, setSelectedAdmission] = useState<MonitoringAdmission | null>(null);
@@ -65,6 +72,17 @@ const Monitoring: React.FC = () => {
     };
     fetchAdmissions();
   }, []);
+
+  // Auto-select admission from URL parameter (coming from Admission page)
+  useEffect(() => {
+    const admissionId = searchParams.get('admission_id');
+    if (admissionId && admissions.length > 0) {
+      const admission = admissions.find(a => a.id.toString() === admissionId);
+      if (admission) {
+        handleSelectAdmission(admission);
+      }
+    }
+  }, [searchParams, admissions]);
 
   // Filter handlers
   const handleFilterChange = (key: string, value: string) => {

@@ -2,9 +2,10 @@
 // src/pages/Admission.tsx
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Plus, Search, RefreshCw, LayoutGrid, List, MoreHorizontal
+import {
+  Plus, Search, RefreshCw, LayoutGrid, List, MoreHorizontal, Activity
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Admission } from '@/types/admission';
 import { admissionService } from '@/services/admissionService';
 import RoomManagementView from '@/components/admission/RoomManagementView';
@@ -25,7 +26,7 @@ const StatusBadge = ({ status }: { status: string }) => {
     'finished': 'bg-gray-100 text-gray-700',
     'cancelled': 'bg-red-100 text-red-700',
   };
-  
+
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${styles[status] || styles['finished']}`}>
       {(status || '').replace('-', ' ')}
@@ -46,8 +47,8 @@ const CapacityCard = ({ name, type, occupied, total, status }: any) => {
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{type === 'wa' ? 'General Ward' : 'Specialized Unit'}</p>
           </div>
           <div className="text-right">
-             <span className="text-2xl font-bold text-gray-900">{occupied}</span>
-             <span className="text-sm text-gray-400">/{total}</span>
+            <span className="text-2xl font-bold text-gray-900">{occupied}</span>
+            <span className="text-sm text-gray-400">/{total}</span>
           </div>
         </div>
         <div className="space-y-1.5">
@@ -72,7 +73,8 @@ const AdmissionPage = () => {
   const [activeTab, setActiveTab] = useState<'patients' | 'rooms'>('patients');
   const [statusFilter, setStatusFilter] = useState('in-progress');
   const [searchQuery, setSearchQuery] = useState('');
-  
+  const navigate = useNavigate();
+
   // Modal States
   const [isAdmitModalOpen, setIsAdmitModalOpen] = useState(false);
   const [selectedAdmission, setSelectedAdmission] = useState<Admission | null>(null);
@@ -83,29 +85,29 @@ const AdmissionPage = () => {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-        const [adm, loc] = await Promise.all([admissionService.getAll(), admissionService.getLocations()]);
-        setAdmissions(adm || []);
-        setLocations(loc || null);
+      const [adm, loc] = await Promise.all([admissionService.getAll(), admissionService.getLocations()]);
+      setAdmissions(adm || []);
+      setLocations(loc || null);
     } catch (e) {
-        console.error("Fetch Data Error", e);
+      console.error("Fetch Data Error", e);
     } finally {
-        setIsLoading(false);
+      setIsLoading(false);
     }
   };
 
   const filteredAdmissions = admissions.filter(a => {
     const matchesStatus = statusFilter === 'all' ? true : a.status === statusFilter;
-    const matchesSearch = (a.patientName || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          (a.admissionNo || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = (a.patientName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (a.admissionNo || '').toLowerCase().includes(searchQuery.toLowerCase());
     return matchesStatus && matchesSearch;
   });
-  
+
   // Calculate counts
   const counts = {
-      'in-progress': admissions.filter(a => a.status === 'in-progress').length,
-      'planned': admissions.filter(a => a.status === 'planned').length,
-      'finished': admissions.filter(a => a.status === 'finished').length,
-      'all': admissions.length
+    'in-progress': admissions.filter(a => a.status === 'in-progress').length,
+    'planned': admissions.filter(a => a.status === 'planned').length,
+    'finished': admissions.filter(a => a.status === 'finished').length,
+    'all': admissions.length
   };
 
   const getWardStats = () => {
@@ -119,21 +121,21 @@ const AdmissionPage = () => {
     });
     return stats;
   };
-  
+
   const formatDate = (dateStr?: string) => {
-      if (!dateStr) return { full: 'N/A', relative: '' };
-      const date = new Date(dateStr);
-      return {
-          full: date.toLocaleString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric', hour12: true }),
-          relative: formatDistanceToNow(date, { addSuffix: true })
-      };
+    if (!dateStr) return { full: 'N/A', relative: '' };
+    const date = new Date(dateStr);
+    return {
+      full: date.toLocaleString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric', hour12: true }),
+      relative: formatDistanceToNow(date, { addSuffix: true })
+    };
   };
 
   if (isLoading) return <div className="h-screen flex items-center justify-center text-blue-600 font-medium animate-pulse">Loading Hospital System...</div>;
 
   return (
     <div className="p-6 md:p-8 space-y-8 bg-slate-50 min-h-screen font-sans">
-      
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
         <div>
@@ -160,7 +162,7 @@ const AdmissionPage = () => {
 
       {activeTab === 'patients' && (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          
+
           {/* Stats Overview */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {getWardStats().slice(0, 4).map((ward) => (
@@ -174,18 +176,18 @@ const AdmissionPage = () => {
             <div className="p-4 border-b border-slate-100 flex flex-wrap gap-4 justify-between items-center bg-white sticky top-0 z-10">
               <div className="flex gap-2 p-1 bg-slate-50 rounded-lg">
                 {[
-                    { key: 'in-progress', label: 'IN-PROGRESS' },
-                    { key: 'finished', label: 'FINISHED' },
-                    { key: 'all', label: 'ALL' }
+                  { key: 'in-progress', label: 'IN-PROGRESS' },
+                  { key: 'finished', label: 'FINISHED' },
+                  { key: 'all', label: 'ALL' }
                 ].map(tab => (
-                  <button 
-                    key={tab.key} 
-                    onClick={() => setStatusFilter(tab.key)} 
+                  <button
+                    key={tab.key}
+                    onClick={() => setStatusFilter(tab.key)}
                     className={`px-4 py-2 text-xs font-bold rounded-md uppercase transition-all flex items-center gap-2 ${statusFilter === tab.key ? 'bg-emerald-100 text-emerald-800 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}`}
                   >
                     {tab.label}
                     <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${statusFilter === tab.key ? 'bg-white text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
-                        {counts[tab.key as keyof typeof counts] || 0}
+                      {counts[tab.key as keyof typeof counts] || 0}
                     </span>
                   </button>
                 ))}
@@ -212,84 +214,95 @@ const AdmissionPage = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {filteredAdmissions.length > 0 ? filteredAdmissions.map(p => {
-                      const dateInfo = formatDate(p.admissionDate);
-                      return (
-                        <tr key={p.id} className="hover:bg-blue-50/50 transition-colors group">
-                          {/* Patient Name */}
-                          <td className="px-6 py-4 align-top">
-                            <div>
-                                <div className="font-bold text-slate-900 text-sm">{p.patientName}</div>
-                                <div className="text-xs text-slate-400 mt-1">ID: {p.patientId}</div>
-                            </div>
-                          </td>
-                          
-                          {/* Admission # */}
-                          <td className="px-6 py-4 align-top">
-                             <div className="font-medium text-slate-700 text-sm">{p.admissionNo}</div>
-                             <div className="mt-1">
-                                <StatusBadge status={p.status} />
-                             </div>
-                          </td>
+                    const dateInfo = formatDate(p.admissionDate);
+                    return (
+                      <tr key={p.id} className="hover:bg-blue-50/50 transition-colors group">
+                        {/* Patient Name */}
+                        <td className="px-6 py-4 align-top">
+                          <div>
+                            <div className="font-bold text-slate-900 text-sm">{p.patientName}</div>
+                            <div className="text-xs text-slate-400 mt-1">ID: {p.patientId}</div>
+                          </div>
+                        </td>
 
-                          {/* Date/Time */}
-                          <td className="px-6 py-4 align-top">
-                              <div className="text-sm text-slate-700">{dateInfo.full}</div>
-                              <div className="text-xs text-slate-400 mt-1">{dateInfo.relative}</div>
-                          </td>
-                          
-                          {/* Physician */}
-                          <td className="px-6 py-4 align-top">
-                              <div className="font-medium text-slate-900 text-sm">{p.physician}</div>
-                              <div className="text-xs text-slate-400 mt-1">Attending</div>
-                          </td>
+                        {/* Admission # */}
+                        <td className="px-6 py-4 align-top">
+                          <div className="font-medium text-slate-700 text-sm">{p.admissionNo}</div>
+                          <div className="mt-1">
+                            <StatusBadge status={p.status} />
+                          </div>
+                        </td>
 
-                          {/* Source */}
-                          <td className="px-6 py-4 align-top">
-                              <div className="text-sm font-medium text-slate-700">{p.admitSource || 'N/A'}</div>
-                          </td>
+                        {/* Date/Time */}
+                        <td className="px-6 py-4 align-top">
+                          <div className="text-sm text-slate-700">{dateInfo.full}</div>
+                          <div className="text-xs text-slate-400 mt-1">{dateInfo.relative}</div>
+                        </td>
 
-                          {/* Room/Bed */}
-                          <td className="px-6 py-4 align-top">
-                              <div className="font-medium text-slate-700 text-sm">{p.location?.ward || 'Unassigned'}</div>
-                              <div className="text-xs text-slate-400 mt-1">
-                                {p.location?.room ? `Room ${p.location.room}` : ''}
-                                {p.location?.bed ? `, Bed ${p.location.bed}` : ''}
-                              </div>
-                          </td>
+                        {/* Physician */}
+                        <td className="px-6 py-4 align-top">
+                          <div className="font-medium text-slate-900 text-sm">{p.physician}</div>
+                          <div className="text-xs text-slate-400 mt-1">Attending</div>
+                        </td>
 
-                          {/* Actions */}
-                          <td className="px-6 py-4 text-right align-top">
-                  <div className="flex justify-end gap-2">
-                            <Button 
-                                size="sm" 
-                                className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 h-8"
-                                onClick={() => { setSelectedAdmission(p); setIsDetailsOpen(true); }}
+                        {/* Source */}
+                        <td className="px-6 py-4 align-top">
+                          <div className="text-sm font-medium text-slate-700">{p.admitSource || 'N/A'}</div>
+                        </td>
+
+                        {/* Room/Bed */}
+                        <td className="px-6 py-4 align-top">
+                          <div className="font-medium text-slate-700 text-sm">{p.location?.ward || 'Unassigned'}</div>
+                          <div className="text-xs text-slate-400 mt-1">
+                            {p.location?.room ? `Room ${p.location.room}` : ''}
+                            {p.location?.bed ? `, Bed ${p.location.bed}` : ''}
+                          </div>
+                        </td>
+
+                        {/* Actions */}
+                        <td className="px-6 py-4 text-right align-top">
+                          <div className="flex justify-end gap-2">
+                            {/* Monitor Button - Navigate to Monitoring */}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="bg-green-50 hover:bg-green-100 border-green-200 text-green-700 font-medium px-4 h-8"
+                              onClick={() => navigate(`/monitoring?admission_id=${p.id}`)}
+                            >
+                              <Activity className="w-3.5 h-3.5 mr-1.5" />
+                              Monitor
+                            </Button>
+                            {/* Details Button */}
+                            <Button
+                              size="sm"
+                              className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 h-8"
+                              onClick={() => { setSelectedAdmission(p); setIsDetailsOpen(true); }}
                             >
                               Details
                             </Button>
-                            <Button 
-                                size="sm" 
-                                variant="destructive"
-                                className="h-8 w-8 p-0"
-                                onClick={async (e) => {
-                                   e.stopPropagation();
-                                   if (window.confirm(`Are you sure you want to delete admission for ${p.patientName}? This action cannot be undone.`)) {
-                                       try {
-                                           await admissionService.delete(p.id);
-                                           fetchData();
-                                       } catch (err) {
-                                           console.error("Failed to delete", err);
-                                           alert("Failed to delete admission.");
-                                       }
-                                   }
-                                }}
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="h-8 w-8 p-0"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (window.confirm(`Are you sure you want to delete admission for ${p.patientName}? This action cannot be undone.`)) {
+                                  try {
+                                    await admissionService.delete(p.id);
+                                    fetchData();
+                                  } catch (err) {
+                                    console.error("Failed to delete", err);
+                                    alert("Failed to delete admission.");
+                                  }
+                                }
+                              }}
                             >
-                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-trash-2"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></svg>
                             </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
+                          </div>
+                        </td>
+                      </tr>
+                    );
                   }) : (
                     <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-400">No patients found.</td></tr>
                   )}
@@ -304,15 +317,15 @@ const AdmissionPage = () => {
 
       {/* Modals */}
       <AdmitPatientModal isOpen={isAdmitModalOpen} onClose={() => setIsAdmitModalOpen(false)} onSuccess={() => { setIsAdmitModalOpen(false); fetchData(); }} />
-      <AdmissionDetailsModal 
-        isOpen={isDetailsOpen} 
-        onClose={() => setIsDetailsOpen(false)} 
-        admission={selectedAdmission} 
+      <AdmissionDetailsModal
+        isOpen={isDetailsOpen}
+        onClose={() => setIsDetailsOpen(false)}
+        admission={selectedAdmission}
         onUpdate={(updatedAdmission) => {
-           fetchData(); // Refresh list
-           setSelectedAdmission(updatedAdmission); // Update modal view
-        }} 
-        onDelete={() => { fetchData(); setIsDetailsOpen(false); }} 
+          fetchData(); // Refresh list
+          setSelectedAdmission(updatedAdmission); // Update modal view
+        }}
+        onDelete={() => { fetchData(); setIsDetailsOpen(false); }}
       />
     </div>
   );

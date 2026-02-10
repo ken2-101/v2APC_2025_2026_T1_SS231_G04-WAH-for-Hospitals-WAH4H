@@ -3,6 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, User } from 'lucide-react';
 import { MonitoringAdmission, VitalSign, ClinicalNote, DietaryOrder, HistoryEvent, LabRequest, LabResult } from '../../types/monitoring';
+import { useAuth } from '@/contexts/AuthContext';
+import { RoleBadge } from './RoleBadge';
 
 import { VitalSignsTab } from './VitalSignsTab';
 import { ClinicalNotesTab } from './ClinicalNotesTab';
@@ -40,6 +42,10 @@ export const PatientMonitoringPage: React.FC<PatientMonitoringPageProps> = ({
     onAddLabRequest,
     onUpdateLabResult,
 }) => {
+    // Get current user role from AuthContext
+    const { user } = useAuth();
+    const userRole = user?.role || 'doctor'; // Default fallback
+
     const defaultDietaryOrder: DietaryOrder = {
         admissionId: patient.id.toString(),
         dietType: '',
@@ -90,6 +96,12 @@ export const PatientMonitoringPage: React.FC<PatientMonitoringPageProps> = ({
                                 <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20">
                                     <span className="text-blue-100 text-xs font-medium">Status</span>
                                     <p className="font-semibold">{patient.status}</p>
+                                </div>
+                                <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20">
+                                    <span className="text-blue-100 text-xs font-medium">Your Role</span>
+                                    < div className="mt-1">
+                                        <RoleBadge role={userRole} />
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -151,6 +163,7 @@ export const PatientMonitoringPage: React.FC<PatientMonitoringPageProps> = ({
                         }))}
                         onAddVital={onAddVital}
                         patientId={patient.id.toString()}
+                        userRole={userRole}
                     />
                 </TabsContent>
 
@@ -160,6 +173,7 @@ export const PatientMonitoringPage: React.FC<PatientMonitoringPageProps> = ({
                         patientId={patient.patientId}
                         notes={notes}
                         onAddNote={onAddNote}
+                        userRole={userRole}
                     />
                 </TabsContent>
 
@@ -177,6 +191,8 @@ export const PatientMonitoringPage: React.FC<PatientMonitoringPageProps> = ({
                         labRequests={labRequests}
                         onAddRequest={onAddLabRequest}
                         onUpdateResult={onUpdateLabResult}
+                        userRole={userRole}
+                        admissionId={patient.id.toString()}
                     />
                 </TabsContent>
 
