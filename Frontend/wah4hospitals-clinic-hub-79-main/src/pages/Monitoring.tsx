@@ -8,6 +8,8 @@ import {
   ClinicalNote,
   DietaryOrder,
   HistoryEvent,
+  LabRequest,
+  LabResult,
 } from '../types/monitoring';
 import { PatientMonitoringPage } from '@/components/monitoring/PatientMonitoringPage';
 import { MonitoringDashboard } from '@/components/monitoring/MonitoringDashboard';
@@ -24,6 +26,7 @@ const Monitoring: React.FC = () => {
   const [notes, setNotes] = useState<ClinicalNote[]>([]);
   const [dietary, setDietary] = useState<DietaryOrder | null>(null);
   const [history, setHistory] = useState<HistoryEvent[]>([]);
+  const [labRequests, setLabRequests] = useState<LabRequest[]>([]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilters, setActiveFilters] = useState({ ward: '', status: '', doctor: '' });
@@ -79,17 +82,19 @@ const Monitoring: React.FC = () => {
 
     try {
       // Fetch data using monitoringService
-      const [fetchedVitals, fetchedNotes, fetchedDietary] = await Promise.all([
+      const [fetchedVitals, fetchedNotes, fetchedDietary, fetchedLabRequests] = await Promise.all([
         monitoringService.getVitals(adm.id),
         monitoringService.getNotes(adm.id),
-        monitoringService.getDietary(adm.id)
+        monitoringService.getDietary(adm.id),
+        monitoringService.getLaboratoryRequests(adm.id)
       ]);
 
       setVitals(fetchedVitals);
       setNotes(fetchedNotes);
       setDietary(fetchedDietary);
+      setLabRequests(fetchedLabRequests);
       // History not yet implemented in service
-      setHistory([]); 
+      setHistory([]);
     } catch (err) {
       console.error('Error fetching admission details:', err);
     }
@@ -148,6 +153,32 @@ const Monitoring: React.FC = () => {
     }
   };
 
+  // Add laboratory request
+  const handleAddLabRequest = async (request: Omit<LabRequest, 'id'>) => {
+    if (!selectedAdmission) return;
+    try {
+      await monitoringService.addLaboratoryRequest(request, selectedAdmission.patientId);
+      // Refresh list
+      const updatedLabRequests = await monitoringService.getLaboratoryRequests(selectedAdmission.id);
+      setLabRequests(updatedLabRequests);
+    } catch (err) {
+      console.error('Error adding lab request:', err);
+    }
+  };
+
+  // Update laboratory result  
+  const handleUpdateLabResult = async (requestId: string, result: LabResult) => {
+    if (!selectedAdmission) return;
+    try {
+      await monitoringService.updateLabResult(parseInt(requestId), result);
+      // Refresh list
+      const updatedLabRequests = await monitoringService.getLaboratoryRequests(selectedAdmission.id);
+      setLabRequests(updatedLabRequests);
+    } catch (err) {
+      console.error('Error updating lab result:', err);
+    }
+  };
+
   // Render patient page
   if (currentView === 'patient' && selectedAdmission) {
     return (
@@ -156,11 +187,14 @@ const Monitoring: React.FC = () => {
         vitals={vitals}
         notes={notes}
         history={history}
+        labRequests={labRequests}
         dietaryOrder={dietary || undefined}
         onBack={() => setCurrentView('dashboard')}
         onAddVital={handleAddVital}
         onAddNote={handleAddNote}
         onUpdateDietary={handleUpdateDietary}
+        onAddLabRequest={handleAddLabRequest}
+        onUpdateLabResult={handleUpdateLabResult}
       />
     );
   }
@@ -213,7 +247,7 @@ const Monitoring: React.FC = () => {
           </div>
         </div>
       </div>
-      
+
       <MonitoringDashboard admissions={admissions} onSelectAdmission={handleSelectAdmission} />
     </div>
   );

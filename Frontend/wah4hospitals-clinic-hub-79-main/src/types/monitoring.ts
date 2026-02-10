@@ -56,9 +56,38 @@ export interface HistoryEvent {
     details?: string;
 }
 
-
 /* =========================
-   MONITORING ADMISSION
+   LABORATORY REQUESTS
+   ========================= */
+export interface LabRequest {
+    id: string;
+    admissionId: string;
+    testName: string;
+    testCode: string;                // LOINC code
+    priority: 'routine' | 'urgent' | 'stat';
+    notes: string;
+    lifecycleStatus: 'ordered' | 'requested' | 'completed';
+    orderedBy: string;
+    orderedAt: string;
+    requestedBy?: string;
+    requestedAt?: string;
+    completedAt?: string;
+    resultContent?: {
+        findings: string;
+        values: { parameter: string; value: string; reference: string; flag?: string }[];
+        interpretation: string;
+        reportedBy: string;
+        reportedAt: string;
+    };
+}
+
+export interface LabResult {
+    findings: string;
+    values: { parameter: string; value: string; reference: string; flag?: string }[];
+    interpretation: string;
+    reportedBy: string;
+    reportedAt: string;
+}
    (UI AGGREGATE TYPE)
    ========================= */
 export interface MonitoringAdmission {

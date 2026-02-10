@@ -19,16 +19,27 @@ class ObservationSerializer(serializers.ModelSerializer):
     
     Manual Integer FKs (writable): subject_id, encounter_id, performer_id
     Resolved Fields (read-only): subject, encounter, performer
+    Components (writable): Nested array for multi-component observations (e.g., BP)
     """
     # Resolved read-only fields
     subject = serializers.SerializerMethodField(read_only=True)
     encounter = serializers.SerializerMethodField(read_only=True)
     performer = serializers.SerializerMethodField(read_only=True)
     
+    # Writable nested components field
+    components = serializers.ListField(
+        child=serializers.DictField(),
+        required=False,
+        write_only=True,
+        allow_empty=True
+    )
+    
     class Meta:
         model = Observation
         fields = [
             'observation_id',
+            'identifier',  # Added: Required for frontend-generated unique IDs
+            'status',      # Added: Required for observation lifecycle status
             # Foreign Key IDs (writable)
             'subject_id',
             'encounter_id',
@@ -52,6 +63,8 @@ class ObservationSerializer(serializers.ModelSerializer):
             'based_on',
             'part_of',
             'note',
+            # Components (nested array for write, flattened for compatibility)
+            'components',  # Added: Write-only nested components array
             # Value fields
             'value_string',
             'value_boolean',
@@ -66,7 +79,7 @@ class ObservationSerializer(serializers.ModelSerializer):
             'value_sampled_data',
             'value_range_low',
             'value_range_high',
-            # Component fields
+            # Component fields (flattened for backward compatibility)
             'component_code',
             'component_value_quantity',
             'component_value_codeableconcept',
@@ -148,6 +161,58 @@ class ObservationSerializer(serializers.ModelSerializer):
             }
         except Practitioner.DoesNotExist:
             return None
+    
+    def create(self, validated_data):
+        """Create observation with nested components."""
+        from monitoring.models import ObservationComponent
+        from django.db import transaction
+        
+        # Extract components if provided
+        components_data = validated_data.pop('components', [])
+        
+        # Create the main observation
+        with transaction.atomic():
+            observation = Observation.objects.create(**validated_data)
+            
+            # Create nested components if provided
+            for comp_data in components_data:
+                ObservationComponent.objects.create(
+                    observation=observation,
+                    code=comp_data.get('code', ''),
+                    value_quantity=comp_data.get('value_quantity'),
+                    value_string=comp_data.get('value_string'),
+                    value_codeableconcept=comp_data.get('value_codeableconcept'),
+                )
+        
+        return observation
+    
+    def update(self, instance, validated_data):
+        """Update observation and replace components."""
+        from monitoring.models import ObservationComponent
+        from django.db import transaction
+        
+        # Extract components if provided
+        components_data = validated_data.pop('components', None)
+        
+        with transaction.atomic():
+            # Update main observation fields
+            for attr, value in validated_data.items():
+                setattr(instance, attr, value)
+            instance.save()
+            
+            # Replace components if provided (delete old, create new)
+            if components_data is not None:
+                instance.observationcomponent_set.all().delete()
+                for comp_data in components_data:
+                    ObservationComponent.objects.create(
+                        observation=instance,
+                        code=comp_data.get('code', ''),
+                        value_quantity=comp_data.get('value_quantity'),
+                        value_string=comp_data.get('value_string'),
+                        value_codeableconcept=comp_data.get('value_codeableconcept'),
+                    )
+        
+        return instance
 
 
 class ChargeItemSerializer(serializers.ModelSerializer):
@@ -171,6 +236,7 @@ class ChargeItemSerializer(serializers.ModelSerializer):
         model = ChargeItem
         fields = [
             'chargeitem_id',
+            'status',  # Added: Required for charge item lifecycle status
             # Foreign Key IDs (writable)
             'subject_id',
             'account_id',
