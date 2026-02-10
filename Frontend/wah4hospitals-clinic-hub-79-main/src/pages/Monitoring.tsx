@@ -8,7 +8,11 @@ import {
 } from 'lucide-react';
 import { admissionService } from '@/services/admissionService';
 import monitoringService from '@/services/monitoringService';
+import laboratoryService from '@/services/laboratoryService';
+import pharmacyService from '@/services/pharmacyService';
 import { VitalSign, ClinicalNote } from '@/types/monitoring';
+import { useRole } from '@/contexts/RoleContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 // ==================== TYPE DEFINITIONS ====================
 interface Patient {
@@ -92,9 +96,10 @@ interface LabRequest {
 }
 
 const Monitoring: React.FC = () => {
+  const { currentRole, canModify } = useRole();
+  const { user } = useAuth();
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [activeTab, setActiveTab] = useState<'vitals' | 'notes' | 'medication' | 'laboratory'>('vitals');
-  const [currentRole, setCurrentRole] = useState<'doctor' | 'nurse'>('doctor');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'stable' | 'critical' | 'monitoring'>('all');
   const [vitalsViewMode, setVitalsViewMode] = useState<'graph' | 'table'>('table');
@@ -201,9 +206,52 @@ const Monitoring: React.FC = () => {
       setVitalsHistory(vitalRecords);
       setNotesHistory(noteRecords);
 
-      // Mock data for medication and lab (these would be from actual services)
-      setMedicationRequests([]);
-      setLabRequests([]);
+      // Fetch medication requests from pharmacy service
+      const medRequests = await pharmacyService.getRequestsByAdmission(patient.encounterId);
+      const medicationRecords: MedicationRequest[] = medRequests.map((req: any) => ({
+        id: req.id,
+        medicationName: req.inventory_item_detail?.generic_name || 'Unknown Medication',
+        quantity: req.quantity,
+        dosage: req.inventory_item_detail?.description || '',
+        route: 'oral', // Default, should be in backend
+        frequency: '', // Should be in backend
+        notes: req.notes || '',
+        lifecycleStatus: req.status === 'pending' ? 'requested' :
+                        req.status === 'completed' ? 'administered' : 'requested',
+        intent: 'order',
+        prescribedBy: req.requested_by || 'Unknown',
+        prescribedAt: req.requested_at,
+        requestedBy: req.requested_by,
+        requestedAt: req.requested_at,
+        dispensedAt: req.status === 'completed' ? req.updated_at : undefined,
+        administeredBy: undefined,
+        administeredAt: undefined
+      }));
+
+      // Fetch lab requests from laboratory service
+      const labResponse = await laboratoryService.getLabRequests({
+        search: patient.encounterId.toString()
+      });
+      const labRecords: LabRequest[] = labResponse.results
+        .filter((lab: any) => lab.admission === patient.encounterId)
+        .map((lab: any) => ({
+          id: lab.id,
+          testName: lab.test_type_display || 'Lab Test',
+          testCode: lab.test_type || '',
+          priority: lab.priority || 'routine',
+          notes: lab.clinical_reason || '',
+          lifecycleStatus: lab.status === 'pending' ? 'ordered' :
+                          lab.status === 'completed' ? 'completed' : 'requested',
+          orderedBy: lab.doctor_name || 'Unknown',
+          orderedAt: lab.created_at,
+          requestedBy: undefined,
+          requestedAt: undefined,
+          completedAt: lab.status === 'completed' ? lab.updated_at : undefined,
+          resultContent: undefined
+        }));
+
+      setMedicationRequests(medicationRecords);
+      setLabRequests(labRecords);
     } catch (err) {
       console.error('Error fetching patient data:', err);
     }
@@ -490,38 +538,15 @@ const Monitoring: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => setCurrentRole('doctor')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  currentRole === 'doctor'
-                    ? 'bg-white text-purple-700 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                👨‍⚕️ Doctor
-              </button>
-              <button
-                onClick={() => setCurrentRole('nurse')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  currentRole === 'nurse'
-                    ? 'bg-white text-blue-700 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                👩‍⚕️ Nurse
-              </button>
-            </div>
-
             <div className="flex items-center gap-2">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-medium text-sm ${
                 currentRole === 'doctor' ? 'bg-purple-600' : 'bg-blue-600'
               }`}>
-                JN
+                {user?.username?.substring(0, 2).toUpperCase() || 'U'}
               </div>
               <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">Jhon Lloyd Nicolas</p>
-                <p className="text-xs text-gray-500 capitalize">{currentRole}</p>
+                <p className="text-sm font-medium text-gray-900">{user?.username || 'User'}</p>
+                <p className="text-xs text-gray-500 capitalize">{currentRole.replace('_', ' ')}</p>
               </div>
             </div>
           </div>
@@ -810,17 +835,17 @@ const Monitoring: React.FC = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900">
-                          {currentRole === 'doctor' ? 'Medication Prescriptions' : 'Medication Requests'}
+                          {canModify('prescriptions') ? 'Medication Prescriptions' : 'Medication Requests'}
                         </h3>
                         <p className="text-sm text-gray-600 mt-1">
-                          {currentRole === 'doctor'
+                          {canModify('prescriptions')
                             ? 'Manage and track medication prescriptions'
                             : 'Request and administer medications'
                           }
                         </p>
                       </div>
 
-                      {currentRole === 'doctor' && (
+                      {canModify('prescriptions') && (
                         <button
                           onClick={() => setShowMedicationModal(true)}
                           className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium flex items-center gap-2"
@@ -836,7 +861,7 @@ const Monitoring: React.FC = () => {
                           <Pill className="text-purple-400 mb-4" size={48} />
                           <h3 className="text-lg font-semibold text-gray-900 mb-2">No Medications</h3>
                           <p className="text-gray-600 text-sm">
-                            {currentRole === 'doctor'
+                            {canModify('prescriptions')
                               ? 'Prescribe medications to get started'
                               : 'No medications prescribed yet'
                             }
@@ -871,7 +896,7 @@ const Monitoring: React.FC = () => {
                               </div>
 
                               <div className="flex gap-2 flex-wrap">
-                                {currentRole === 'nurse' && med.lifecycleStatus === 'prescribed' && (
+                                {canModify('medication-administration') && med.lifecycleStatus === 'prescribed' && (
                                   <button
                                     onClick={() => handleRequestFromPharmacy(med.id)}
                                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2 text-sm"
@@ -897,7 +922,7 @@ const Monitoring: React.FC = () => {
                                   </>
                                 )}
 
-                                {currentRole === 'nurse' && med.lifecycleStatus === 'ready-for-admin' && (
+                                {canModify('medication-administration') && med.lifecycleStatus === 'ready-for-admin' && (
                                   <button
                                     onClick={() => handleAdministerMedication(med.id)}
                                     className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium flex items-center gap-2 text-sm"
@@ -926,17 +951,17 @@ const Monitoring: React.FC = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900">
-                          {currentRole === 'doctor' ? 'Laboratory Test Orders' : 'Laboratory Requests'}
+                          {canModify('lab-orders') ? 'Laboratory Test Orders' : 'Laboratory Requests'}
                         </h3>
                         <p className="text-sm text-gray-600 mt-1">
-                          {currentRole === 'doctor'
+                          {canModify('lab-orders')
                             ? 'Order and track laboratory tests'
                             : 'Send requests and view results'
                           }
                         </p>
                       </div>
 
-                      {currentRole === 'doctor' && (
+                      {canModify('lab-orders') && (
                         <button
                           onClick={() => setShowLabModal(true)}
                           className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium flex items-center gap-2"
@@ -952,7 +977,7 @@ const Monitoring: React.FC = () => {
                           <FlaskConical className="text-purple-400 mb-4" size={48} />
                           <h3 className="text-lg font-semibold text-gray-900 mb-2">No Lab Tests</h3>
                           <p className="text-gray-600 text-sm">
-                            {currentRole === 'doctor'
+                            {canModify('lab-orders')
                               ? 'Order laboratory tests to get started'
                               : 'No laboratory tests ordered yet'
                             }
@@ -1003,7 +1028,7 @@ const Monitoring: React.FC = () => {
                               </div>
 
                               <div className="flex gap-2 flex-wrap">
-                                {currentRole === 'nurse' && lab.lifecycleStatus === 'ordered' && (
+                                {canModify('nursing-notes') && lab.lifecycleStatus === 'ordered' && (
                                   <button
                                     onClick={() => handleSendRequestToLab(lab.id)}
                                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2 text-sm"
@@ -1261,7 +1286,7 @@ const Monitoring: React.FC = () => {
       )}
 
       {/* Medication Modal */}
-      {showMedicationModal && currentRole === 'doctor' && (
+      {showMedicationModal && canModify('prescriptions') && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
@@ -1380,7 +1405,7 @@ const Monitoring: React.FC = () => {
       )}
 
       {/* Laboratory Order Modal */}
-      {showLabModal && currentRole === 'doctor' && (
+      {showLabModal && canModify('lab-orders') && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-lg w-full">
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
