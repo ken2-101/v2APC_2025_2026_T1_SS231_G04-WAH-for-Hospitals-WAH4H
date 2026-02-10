@@ -430,7 +430,7 @@ def fhir_to_dict(fhir):
         "first_name": given[0] if given else "",
         "middle_name": given[1] if len(given) > 1 else "",
         "last_name": name.get("family", ""),
-        "gender": fhir.get("gender", "").capitalize(),
+        "gender": fhir.get("gender", "").lower(),
         "birthdate": fhir.get("birthDate"),
         "philhealth_id": ph_id,
         "mobile_number": phone,
