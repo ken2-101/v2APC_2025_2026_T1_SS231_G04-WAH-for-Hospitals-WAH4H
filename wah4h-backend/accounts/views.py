@@ -26,6 +26,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.core.cache import cache
 from django.conf import settings
 from django.db import transaction
+from django.contrib.auth import get_user_model
 import json
 from datetime import date
 from .serializers import PractitionerSerializer
@@ -354,6 +355,36 @@ class LoginInitiateAPIView(APIView):
                 errors=serializer.errors if hasattr(serializer, 'errors') else {'detail': str(e)},
                 http_status=status.HTTP_401_UNAUTHORIZED
             )
+
+
+class EmailCheckAPIView(APIView):
+    """
+    GET /api/accounts/check-email/?email=you@example.com
+
+    Returns JSON indicating whether the email is available for registration.
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        email = request.query_params.get('email')
+        if not email:
+            return error_response(
+                message='Email query parameter is required.',
+                errors={'email': 'Missing email parameter.'},
+                http_status=status.HTTP_400_BAD_REQUEST
+            )
+
+        User = get_user_model()
+        exists = User.objects.filter(email__iexact=email).exists()
+
+        return success_response(
+            message='Email availability checked.',
+            data={
+                'email': email,
+                'available': not exists,
+                'message': 'This email is already associated with another account.' if exists else 'Email is available.'
+            }
+        )
 
 
 class LoginVerifyAPIView(APIView):

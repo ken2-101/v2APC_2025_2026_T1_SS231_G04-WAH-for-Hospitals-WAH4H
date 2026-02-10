@@ -23,6 +23,7 @@ from .views import (
     ChangePasswordAPIView,
     ChangePasswordInitiateAPIView,
     ChangePasswordVerifyAPIView,
+    EmailCheckAPIView,
     OrganizationListAPIView,
     PractitionerListAPIView
 )
@@ -102,5 +103,6 @@ urlpatterns = [
     path('organizations/', OrganizationListAPIView.as_view(), name='organization-list'),
 
     path('practitioners/', PractitionerListAPIView.as_view(), name='practitioner-list'),
+    path('check-email/', EmailCheckAPIView.as_view(), name='check-email'),
 ]
 

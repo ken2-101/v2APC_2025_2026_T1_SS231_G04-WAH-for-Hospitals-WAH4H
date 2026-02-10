@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { UserRole } from '@/contexts/RoleContext';
 import { cn } from '@/lib/utils';
+import api from '@/services/api';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -224,6 +225,11 @@ const Register = () => {
     fetchOrganizations();
   }, []);
 
+  // Maximum selectable birth date (today minus 18 years) to prevent under-18 registration
+  const maxBirthDate = new Date();
+  maxBirthDate.setFullYear(maxBirthDate.getFullYear() - 18);
+  const maxBirthDateStr = maxBirthDate.toISOString().split('T')[0];
+
   // ============================================================================
   // API FUNCTIONS
   // ============================================================================
@@ -337,14 +343,24 @@ const Register = () => {
     // Gender validation
     if (!formData.gender) newErrors.gender = 'Gender is required';
 
-    // Birth date validation
+    // Birth date validation: required, must be in the past, and must be at least 18 years old
     if (!formData.birthDate) {
       newErrors.birthDate = 'Birth date is required';
     } else {
       const birthDate = new Date(formData.birthDate);
       const today = new Date();
-      if (birthDate >= today) {
+
+      // Calculate age in years accurately
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+
+      if (age < 0) {
         newErrors.birthDate = 'Birth date must be in the past';
+      } else if (age < 18) {
+        newErrors.birthDate = 'You must be 18 years or older to be able to work';
       }
     }
 
@@ -473,7 +489,7 @@ const Register = () => {
     handleInputChange('mobile', formatted);
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     let isValid = false;
 
     if (currentStep === 1) {
@@ -481,6 +497,44 @@ const Register = () => {
       if (!privacyAccepted) {
         setPrivacyError('You must acknowledge the Privacy Statement to create an account.');
         return;
+      }
+
+      // If step1 is valid, pre-check mobile uniqueness to provide immediate feedback
+      // First, check email availability to avoid duplicate registrations
+      if (isValid && formData.email) {
+        try {
+          const resp = await api.get(`/api/accounts/check-email/?email=${encodeURIComponent(formData.email)}`);
+          const available = resp?.data?.data?.available;
+          if (available === false) {
+            setErrors((prev) => ({ ...prev, email: resp?.data?.data?.message || 'Email is already registered. Please use a different email.' }));
+            return;
+          }
+        } catch (err) {
+          // Non-blocking: if check-email fails, log and continue to mobile check; server will still validate on submit
+          console.error('Email availability check failed:', err);
+        }
+      }
+
+      if (isValid && formData.mobile) {
+        try {
+          const cleaned = formData.mobile.replace(/\D/g, '');
+          const resp = await api.get('/api/accounts/practitioners/');
+          let data: any = resp.data;
+          if (data.results && Array.isArray(data.results)) data = data.results;
+
+          const conflict = (data || []).find((p: any) => {
+            const telecom = (p.telecom || '').toString().replace(/\D/g, '');
+            return telecom === cleaned;
+          });
+
+          if (conflict) {
+            setErrors((prev) => ({ ...prev, mobile: 'Mobile number is already in use by another account.' }));
+            return;
+          }
+        } catch (err) {
+          // Non-blocking: if practitioners endpoint fails, allow progression and rely on server-side validation
+          console.error('Pre-check practitioners failed:', err);
+        }
       }
     } else if (currentStep === 2) {
       isValid = validateStep2();
@@ -516,22 +570,30 @@ const Register = () => {
     const validationErrors = result.error?.errors || result.error || {};
     console.error('Validation errors:', validationErrors);
 
+    // Normalize backend error formats (arrays or objects) into simple strings for display
+    const formattedErrors: Record<string, string> = {};
+    Object.entries(validationErrors).forEach(([k, v]) => {
+      if (Array.isArray(v)) formattedErrors[k] = v.join(' ');
+      else if (typeof v === 'object' && v !== null) formattedErrors[k] = JSON.stringify(v);
+      else formattedErrors[k] = String(v);
+    });
+
     // Map backend field names to steps
     const step1Fields = ['firstName', 'first_name', 'lastName', 'last_name', 'email', 'mobile', 'telecom', 'gender', 'birthDate', 'birth_date', 'password', 'confirm_password', 'role', 'identifier'];
     const step2Fields = ['addressLine', 'address_line', 'addressCity', 'address_city', 'addressDistrict', 'address_district', 'addressState', 'address_state', 'addressPostalCode', 'address_postal_code', 'addressCountry', 'address_country'];
 
     // Check which step has the error
-    const errorFields = Object.keys(validationErrors);
+    const errorFields = Object.keys(formattedErrors);
 
-    if (errorFields.some(field => step1Fields.includes(field))) {
+    if (errorFields.some((field) => step1Fields.includes(field))) {
       setCurrentStep(1);
-      setErrors(validationErrors);
-    } else if (errorFields.some(field => step2Fields.includes(field))) {
+      setErrors(formattedErrors);
+    } else if (errorFields.some((field) => step2Fields.includes(field))) {
       setCurrentStep(2);
-      setErrors(validationErrors);
+      setErrors(formattedErrors);
     } else {
       // Error is in step 3, stay on current step
-      setErrors(validationErrors);
+      setErrors(formattedErrors);
     }
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -732,7 +794,7 @@ const Register = () => {
                 type="date"
                 value={formData.birthDate}
                 onChange={(e) => handleInputChange('birthDate', e.target.value)}
-                max={new Date().toISOString().split('T')[0]}
+                max={maxBirthDateStr}
                 className={errors.birthDate ? 'border-red-500' : ''}
               />
               {errors.birthDate && (
@@ -1451,9 +1513,9 @@ const Register = () => {
                 <section className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-4">
                   <h3 className="font-bold text-slate-900 text-base">7. Contact Us</h3>
                   <ul className="list-disc pl-5 mt-2 space-y-1">
-                    <li>Project Leader: Jhon Lloyd Nicolas (Pseudoers)</li>
-                    <li>Email: wah4h@gmail.com</li>
-                    <li>Address: 3 Humabon Place, Magallanes, Makati City (Asia Pacific College)</li>
+                    <p className="mt-2">Project Leader: Jhon Lloyd Nicolas (Pseudoers)</p>
+                    <p className="mt-2">Email: wah4h@gmail.com</p>
+                    <p className="mt-2">Address: 3 Humabon Place, Magallanes, Makati City (Asia Pacific College)</p>
                   </ul>
                 </section>
               </div>

@@ -106,7 +106,9 @@ class PractitionerSignupSerializer(serializers.Serializer):
     def validate_email(self, value):
         """Ensure email is unique."""
         if User.objects.filter(email=value).exists():
-            raise serializers.ValidationError("Email already registered.")
+            raise serializers.ValidationError(
+                "This email is already associated with another account. Please use a different email."
+            )
         return value
     
     def validate_identifier(self, value):

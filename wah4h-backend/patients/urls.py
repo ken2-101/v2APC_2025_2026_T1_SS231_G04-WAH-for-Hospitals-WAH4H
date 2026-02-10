@@ -29,11 +29,13 @@ from patients.api.views import (
 # Initialize router
 router = DefaultRouter()
 
-# Register ViewSets with specific route prefixes
-router.register(r'', PatientViewSet, basename='patient')
+# Register clinical ViewSets first so specific routes take precedence
 router.register(r'conditions', ConditionViewSet, basename='condition')
 router.register(r'allergies', AllergyViewSet, basename='allergy')
 router.register(r'immunizations', ImmunizationViewSet, basename='immunization')
+
+# Finally register the Patient ViewSet as a catch-all on the root
+router.register(r'', PatientViewSet, basename='patient')
 
 # URL patterns
 urlpatterns = [

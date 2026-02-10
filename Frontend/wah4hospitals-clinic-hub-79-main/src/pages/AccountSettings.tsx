@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { User, Lock, BadgeCheck, Check, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import api from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -100,9 +101,32 @@ const AccountSettings = () => {
     }
 
     try {
-      // TODO: Implement API call to update mobile number
-      // await updateUserProfile({ mobile: mobileNumber });
-      
+      // Check uniqueness: fetch practitioners and ensure no other practitioner uses this telecom
+      const cleanedNew = mobileNumber.replace(/\D/g, '');
+      const resp = await api.get('/api/accounts/practitioners/');
+      let data: any = resp.data;
+      if (data.results && Array.isArray(data.results)) data = data.results;
+
+      const conflict = (data || []).find((p: any) => {
+        const telecom = (p.telecom || '').toString().replace(/\D/g, '');
+        return telecom === cleanedNew && String(p.practitioner_id) !== String(user?.id);
+      });
+
+      if (conflict) {
+        toast({
+          title: 'Validation error',
+          description: 'Mobile number is already in use by another account.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Persist change via practitioner PATCH endpoint
+      // Endpoint: /api/accounts/practitioners/{id}/ supports PUT/PATCH
+      await api.patch(`/api/accounts/practitioners/${user?.id}/`, {
+        telecom: mobileNumber,
+      });
+
       toast({
         title: 'Profile updated',
         description: 'Your mobile number has been updated successfully.',
