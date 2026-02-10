@@ -12,8 +12,7 @@ Routes:
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from laboratory.api.views import (
-    LabTestDefinitionViewSet,
+from laboratory.views import (
     DiagnosticReportViewSet,
 )
 
@@ -21,7 +20,6 @@ from laboratory.api.views import (
 router = DefaultRouter()
 
 # Register ViewSets with specific route prefixes
-router.register(r'tests', LabTestDefinitionViewSet, basename='lab-test-definition')
 router.register(r'reports', DiagnosticReportViewSet, basename='diagnostic-report')
 
 # URL patterns

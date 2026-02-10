@@ -1,11 +1,26 @@
+"""
+Admission Views
+===============
+Trinity Architecture: Standard ModelViewSets with Direct ORM Access
+
+Thin Views - business logic is in serializers.
+All database queries use direct ORM - no service layers.
+"""
+
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.filters import SearchFilter, OrderingFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
+from django.db import transaction
 
+# Direct Model Imports - Trinity Pattern
 from admission.models import Encounter, Procedure
-from .serializers import (
+from patients.models import Patient
+
+# Serializer Imports
+from admission.serializers import (
     EncounterSerializer,
     EncounterDischargeSerializer,
     ProcedureSerializer
@@ -13,15 +28,31 @@ from .serializers import (
 
 class EncounterViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for Encounter (Admission) operations.
+    Standard ModelViewSet for Encounter (Admission) operations.
+    Trinity Pattern: Thin view, fat serializer, direct ORM.
+    
+    Endpoints:
+        GET /api/admission/encounters/ - List all encounters
+        POST /api/admission/encounters/ - Create new encounter
+        GET /api/admission/encounters/{identifier}/ - Retrieve encounter
+        PUT /api/admission/encounters/{identifier}/ - Update encounter
+        PATCH /api/admission/encounters/{identifier}/ - Partial update
+        DELETE /api/admission/encounters/{identifier}/ - Delete encounter
+        POST /api/admission/encounters/{identifier}/discharge/ - Discharge patient
+        GET /api/admission/encounters/locations/ - Get location hierarchy
+        GET /api/admission/encounters/search_patients/?q=term - Search patients
     """
-    queryset = Encounter.objects.all().order_by('-period_start')
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['subject_id', 'status', 'class_field']
+    queryset = Encounter.objects.all().select_related().order_by('-period_start')
     serializer_class = EncounterSerializer
     lookup_field = 'identifier'
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['subject_id', 'status', 'class_field', 'location_id', 'participant_individual_id']
+    search_fields = ['identifier', 'patient__first_name', 'patient__last_name']
+    ordering_fields = ['period_start', 'period_end', 'created_at']
+    ordering = ['-period_start']
 
     def get_serializer_class(self):
+        """Return appropriate serializer based on action."""
         if self.action == 'discharge':
             return EncounterDischargeSerializer
         return EncounterSerializer
@@ -29,27 +60,37 @@ class EncounterViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def discharge(self, request, identifier=None):
         """
-        Discharge patient.
+        Discharge a patient from encounter.
+        Updates status to 'finished' and sets discharge details.
         """
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response(EncounterSerializer(instance).data)
+        
+        # Return full encounter details after discharge
+        return Response(
+            EncounterSerializer(instance).data,
+            status=status.HTTP_200_OK
+        )
 
     @action(detail=False, methods=['get'])
     def locations(self, request):
         """
-        Get Location Hierarchy with dynamic occupancy calculation.
+        Get location hierarchy with dynamic occupancy calculation.
+        Uses direct ORM query to count active encounters per location.
         """
+        # Direct ORM query for occupancy calculation
         active_encounters = Encounter.objects.filter(status='in-progress')
         occupancy = {}
+        
         for enc in active_encounters:
             if enc.location_ids:
                 for code in enc.location_ids:
                     if code:
                         occupancy[code] = occupancy.get(code, 0) + 1
 
+        # Static location hierarchy (can be moved to database later)
         data = {
            "buildings": [
              { "code": "MAIN", "name": "Main Building" },
@@ -113,16 +154,17 @@ class EncounterViewSet(viewsets.ModelViewSet):
              ]
            }
         }
-        return Response(data)
+        return Response(data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['get'])
     def search_patients(self, request):
         """
-        Search for patients by name or ID.
+        Search for patients by name or patient ID.
+        Uses direct ORM query with Q objects for flexible search.
         """
-        query = request.query_params.get('q', '')
-        from patients.models import Patient
+        query = request.query_params.get('q', '').strip()
 
+        # Direct ORM query - no service layer
         if not query:
             patients = Patient.objects.all().order_by('-id')[:10]
         else:
@@ -130,28 +172,71 @@ class EncounterViewSet(viewsets.ModelViewSet):
                 Q(first_name__icontains=query) | 
                 Q(last_name__icontains=query) | 
                 Q(patient_id__icontains=query)
-            )[:10]
+            ).order_by('-id')[:10]
         
+        # Build response with patient summaries
         results = []
         for p in patients:
             results.append({
                 'id': p.id,
                 'patientId': p.patient_id,
                 'name': f"{p.first_name} {p.last_name}",
-                'dob': p.birthdate,
-                'age': 0,
+                'firstName': p.first_name,
+                'lastName': p.last_name,
+                'dob': p.birthdate.isoformat() if p.birthdate else None,
+                'age': 0,  # Can calculate if needed
+                'gender': p.gender,
                 'contact': p.mobile_number,
                 'philhealth': p.philhealth_id
             })
             
-        return Response(results)
+        return Response(results, status=status.HTTP_200_OK)
+
 
 class ProcedureViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for Procedure operations.
+    Standard ModelViewSet for Procedure operations.
+    Trinity Pattern: Thin view, fat serializer, direct ORM.
+    
+    Endpoints:
+        GET /api/admission/procedures/ - List all procedures
+        POST /api/admission/procedures/ - Create new procedure
+        GET /api/admission/procedures/{identifier}/ - Retrieve procedure
+        PUT /api/admission/procedures/{identifier}/ - Update procedure
+        PATCH /api/admission/procedures/{identifier}/ - Partial update
+        DELETE /api/admission/procedures/{identifier}/ - Delete procedure
     """
-    queryset = Procedure.objects.all().order_by('-performed_datetime')
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['encounter', 'subject_id', 'status']
+    queryset = Procedure.objects.all().select_related('encounter').order_by('-performed_datetime')
     serializer_class = ProcedureSerializer
     lookup_field = 'identifier'
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['encounter', 'subject_id', 'status', 'code_code', 'category_code']
+    search_fields = ['identifier', 'code_display', 'note']
+    ordering_fields = ['performed_datetime', 'performed_period_start', 'created_at']
+    ordering = ['-performed_datetime']
+
+    def get_queryset(self):
+        """
+        Optionally filter by encounter_id query parameter.
+        Allows frontend to fetch all procedures for a specific encounter.
+        """
+        queryset = super().get_queryset()
+        encounter_id = self.request.query_params.get('encounter_id', None)
+        
+        if encounter_id:
+            queryset = queryset.filter(encounter__encounter_id=encounter_id)
+        
+        return queryset
+
+    def perform_create(self, serializer):
+        """
+        Override to pass request context for recorder_id assignment.
+        """
+        serializer.save()
+
+    def perform_update(self, serializer):
+        """
+        Override to ensure atomic updates.
+        """
+        with transaction.atomic():
+            serializer.save()

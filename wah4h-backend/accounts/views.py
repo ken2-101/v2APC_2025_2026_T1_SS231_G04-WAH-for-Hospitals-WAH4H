@@ -28,10 +28,11 @@ from django.conf import settings
 from django.db import transaction
 import json
 from datetime import date
+from .serializers import PractitionerSerializer
 
 from .emails import send_otp_email
 
-from .models import Organization
+from .models import Organization, Practitioner
 from .serializers import (
     OrganizationSerializer,
     PractitionerSignupSerializer,
@@ -690,3 +691,17 @@ class ChangePasswordVerifyAPIView(APIView):
                 message='Password change verification failed.',
                 errors=serializer.errors if hasattr(serializer, 'errors') else {'detail': str(e)}
             )
+
+
+# ============================================================================
+# PRACTITIONER CALL OUTS FUNCTIONS
+# ============================================================================
+
+class PractitionerListAPIView(generics.ListAPIView):
+    """
+    GET /api/accounts/practitioners/
+    List all active practitioners for dropdowns.
+    """
+    permission_classes = [AllowAny]  # Changed to AllowAny for testing
+    serializer_class = PractitionerSerializer
+    queryset = Practitioner.objects.filter(active=True)

@@ -203,7 +203,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginVerify = async (email: string, otp: string): Promise<AuthResult> => {
     setIsLoading(true);
     try {
-      const res = await axiosInstance.post('/accounts/login/verify/', {
+      const res = await axiosInstance.post('/api/accounts/login/verify/', {
         email,
         otp,
       });

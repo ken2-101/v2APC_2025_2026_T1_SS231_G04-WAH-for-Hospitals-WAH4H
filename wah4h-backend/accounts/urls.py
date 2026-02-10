@@ -23,7 +23,8 @@ from .views import (
     ChangePasswordAPIView,
     ChangePasswordInitiateAPIView,
     ChangePasswordVerifyAPIView,
-    OrganizationListAPIView
+    OrganizationListAPIView,
+    PractitionerListAPIView
 )
 
 urlpatterns = [
@@ -99,5 +100,7 @@ urlpatterns = [
 
 
     path('organizations/', OrganizationListAPIView.as_view(), name='organization-list'),
+
+    path('practitioners/', PractitionerListAPIView.as_view(), name='practitioner-list'),
 ]
 

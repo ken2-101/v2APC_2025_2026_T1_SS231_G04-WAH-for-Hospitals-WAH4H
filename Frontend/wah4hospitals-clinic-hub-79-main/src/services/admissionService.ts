@@ -122,7 +122,8 @@ export const admissionService = {
             diagnosis_use: admission.diagnosis_use,
             service_type: admission.serviceType,
             priority: admission.priority,
-            period_start: `${admission.admissionDate}T${admission.admissionTime}:00Z`,
+            // ✅ Fixed Code (Sends only YYYY-MM-DD)
+            period_start: admission.admissionDate,
             reason_code: admission.reasonForAdmission,
             participant_individual_id: admission.participant_individual_id || admission.physicianId || 1, 
             location_id: null, 

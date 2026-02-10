@@ -13,7 +13,7 @@ Routes:
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from pharmacy.api.views import (
+from pharmacy.views import (
     InventoryViewSet,
     MedicationRequestViewSet,
     MedicationAdministrationViewSet,

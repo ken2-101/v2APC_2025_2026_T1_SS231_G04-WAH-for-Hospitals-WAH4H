@@ -1,12 +1,23 @@
+"""
+Admission Serializers
+=====================
+Trinity Architecture: Direct Model Access with Fat Serializers
+
+All validation and business logic is contained in serializers.
+Uses direct ORM queries - NO service layers or ACL classes.
+"""
+
 from rest_framework import serializers
 from django.db import transaction
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.utils import timezone
-from datetime import date
-from admission.models import Encounter, Procedure, ProcedurePerformer
-from patients.services.patient_acl import validate_patient_exists, get_patient_summary
-from accounts.models import Practitioner, Location
+from datetime import date, datetime
 import random
+
+# Direct Model Imports - Trinity Pattern
+from admission.models import Encounter, Procedure, ProcedurePerformer
+from patients.models import Patient
+from accounts.models import Practitioner, Location
 
 # ============================================================================
 # ENCOUNTER SERIALIZERS
@@ -47,45 +58,107 @@ class EncounterSerializer(serializers.ModelSerializer):
         }
 
     def get_patient_summary(self, obj):
-        if obj.subject_id:
-            return get_patient_summary(obj.subject_id)
-        return None
+        """Direct ORM lookup for patient summary."""
+        if not obj.subject_id:
+            return None
+        try:
+            patient = Patient.objects.get(id=obj.subject_id)
+            return {
+                "id": patient.id,
+                "patient_id": patient.patient_id,
+                "full_name": f"{patient.first_name} {patient.last_name}",
+                "first_name": patient.first_name,
+                "last_name": patient.last_name,
+                "gender": patient.gender,
+                "birthdate": patient.birthdate,
+                "mobile_number": patient.mobile_number,
+                "philhealth_id": patient.philhealth_id,
+            }
+        except Patient.DoesNotExist:
+            return None
 
     def get_location_summary(self, obj):
-        if obj.location_id:
-            return LocationACL.get_location_summary(obj.location_id)
-        return None
+        """Direct ORM lookup for location summary."""
+        if not obj.location_id:
+            return None
+        try:
+            location = Location.objects.get(location_id=obj.location_id)
+            return {
+                "location_id": location.location_id,
+                "name": location.name,
+                "ward": location.address_line,
+            }
+        except Location.DoesNotExist:
+            return None
 
     def get_practitioner_summary(self, obj):
-        if obj.participant_individual_id:
-            return PractitionerACL.get_practitioner_summary(obj.participant_individual_id)
-        return None
+        """Direct ORM lookup for practitioner summary."""
+        if not obj.participant_individual_id:
+            return None
+        try:
+            practitioner = Practitioner.objects.get(practitioner_id=obj.participant_individual_id)
+            return {
+                "practitioner_id": practitioner.practitioner_id,
+                "full_name": f"{practitioner.first_name} {practitioner.last_name}",
+                "first_name": practitioner.first_name,
+                "last_name": practitioner.last_name,
+                "role": "Physician",
+            }
+        except Practitioner.DoesNotExist:
+            return None
 
     def validate(self, data):
+        """
+        Direct ORM validation - no ACL layer.
+        Handles both patient_id string lookup and subject_id integer validation.
+        """
         # Resolve patient_id string to subject_id if provided
         patient_id_str = data.get('patient_id')
         if patient_id_str and not data.get('subject_id'):
-            from patients.models import Patient
             try:
                 patient = Patient.objects.get(patient_id=patient_id_str)
                 data['subject_id'] = patient.id
             except Patient.DoesNotExist:
-                raise serializers.ValidationError({"patient_id": f"Patient with identifier {patient_id_str} does not exist"})
+                raise serializers.ValidationError({
+                    "patient_id": f"Patient with identifier {patient_id_str} does not exist"
+                })
 
-        # Validate subject_id exists
+        # Validate subject_id exists using direct ORM query
         subject_id = data.get('subject_id')
-        if subject_id and not validate_patient_exists(subject_id):
-            raise serializers.ValidationError({"subject_id": f"Patient with ID {subject_id} does not exist"})
+        if subject_id:
+            if not Patient.objects.filter(id=subject_id).exists():
+                raise serializers.ValidationError({
+                    "subject_id": f"Patient with ID {subject_id} does not exist"
+                })
 
-        # Validate practitioner if provided
+        # Validate practitioner using direct ORM query
         participant_id = data.get('participant_individual_id')
-        if participant_id and not PractitionerACL.validate_practitioner_exists(participant_id):
-            raise serializers.ValidationError({"participant_individual_id": f"Practitioner with ID {participant_id} does not exist"})
+        if participant_id:
+            if not Practitioner.objects.filter(practitioner_id=participant_id).exists():
+                raise serializers.ValidationError({
+                    "participant_individual_id": f"Practitioner with ID {participant_id} does not exist"
+                })
 
-        # Validate location if provided
+        # Validate location using direct ORM query
         location_id = data.get('location_id')
-        if location_id and not LocationACL.validate_location_exists(location_id):
-            raise serializers.ValidationError({"location_id": f"Location with ID {location_id} does not exist"})
+        if location_id:
+            if not Location.objects.filter(location_id=location_id).exists():
+                raise serializers.ValidationError({
+                    "location_id": f"Location with ID {location_id} does not exist"
+                })
+
+        # Handle period_start date parsing
+        period_start = data.get('period_start')
+        if period_start and isinstance(period_start, str):
+            # Handle ISO timestamp format (YYYY-MM-DDTHH:mm:ss)
+            if 'T' in period_start:
+                period_start = period_start.split('T')[0]
+            try:
+                data['period_start'] = datetime.strptime(period_start, '%Y-%m-%d').date()
+            except ValueError:
+                raise serializers.ValidationError({
+                    "period_start": "Invalid date format. Expected YYYY-MM-DD"
+                })
 
         return data
 
@@ -135,18 +208,24 @@ class EncounterSerializer(serializers.ModelSerializer):
 class EncounterDischargeSerializer(serializers.ModelSerializer):
     """
     Serializer specifically for discharging a patient.
+    Uses direct ORM queries - no ACL layer.
     """
     class Meta:
         model = Encounter
         fields = ['period_end', 'discharge_disposition', 'discharge_destination_id']
 
     def validate_discharge_destination_id(self, value):
-        if value and not LocationACL.validate_location_exists(value):
-            raise serializers.ValidationError(f"Discharge destination with ID {value} does not exist")
+        """Direct ORM validation for discharge destination."""
+        if value:
+            if not Location.objects.filter(location_id=value).exists():
+                raise serializers.ValidationError(
+                    f"Discharge destination with ID {value} does not exist"
+                )
         return value
 
     @transaction.atomic
     def save(self, **kwargs):
+        """Atomic discharge operation with status update."""
         instance = self.instance
         if instance.status == 'finished':
             raise serializers.ValidationError("Encounter is already discharged")
@@ -161,6 +240,7 @@ class EncounterDischargeSerializer(serializers.ModelSerializer):
 # ============================================================================
 
 class ProcedurePerformerSerializer(serializers.ModelSerializer):
+    """Serializer for procedure performers with direct ORM lookups."""
     practitioner_summary = serializers.SerializerMethodField()
 
     class Meta:
@@ -171,11 +251,26 @@ class ProcedurePerformerSerializer(serializers.ModelSerializer):
         ]
 
     def get_practitioner_summary(self, obj):
-        if obj.performer_actor_id:
-            return PractitionerACL.get_practitioner_summary(obj.performer_actor_id)
-        return None
+        """Direct ORM lookup for practitioner summary."""
+        if not obj.performer_actor_id:
+            return None
+        try:
+            practitioner = Practitioner.objects.get(practitioner_id=obj.performer_actor_id)
+            return {
+                "practitioner_id": practitioner.practitioner_id,
+                "full_name": f"{practitioner.first_name} {practitioner.last_name}",
+                "first_name": practitioner.first_name,
+                "last_name": practitioner.last_name,
+                "role": "Physician",
+            }
+        except Practitioner.DoesNotExist:
+            return None
 
 class ProcedureSerializer(serializers.ModelSerializer):
+    """
+    Serializer for medical procedures with direct ORM validation.
+    Fat Serializer pattern - all business logic here.
+    """
     patient_id = serializers.CharField(write_only=True, required=False, allow_null=True)
     patient_summary = serializers.SerializerMethodField()
     performers = ProcedurePerformerSerializer(many=True, required=False)
@@ -197,92 +292,82 @@ class ProcedureSerializer(serializers.ModelSerializer):
         }
 
     def get_patient_summary(self, obj):
-        if obj.subject_id:
-            return get_patient_summary(obj.subject_id)
-        return None
+        """Direct ORM lookup for patient summary."""
+        if not obj.subject_id:
+            return None
+        try:
+            patient = Patient.objects.get(id=obj.subject_id)
+            return {
+                "id": patient.id,
+                "patient_id": patient.patient_id,
+                "full_name": f"{patient.first_name} {patient.last_name}",
+                "first_name": patient.first_name,
+                "last_name": patient.last_name,
+                "gender": patient.gender,
+                "birthdate": patient.birthdate,
+            }
+        except Patient.DoesNotExist:
+            return None
 
     def validate(self, data):
+        """Direct ORM validation - no ACL layer."""
         # Resolve patient_id string to subject_id if provided
         patient_id_str = data.get('patient_id')
         if patient_id_str and not data.get('subject_id'):
-            from patients.models import Patient
             try:
                 patient = Patient.objects.get(patient_id=patient_id_str)
                 data['subject_id'] = patient.id
             except Patient.DoesNotExist:
-                raise serializers.ValidationError({"patient_id": f"Patient with identifier {patient_id_str} does not exist"})
+                raise serializers.ValidationError({
+                    "patient_id": f"Patient with identifier {patient_id_str} does not exist"
+                })
 
         encounter = data.get('encounter')
         subject_id = data.get('subject_id')
 
-        # Validate subject_id exists
-        if subject_id and not validate_patient_exists(subject_id):
-            raise serializers.ValidationError({"subject_id": f"Patient with ID {subject_id} does not exist"})
+        # Validate subject_id exists using direct ORM query
+        if subject_id:
+            if not Patient.objects.filter(id=subject_id).exists():
+                raise serializers.ValidationError({
+                    "subject_id": f"Patient with ID {subject_id} does not exist"
+                })
 
         # Validate patient matches encounter's patient
-        if encounter and encounter.subject_id != subject_id:
-            raise serializers.ValidationError("Procedure subject_id must match encounter's subject_id")
+        if encounter and subject_id and encounter.subject_id != subject_id:
+            raise serializers.ValidationError(
+                "Procedure subject_id must match encounter's subject_id"
+            )
 
         return data
 
     @transaction.atomic
     def create(self, validated_data):
+        """Atomic create operation with performer handling."""
         # Remove patient_id from validated_data
         validated_data.pop('patient_id', None)
         
         performers_data = validated_data.pop('performers', [])
         
+        # Generate identifier if not provided
         if not validated_data.get('identifier'):
             random_digits = ''.join([str(random.randint(0, 9)) for _ in range(11)])
             validated_data['identifier'] = f"PROC-{random_digits}"
             
         # Set recorder_id from context if available
         if 'request' in self.context:
-            validated_data['recorder_id'] = self.context['request'].user.id
+            user = self.context['request'].user
+            if hasattr(user, 'id'):
+                validated_data['recorder_id'] = user.id
 
+        # Default status
         if not validated_data.get('status'):
             validated_data['status'] = 'completed'
 
+        # Create procedure
         procedure = Procedure.objects.create(**validated_data)
         
+        # Create performers
         for performer_data in performers_data:
             ProcedurePerformer.objects.create(procedure=procedure, **performer_data)
             
         return procedure
-
-# ============================================================================
-# COMPATIBILITY HELPERS (ACLs)
-# ============================================================================
-
-class EncounterACL:
-    """
-    Compatibility helper for external modules.
-    """
-    @staticmethod
-    def validate_encounter_exists(encounter_id: int) -> bool:
-        return Encounter.objects.filter(encounter_id=encounter_id).exists()
-    
-    @staticmethod
-    def get_encounter_details(encounter_id: int):
-        try:
-            instance = Encounter.objects.get(encounter_id=encounter_id)
-            return EncounterSerializer(instance).data
-        except ObjectDoesNotExist:
-            return None
-
-class ProcedureACL:
-    """
-    Compatibility helper for external modules.
-    """
-    @staticmethod
-    def validate_procedure_exists(procedure_id: int) -> bool:
-        return Procedure.objects.filter(procedure_id=procedure_id).exists()
-    
-    @staticmethod
-    def get_procedure_details(procedure_id: int):
-        try:
-            instance = Procedure.objects.get(procedure_id=procedure_id)
-            return ProcedureSerializer(instance).data
-        except ObjectDoesNotExist:
-            return None
-

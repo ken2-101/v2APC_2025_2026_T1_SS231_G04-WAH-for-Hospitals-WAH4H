@@ -14,12 +14,12 @@ Routes:
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from billing.api.views import (
+from billing.views import (
     AccountViewSet,
     InvoiceViewSet,
     ClaimViewSet,
     PaymentReconciliationViewSet,
-    BillingRecordViewSet,
+    PaymentNoticeViewSet,
 )
 
 # Initialize router
@@ -30,7 +30,7 @@ router.register(r'accounts', AccountViewSet, basename='account')
 router.register(r'invoices', InvoiceViewSet, basename='invoice')
 router.register(r'claims', ClaimViewSet, basename='claim')
 router.register(r'payments', PaymentReconciliationViewSet, basename='payment')
-router.register(r'billing-records', BillingRecordViewSet, basename='billing-record')
+router.register(r'payment-notices', PaymentNoticeViewSet, basename='payment-notice')
 
 # URL patterns
 urlpatterns = [

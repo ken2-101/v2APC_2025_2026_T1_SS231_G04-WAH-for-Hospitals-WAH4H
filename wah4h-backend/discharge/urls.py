@@ -12,8 +12,7 @@ Routes:
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from discharge.api.views import (
-    ProcedureViewSet,
+from discharge.views import (
     DischargeViewSet,
 )
 
@@ -21,7 +20,6 @@ from discharge.api.views import (
 router = DefaultRouter()
 
 # Register ViewSets with specific route prefixes
-router.register(r'procedures', ProcedureViewSet, basename='procedure')
 router.register(r'discharges', DischargeViewSet, basename='discharge')
 
 # URL patterns

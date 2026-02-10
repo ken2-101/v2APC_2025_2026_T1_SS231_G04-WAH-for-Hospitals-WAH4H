@@ -28,6 +28,23 @@ class OrganizationSerializer(serializers.ModelSerializer):
         model = Organization
         fields = ['organization_id', 'name']
 
+
+class PractitionerSerializer(serializers.ModelSerializer):
+    """Serializer for listing/practitioner dropdowns."""
+    class Meta:
+        model = Practitioner
+        fields = [
+            'practitioner_id',
+            'identifier',
+            'first_name',
+            'middle_name',
+            'last_name',
+            'suffix_name',
+            'active',
+            'birth_date',
+            'telecom',
+        ]
+
 # ============================================================================
 # UTILITY FUNCTIONS
 # ============================================================================

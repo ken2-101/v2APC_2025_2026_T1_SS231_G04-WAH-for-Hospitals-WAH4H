@@ -1,6 +1,16 @@
+"""
+Monitoring Serializers
+======================
+Trinity Architecture: Direct Model Access with Fat Serializers
+
+Direct ORM queries - NO service layers.
+"""
+
 from rest_framework import serializers
-from .models import Observation, ChargeItem, ChargeItemDefinition
-from .services import ResourceResolver
+from monitoring.models import Observation, ChargeItem, ChargeItemDefinition
+from patients.models import Patient
+from admission.models import Encounter
+from accounts.models import Practitioner, Organization
 
 
 class ObservationSerializer(serializers.ModelSerializer):
@@ -99,16 +109,45 @@ class ObservationSerializer(serializers.ModelSerializer):
         ]
     
     def get_subject(self, obj):
-        """Resolve patient information from subject_id."""
-        return ResourceResolver.resolve_patient(obj.subject_id)
+        """Resolve patient reference using direct ORM."""
+        if not obj.subject_id:
+            return None
+        try:
+            patient = Patient.objects.get(id=obj.subject_id)
+            return {
+                "id": patient.id,
+                "patient_id": patient.patient_id,
+                "name": f"{patient.first_name} {patient.last_name}"
+            }
+        except Patient.DoesNotExist:
+            return None
     
     def get_encounter(self, obj):
-        """Resolve encounter information from encounter_id."""
-        return ResourceResolver.resolve_encounter(obj.encounter_id)
+        """Resolve encounter reference using direct ORM."""
+        if not obj.encounter_id:
+            return None
+        try:
+            encounter = Encounter.objects.get(encounter_id=obj.encounter_id)
+            return {
+                "encounter_id": encounter.encounter_id,
+                "identifier": encounter.identifier,
+                "status": encounter.status
+            }
+        except Encounter.DoesNotExist:
+            return None
     
     def get_performer(self, obj):
-        """Resolve practitioner information from performer_id."""
-        return ResourceResolver.resolve_practitioner(obj.performer_id)
+        """Resolve practitioner reference using direct ORM."""
+        if not obj.performer_id:
+            return None
+        try:
+            practitioner = Practitioner.objects.get(practitioner_id=obj.performer_id)
+            return {
+                "practitioner_id": practitioner.practitioner_id,
+                "name": f"{practitioner.first_name} {practitioner.last_name}"
+            }
+        except Practitioner.DoesNotExist:
+            return None
 
 
 class ChargeItemSerializer(serializers.ModelSerializer):
@@ -182,28 +221,74 @@ class ChargeItemSerializer(serializers.ModelSerializer):
         ]
     
     def get_subject(self, obj):
-        """Resolve patient information from subject_id."""
-        return ResourceResolver.resolve_patient(obj.subject_id)
+        """Resolve patient reference using direct ORM."""
+        if not obj.subject_id:
+            return None
+        try:
+            patient = Patient.objects.get(id=obj.subject_id)
+            return {
+                "id": patient.id,
+                "patient_id": patient.patient_id,
+                "name": f"{patient.first_name} {patient.last_name}"
+            }
+        except Patient.DoesNotExist:
+            return None
     
     def get_account(self, obj):
-        """Resolve billing account information from account_id."""
-        return ResourceResolver.resolve_account(obj.account_id)
+        """Return account ID - no ACL available yet."""
+        return {"account_id": obj.account_id} if obj.account_id else None
     
     def get_performing_organization(self, obj):
-        """Resolve organization information from performing_organization_id."""
-        return ResourceResolver.resolve_organization(obj.performing_organization_id)
+        """Resolve organization using direct ORM."""
+        if not obj.performing_organization_id:
+            return None
+        try:
+            org = Organization.objects.get(organization_id=obj.performing_organization_id)
+            return {
+                "organization_id": org.organization_id,
+                "name": org.name
+            }
+        except Organization.DoesNotExist:
+            return None
     
     def get_requesting_organization(self, obj):
-        """Resolve organization information from requesting_organization_id."""
-        return ResourceResolver.resolve_organization(obj.requesting_organization_id)
+        """Resolve organization using direct ORM."""
+        if not obj.requesting_organization_id:
+            return None
+        try:
+            org = Organization.objects.get(organization_id=obj.requesting_organization_id)
+            return {
+                "organization_id": org.organization_id,
+                "name": org.name
+            }
+        except Organization.DoesNotExist:
+            return None
     
     def get_performer_actor(self, obj):
-        """Resolve practitioner information from performer_actor_id."""
-        return ResourceResolver.resolve_practitioner(obj.performer_actor_id)
+        """Resolve practitioner using direct ORM."""
+        if not obj.performer_actor_id:
+            return None
+        try:
+            practitioner = Practitioner.objects.get(practitioner_id=obj.performer_actor_id)
+            return {
+                "practitioner_id": practitioner.practitioner_id,
+                "name": f"{practitioner.first_name} {practitioner.last_name}"
+            }
+        except Practitioner.DoesNotExist:
+            return None
     
     def get_enterer(self, obj):
-        """Resolve practitioner information from enterer_id."""
-        return ResourceResolver.resolve_practitioner(obj.enterer_id)
+        """Resolve enterer using direct ORM."""
+        if not obj.enterer_id:
+            return None
+        try:
+            practitioner = Practitioner.objects.get(practitioner_id=obj.enterer_id)
+            return {
+                "practitioner_id": practitioner.practitioner_id,
+                "name": f"{practitioner.first_name} {practitioner.last_name}"
+            }
+        except Practitioner.DoesNotExist:
+            return None
 
 
 class ChargeItemDefinitionSerializer(serializers.ModelSerializer):

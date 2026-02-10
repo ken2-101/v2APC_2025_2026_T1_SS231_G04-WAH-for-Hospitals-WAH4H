@@ -12,7 +12,7 @@ Routes:
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from monitoring.api.views import (
+from monitoring.views import (
     ObservationViewSet,
     ChargeItemViewSet,
 )
