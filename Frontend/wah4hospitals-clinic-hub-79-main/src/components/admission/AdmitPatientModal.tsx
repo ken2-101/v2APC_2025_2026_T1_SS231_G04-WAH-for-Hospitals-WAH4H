@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import { X, Search, User, MapPin, CheckCircle, ChevronRight, ChevronLeft, AlertCircle } from 'lucide-react';
 import { admissionService } from '@/services/admissionService';
 import { NewAdmission } from '@/types/admission';
@@ -42,7 +43,8 @@ const INITIAL_FORM: NewAdmission = {
 
 // Removed MOCK_PHYSICIANS as we now fetch from the backend
 
-const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({ isOpen, onClose, onSuccess }) => {
+const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({ isOpen, onClose, onSuccess, onNavigate }) => {
+  const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState<NewAdmission>(INITIAL_FORM);
   const [searchQuery, setSearchQuery] = useState('');
@@ -186,7 +188,25 @@ const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({ isOpen, onClose, 
                     <ChevronRight className="text-slate-300 group-hover:text-blue-500" />
                   </div>
                 ))}
-                {searchQuery && !isSearching && searchResults.length === 0 && <div className="text-center text-slate-400 py-10">No patients found.</div>}
+                {searchQuery && !isSearching && searchResults.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-10 animate-in fade-in duration-300">
+                    <div className="text-slate-400 mb-3">No patients found.</div>
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => {
+                        onClose();
+                        if (onNavigate) {
+                          onNavigate('patients');
+                        } else {
+                          navigate('/patients');
+                        }
+                      }}
+                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 font-bold flex items-center gap-2"
+                    >
+                      + Add New Patient
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           )}
