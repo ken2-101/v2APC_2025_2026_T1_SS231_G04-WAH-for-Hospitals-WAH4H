@@ -74,80 +74,12 @@ def request_patient(target_id, philhealth_id, idempotency_key=None):
 
 
 def patient_to_fhir(patient):
-    """Convert local Patient model to PH Core FHIR Patient resource."""
-    extensions = [
-        {
-            "url": "urn://example.com/ph-core/fhir/StructureDefinition/indigenous-people",
-            "valueBoolean": patient.indigenous_flag or False,
-        }
-    ]
-
-    if patient.nationality:
-        extensions.append({
-            "url": "http://hl7.org/fhir/StructureDefinition/patient-nationality",
-            "extension": [{
-                "url": "code",
-                "valueCodeableConcept": {
-                    "coding": [{"system": "urn:iso:std:iso:3166", "code": "PH", "display": patient.nationality}]
-                },
-            }],
-        })
-
-    if patient.religion:
-        extensions.append({
-            "url": "http://hl7.org/fhir/StructureDefinition/patient-religion",
-            "valueCodeableConcept": {
-                "coding": [{
-                    "system": "http://terminology.hl7.org/CodeSystem/v3-ReligiousAffiliation",
-                    "display": patient.religion,
-                }]
-            },
-        })
-
-    if patient.indigenous_flag and patient.indigenous_group:
-        extensions.append({
-            "url": "urn://example.com/ph-core/fhir/StructureDefinition/indigenous-group",
-            "valueCodeableConcept": {
-                "coding": [{
-                    "system": "urn://example.com/ph-core/fhir/CodeSystem/indigenous-groups",
-                    "display": patient.indigenous_group,
-                }]
-            },
-        })
-
-    if patient.occupation:
-        extensions.append({
-            "url": "urn://example.com/ph-core/fhir/StructureDefinition/occupation",
-            "valueCodeableConcept": {
-                "coding": [{
-                    "system": "urn://example.com/ph-core/fhir/ValueSet/occupational-classifications",
-                    "display": patient.occupation,
-                }]
-            },
-        })
-
-    if patient.education:
-        extensions.append({
-            "url": "urn://example.com/ph-core/fhir/StructureDefinition/educational-attainment",
-            "valueCodeableConcept": {
-                "coding": [{
-                    "system": "urn://example.com/ph-core/fhir/ValueSet/educational-attainments",
-                    "display": patient.education,
-                }]
-            },
-        })
-
+    """Convert local Patient model to standard FHIR R4 Patient resource."""
     fhir = {
         "resourceType": "Patient",
-        "meta": {
-            "profile": ["urn://example.com/ph-core/fhir/StructureDefinition/ph-core-patient"]
-        },
-        "extension": extensions,
-        "identifier": (
-            [{"system": "http://philhealth.gov.ph/fhir/Identifier/philhealth-id", "value": patient.philhealth_id}]
-            if patient.philhealth_id else []
-        ),
+        "identifier": [],
         "name": [{
+            "use": "official",
             "family": patient.last_name,
             "given": [n for n in [patient.first_name, patient.middle_name] if n],
         }],
@@ -156,40 +88,113 @@ def patient_to_fhir(patient):
         "active": True,
     }
 
-    if patient.mobile_number:
-        fhir["telecom"] = [{"system": "phone", "value": patient.mobile_number, "use": "mobile"}]
+    # Add PhilHealth identifier with proper type
+    if patient.philhealth_id:
+        fhir["identifier"].append({
+            "type": {
+                "coding": [{
+                    "system": "http://terminology.hl7.org/CodeSystem/v2-0203",
+                    "code": "NI",
+                    "display": "National unique individual identifier"
+                }]
+            },
+            "system": "http://philhealth.gov.ph",
+            "value": patient.philhealth_id
+        })
 
+    # Add MRN if exists
+    if patient.patient_id:
+        fhir["identifier"].append({
+            "type": {
+                "coding": [{
+                    "system": "http://terminology.hl7.org/CodeSystem/v2-0203",
+                    "code": "MR",
+                    "display": "Medical record number"
+                }]
+            },
+            "system": "http://hospital.example.org",
+            "value": patient.patient_id
+        })
+
+    # Telecom
+    if patient.mobile_number:
+        fhir["telecom"] = [{
+            "system": "phone",
+            "value": patient.mobile_number,
+            "use": "mobile"
+        }]
+
+    # Marital status with valid codes
     if patient.civil_status:
         status_map = {
-            "single": "S", "married": "M", "widowed": "W", "divorced": "D",
-            "separated": "L", "annulled": "A",
+            "single": "S",
+            "s": "S",
+            "married": "M",
+            "m": "M",
+            "widowed": "W",
+            "w": "W",
+            "divorced": "D",
+            "d": "D",
+            "separated": "L",
+            "l": "L",
+            "annulled": "A",
+            "a": "A",
         }
-        code = status_map.get(patient.civil_status.lower(), "UNK")
-        fhir["maritalStatus"] = {
-            "coding": [{
-                "system": "http://terminology.hl7.org/CodeSystem/v3-MaritalStatus",
-                "code": code,
-                "display": patient.civil_status,
-            }]
-        }
+        code = status_map.get(patient.civil_status.lower())
 
+        if code:  # Only include if we have a valid code
+            fhir["maritalStatus"] = {
+                "coding": [{
+                    "system": "http://terminology.hl7.org/CodeSystem/v3-MaritalStatus",
+                    "code": code
+                }]
+            }
+
+    # Address with use attribute
     if patient.address_line or patient.address_city:
         fhir["address"] = [{
+            "use": "home",
             "line": [patient.address_line] if patient.address_line else [],
             "city": patient.address_city,
             "district": patient.address_district,
             "state": patient.address_state,
             "postalCode": patient.address_postal_code,
-            "country": patient.address_country or "PH",
+            "country": patient.address_country or "Philippines",
         }]
 
+    # Emergency contact with proper relationship code
     if patient.contact_first_name or patient.contact_last_name:
+        # Map common relationship values to v2-0131 codes
+        relationship_map = {
+            "spouse": "SPS",
+            "parent": "PAR",
+            "mother": "MTH",
+            "father": "FTH",
+            "child": "CHD",
+            "sibling": "SIB",
+            "emergency": "C",
+        }
+
+        rel_code = None
+        rel_display = patient.contact_relationship or "Emergency Contact"
+
+        # Try to find matching code
+        for key, code in relationship_map.items():
+            if key in rel_display.lower():
+                rel_code = code
+                break
+
+        # Default to "C" (Emergency Contact) if no match
+        if not rel_code:
+            rel_code = "C"
+
         fhir["contact"] = [{
             "relationship": [{
                 "coding": [{
-                    "system": "http://hl7.org/fhir/ValueSet/relatedperson-relationshiptype",
-                    "display": patient.contact_relationship or "Emergency Contact",
-                }]
+                    "system": "http://terminology.hl7.org/CodeSystem/v2-0131",
+                    "code": rel_code
+                }],
+                "text": rel_display
             }],
             "name": {
                 "family": patient.contact_last_name,
@@ -201,7 +206,38 @@ def patient_to_fhir(patient):
             ),
         }]
 
-    return {k: v for k, v in fhir.items() if v is not None}
+    # Store Philippine-specific data in extension for interoperability (optional)
+    extensions = []
+
+    if patient.nationality:
+        extensions.append({
+            "url": "http://hl7.org/fhir/StructureDefinition/patient-nationality",
+            "extension": [{
+                "url": "code",
+                "valueCodeableConcept": {
+                    "coding": [{
+                        "system": "urn:iso:std:iso:3166",
+                        "code": "PH",
+                        "display": patient.nationality
+                    }]
+                }
+            }]
+        })
+
+    if patient.religion:
+        extensions.append({
+            "url": "http://hl7.org/fhir/StructureDefinition/patient-religion",
+            "valueCodeableConcept": {
+                "text": patient.religion
+            }
+        })
+
+    if extensions:
+        fhir["extension"] = extensions
+
+    # Remove None values and empty lists
+    return {k: v for k, v in fhir.items() if v not in (None, [], {})}
+
 
 
 def push_patient(target_id, patient, idempotency_key=None):
