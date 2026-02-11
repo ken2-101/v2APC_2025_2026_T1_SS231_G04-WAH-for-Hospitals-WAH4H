@@ -1,10 +1,15 @@
-import requests
+import requests  # pyre-ignore[21]
 import os
 import uuid
+from typing import Any
 
 URL = "https://wah4pc.echosphere.cfd"
 API_KEY = os.getenv("WAH4PC_API_KEY")
 PROVIDER_ID = os.getenv("WAH4PC_PROVIDER_ID")
+
+# NOTE: Education and Occupation extensions use text-only representation
+# to avoid FHIR ValueSet validation errors. The official PH Core ValueSet
+# codes are not publicly available, so we use text which is valid FHIR.
 
 
 def request_patient(target_id, philhealth_id, idempotency_key=None):
@@ -73,29 +78,31 @@ def request_patient(target_id, philhealth_id, idempotency_key=None):
         }
 
 
-def patient_to_fhir(patient):
+def patient_to_fhir(patient) -> dict[str, Any]:
     """Convert local Patient model to standard FHIR R4 Patient resource."""
-    fhir = {
+    identifiers: list[dict[str, Any]] = []
+    fhir: dict[str, Any] = {
         "resourceType": "Patient",
-        "identifier": [],
+        "identifier": identifiers,
         "name": [{
             "use": "official",
             "family": patient.last_name,
             "given": [n for n in [patient.first_name, patient.middle_name] if n],
+            "suffix": [patient.suffix_name] if patient.suffix_name else [],
         }],
         "gender": patient.gender.lower() if patient.gender else None,
         "birthDate": str(patient.birthdate) if patient.birthdate else None,
-        "active": True,
+        "active": patient.active,
     }
 
     # Add PhilHealth identifier with proper type
     if patient.philhealth_id:
-        fhir["identifier"].append({
+        identifiers.append({
             "type": {
                 "coding": [{
                     "system": "http://terminology.hl7.org/CodeSystem/v2-0203",
-                    "code": "NI",
-                    "display": "National unique individual identifier"
+                    "code": "SB",
+                    "display": "Social Beneficiary Identifier"
                 }]
             },
             "system": "http://philhealth.gov.ph",
@@ -104,7 +111,7 @@ def patient_to_fhir(patient):
 
     # Add MRN if exists
     if patient.patient_id:
-        fhir["identifier"].append({
+        identifiers.append({
             "type": {
                 "coding": [{
                     "system": "http://terminology.hl7.org/CodeSystem/v2-0203",
@@ -112,7 +119,7 @@ def patient_to_fhir(patient):
                     "display": "Medical record number"
                 }]
             },
-            "system": "http://hospital.example.org",
+            "system": f"{URL}/providers/{PROVIDER_ID}",
             "value": patient.patient_id
         })
 
@@ -165,22 +172,25 @@ def patient_to_fhir(patient):
     # Emergency contact with proper relationship code
     if patient.contact_first_name or patient.contact_last_name:
         # Map common relationship values to v2-0131 codes
+        # Valid v2-0131 codes: C=Emergency Contact, E=Employer,
+        # F=Federal Agency, I=Insurance Company, N=Next-of-Kin,
+        # O=Other, S=State Agency, U=Unknown
         relationship_map = {
-            "spouse": "SPS",
-            "parent": "PAR",
-            "mother": "MTH",
-            "father": "FTH",
-            "child": "CHD",
-            "sibling": "SIB",
+            "spouse": "N",
+            "parent": "N",
+            "mother": "N",
+            "father": "N",
+            "child": "N",
+            "sibling": "N",
             "emergency": "C",
         }
 
         rel_code = None
-        rel_display = patient.contact_relationship or "Emergency Contact"
+        rel_display: str = patient.contact_relationship or "Emergency Contact"
 
         # Try to find matching code
         for key, code in relationship_map.items():
-            if key in rel_display.lower():
+            if key in rel_display.lower():  # pyre-ignore[16]
                 rel_code = code
                 break
 
@@ -207,7 +217,7 @@ def patient_to_fhir(patient):
         }]
 
     # Store Philippine-specific data in extension for interoperability (optional)
-    extensions = []
+    extensions: list[dict[str, Any]] = []
 
     if patient.nationality:
         extensions.append({
@@ -229,6 +239,46 @@ def patient_to_fhir(patient):
             "url": "http://hl7.org/fhir/StructureDefinition/patient-religion",
             "valueCodeableConcept": {
                 "text": patient.religion
+            }
+        })
+
+    if patient.occupation:
+        # Use text-only representation (safest - no ValueSet validation issues)
+        extensions.append({
+            "url": "urn://example.com/ph-core/fhir/StructureDefinition/occupation",
+            "valueCodeableConcept": {
+                "text": patient.occupation
+            }
+        })
+
+    # NOTE: Education extension is NOT included in FHIR output
+    # The PH Core profile requires coded values from ValueSet 'educational-attainments'
+    # which is not publicly available. Including text-only causes validation ERROR.
+    # The education data is still stored in the database (patient.education field).
+    # TODO: Add education extension when official PH Core ValueSet codes are available
+    # if patient.education:
+    #     extensions.append({
+    #         "url": "urn://example.com/ph-core/fhir/StructureDefinition/educational-attainment",
+    #         "valueCodeableConcept": {
+    #             "text": patient.education
+    #         }
+    #     })
+
+    if patient.indigenous_flag is not None:
+        extensions.append({
+            "url": "urn://example.com/ph-core/fhir/StructureDefinition/indigenous-people",
+            "valueBoolean": patient.indigenous_flag
+        })
+
+    if patient.indigenous_group:
+        extensions.append({
+            "url": "urn://example.com/ph-core/fhir/StructureDefinition/indigenous-group",
+            "valueCodeableConcept": {
+                "coding": [{
+                    "system": "urn://example.com/ph-core/fhir/CodeSystem/indigenous-groups",
+                    "code": patient.indigenous_group,
+                    "display": patient.indigenous_group
+                }]
             }
         })
 
@@ -305,15 +355,15 @@ def push_patient(target_id, patient, idempotency_key=None):
         }
 
 
-def _get_extension(extensions, url):
+def _get_extension(extensions: list[dict[str, Any]], url: str) -> Any:
     """Extract value from a FHIR extension by URL."""
     for ext in extensions:
         if ext.get("url") == url:
-            for key, val in ext.items():
+            for key, val in ext.items():  # pyre-ignore[16]
                 if key.startswith("value"):
                     return val
-            if "extension" in ext:
-                return ext["extension"]
+            if "extension" in ext:  # pyre-ignore[58]
+                return ext["extension"]  # pyre-ignore[29]
     return None
 
 
@@ -414,15 +464,15 @@ def gateway_get_transaction(transaction_id):
         }
 
 
-def fhir_to_dict(fhir):
+def fhir_to_dict(fhir: dict[str, Any]) -> dict[str, Any]:
     """Convert PH Core FHIR Patient resource to local dict."""
-    name = fhir.get("name", [{}])[0]
-    ids = fhir.get("identifier", [])
-    extensions = fhir.get("extension", [])
-    addresses = fhir.get("address", [{}])
-    addr = addresses[0] if addresses else {}
-    telecoms = fhir.get("telecom", [])
-    contacts = fhir.get("contact", [])
+    name: dict[str, Any] = fhir.get("name", [{}])[0]
+    ids: list[dict[str, Any]] = fhir.get("identifier", [])
+    extensions: list[dict[str, Any]] = fhir.get("extension", [])
+    addresses: list[dict[str, Any]] = fhir.get("address", [{}])
+    addr: dict[str, Any] = addresses[0] if addresses else {}
+    telecoms: list[dict[str, Any]] = fhir.get("telecom", [])
+    contacts: list[dict[str, Any]] = fhir.get("contact", [])
 
     ph_id = next(
         (i["value"] for i in ids if "philhealth" in i.get("system", "")), None
@@ -456,11 +506,11 @@ def fhir_to_dict(fhir):
         return None
 
     # Parse contact
-    contact = contacts[0] if contacts else {}
-    contact_name = contact.get("name", {})
-    contact_telecoms = contact.get("telecom", [])
-    contact_rels = contact.get("relationship", [{}])
-    contact_rel = contact_rels[0] if contact_rels else {}
+    contact: dict[str, Any] = contacts[0] if contacts else {}
+    contact_name: dict[str, Any] = contact.get("name", {})
+    contact_telecoms: list[dict[str, Any]] = contact.get("telecom", [])
+    contact_rels: list[dict[str, Any]] = contact.get("relationship", [{}])
+    contact_rel: dict[str, Any] = contact_rels[0] if contact_rels else {}
 
     result = {
         "first_name": given[0] if given else "",
