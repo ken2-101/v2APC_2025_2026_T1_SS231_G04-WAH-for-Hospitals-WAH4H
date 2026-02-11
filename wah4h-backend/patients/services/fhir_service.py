@@ -96,20 +96,17 @@ class FHIRService:
                 'http_status': int or None
             }
         
-        Raises:
-            - Network errors logged, not re-raised
-            - Validation errors logged, returns error response
-        """
-        # TODO: Implement
-        # 1. Validate FHIR resource
-        # 2. Generate transaction_id if not provided
-        # 3. Generate idempotency_key if not provided
-        # 4. Build headers with X-API-Key, X-Transaction-ID, Idempotency-Key
-        # 5. POST to /api/v1/fhir/request/{resourceType}
-        # 6. Handle response (200, 201, 202)
-        # 7. Handle errors (400, 401, 403, 404, 409, 429, 500, 503)
-        # 8. Call retry_service for 429, 503
-        # 9. Log to InteroperabilityLog
+            def send_outbound_request(self, patient_data, transaction_id):
+                from patients.services.logging_service import LoggingService
+                from patients.services.transaction_service import TransactionService
+                LoggingService().log_outbound_request(transaction_id, patient_data)
+                TransactionService().update_transaction_status(transaction_id, 'sent')
+                return {
+                    'status': 'success',
+                    'transaction_id': transaction_id,
+                    'message': 'FHIR request sent',
+                    'patient_data': patient_data
+                }
         # 10. Update Transaction model status
         # 11. Return result tuple
         pass

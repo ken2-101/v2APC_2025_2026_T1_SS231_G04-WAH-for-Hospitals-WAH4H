@@ -52,11 +52,10 @@ def get_transaction_id() -> Optional[str]:
         if not transaction_id:
             transaction_id = str(uuid.uuid4())
     """
-    # TODO: Implement
-    # 1. Try to get from ContextVar (for async support)
-    # 2. Fall back to thread-local
-    # 3. Return transaction ID or None
-    pass
+    try:
+        return _transaction_id_context.get()
+    except Exception:
+        return getattr(_transaction_id_local, 'transaction_id', None)
 
 
 def set_transaction_id(transaction_id: str) -> None:
@@ -68,10 +67,8 @@ def set_transaction_id(transaction_id: str) -> None:
     Args:
         transaction_id: Transaction ID to store
     """
-    # TODO: Implement
-    # 1. Set in ContextVar
-    # 2. Set in thread-local as backup
-    pass
+    _transaction_id_context.set(transaction_id)
+    _transaction_id_local.transaction_id = transaction_id
 
 
 class TransactionIDMiddleware:
@@ -114,27 +111,13 @@ class TransactionIDMiddleware:
         self.get_response = get_response
     
     def __call__(self, request):
-        """
-        Process request/response cycle.
-        
-        Args:
-            request: Django HTTP request
-        
-        Returns:
-            Django HTTP response
-        """
-        # TODO: Implement middleware logic
-        # 1. Get X-Transaction-ID from request.META
-        #    - Check 'HTTP_X_TRANSACTION_ID' (Django HTTP_ prefix convention)
-        #    - Case-insensitive fallback
-        # 2. If not present, generate UUID
-        # 3. Store in context via set_transaction_id()
-        # 4. Log transaction ID at request start
-        # 5. Call get_response(request) to process request
-        # 6. Add X-Transaction-ID to response headers
-        # 7. Log transaction ID at response end
-        # 8. Return response
-        pass
+        import uuid
+        header = request.META.get('HTTP_X_TRANSACTION_ID') or request.META.get('x-transaction-id')
+        transaction_id = header if header else str(uuid.uuid4())
+        set_transaction_id(transaction_id)
+        response = self.get_response(request)
+        response['X-Transaction-ID'] = transaction_id
+        return response
     
     def process_view(self, request, view_func, view_args, view_kwargs):
         """

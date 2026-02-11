@@ -84,15 +84,8 @@ class LoggingService:
     """
     
     def __init__(self, verbosity: VerbosityLevel = VerbosityLevel.STANDARD):
-        """
-        Initialize logging service.
-        
-        Args:
-            verbosity: Logging verbosity level (default STANDARD)
-        
-        TODO: Import and inject model:
-        - from patients.models import InteroperabilityLog
-        """
+        from patients.models import InteroperabilityLog
+        self.model = InteroperabilityLog
         self.verbosity = verbosity
     
     def log_outbound_request(
@@ -106,37 +99,20 @@ class LoggingService:
         request_body: Optional[Dict] = None,
         headers: Optional[Dict] = None,
     ) -> Tuple[bool, Optional[str]]:
-        """
-        Log outbound request to WAH4PC Gateway.
-        
-        Args:
-            transaction_id: Transaction ID
-            endpoint: API endpoint (e.g., /api/v1/fhir/request/Patient)
-            method: HTTP method (POST, GET, etc.)
-            resource_type: FHIR resource type (if applicable)
-            target_provider_id: Target provider ID
-            patient_id: Associated patient ID (if applicable)
-            request_body: Request body (logged if verbosity >= DETAILED)
-            headers: Request headers (logged if verbosity >= DEBUG, excluding auth)
-        
-        Returns:
-            Tuple[success: bool, error: Optional[str]]
-        """
-        # TODO: Implement
-        # 1. Create InteroperabilityLog record with:
-        #    - event_type: OUTBOUND_REQUEST
-        #    - transaction_id
-        #    - endpoint
-        #    - method
-        #    - resource_type
-        #    - target_provider_id
-        #    - patient_id
-        #    - event_data: {request_body, headers} (respecting verbosity)
-        #    - timestamp: now
-        # 2. Save to database
-        # 3. Log to Django logger at INFO level
-        # 4. Return (True, None) or (False, error_msg)
-        pass
+        self.model.objects.create(
+            event_type='OUTBOUND_REQUEST',
+            transaction_id=transaction_id,
+            patient_id=patient_id,
+            external_id=target_provider_id,
+            event_data={
+                'endpoint': endpoint,
+                'method': method,
+                'resource_type': resource_type,
+                'request_body': request_body,
+                'headers': headers,
+            }
+        )
+        return True, None
     
     def log_outbound_response(
         self,
@@ -215,31 +191,17 @@ class LoggingService:
         patient_id: Optional[int] = None,
         payload: Optional[Dict] = None,
     ) -> Tuple[bool, Optional[str]]:
-        """
-        Log incoming webhook request.
-        
-        Args:
-            transaction_id: Transaction ID (generated or from webhook)
-            webhook_type: Type of webhook (process_query, receive_results, receive_push)
-            source_provider_id: Provider sending the webhook
-            patient_id: Associated patient ID (if available)
-            payload: Webhook payload (logged if verbosity >= DETAILED)
-        
-        Returns:
-            Tuple[success: bool, error: Optional[str]]
-        """
-        # TODO: Implement
-        # 1. Create InteroperabilityLog record with:
-        #    - event_type: WEBHOOK_RECEIVED
-        #    - transaction_id
-        #    - external_id: source_provider_id
-        #    - patient_id
-        #    - event_data: {webhook_type, payload}
-        #    - timestamp: now
-        # 2. Save to database
-        # 3. Log to Django logger at INFO level
-        # 4. Return (True, None) or (False, error_msg)
-        pass
+        self.model.objects.create(
+            event_type='WEBHOOK_RECEIVED',
+            transaction_id=transaction_id,
+            patient_id=patient_id,
+            external_id=source_provider_id,
+            event_data={
+                'webhook_type': webhook_type,
+                'payload': payload,
+            }
+        )
+        return True, None
     
     def log_webhook_processed(
         self,

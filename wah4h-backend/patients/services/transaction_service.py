@@ -62,6 +62,8 @@ class TransactionService:
     TRANSACTION_TIMEOUT_SECONDS = 3600  # 1 hour
     
     def __init__(self):
+            from patients.models import WAH4PCTransaction
+            self.model = WAH4PCTransaction
         """
         Initialize transaction service.
         
@@ -108,7 +110,22 @@ class TransactionService:
         # 3. Create WAH4PCTransaction record:
         #    - transaction_id: str
         #    - type: transaction_type.value
-        #    - status: PENDING
+            import uuid
+            # Idempotency check
+            if idempotency_key:
+                existing = self.model.objects.filter(idempotency_key=idempotency_key).first()
+                if existing:
+                    return True, existing.transaction_id, None
+            transaction_id = str(uuid.uuid4())
+            tx = self.model.objects.create(
+                transaction_id=transaction_id,
+                type=transaction_type.value,
+                status='PENDING',
+                patient_id=patient_id,
+                target_provider_id=target_provider_id,
+                idempotency_key=idempotency_key
+            )
+            return True, transaction_id, None
         #    - patient_id: patient_id
         #    - target_provider_id: target_provider_id
         #    - idempotency_key: idempotency_key
@@ -149,7 +166,14 @@ class TransactionService:
         #    - transaction_id: str
         #    - type: transaction_type.value
         #    - status: RECEIVED
-        #    - target_provider_id: source_provider_id (who sent it)
+            tx = self.model.objects.filter(transaction_id=transaction_id).first()
+            if not tx:
+                return False, "Transaction not found"
+            tx.status = new_status.value
+            if error_message:
+                tx.error_message = error_message
+            tx.save()
+            return True, None
         #    - created_at: now
         # 3. Save to database
         # 4. Log creation to InteroperabilityLog
@@ -176,7 +200,21 @@ class TransactionService:
             Tuple[success: bool, error: Optional[str]]
         
         Status transitions:
-        - PENDING → IN_PROGRESS (request sent)
+            tx = self.model.objects.filter(transaction_id=transaction_id).first()
+            if not tx:
+                return False, None, "Transaction not found"
+            tx_dict = {
+                'transaction_id': tx.transaction_id,
+                'type': tx.type,
+                'status': tx.status,
+                'patient_id': tx.patient_id,
+                'target_provider_id': tx.target_provider_id,
+                'error_message': tx.error_message,
+                'idempotency_key': tx.idempotency_key,
+                'created_at': tx.created_at,
+                'updated_at': tx.updated_at,
+            }
+            return True, tx_dict, None
         - IN_PROGRESS → COMPLETED (received 200/201/202)
         - IN_PROGRESS → FAILED (error response)
         - IN_PROGRESS → RETRYING (will retry)
@@ -201,7 +239,10 @@ class TransactionService:
     def get_transaction(self, transaction_id: str) -> Tuple[bool, Optional[Dict], Optional[str]]:
         """
         Retrieve transaction details.
-        
+            tx = self.model.objects.filter(idempotency_key=idempotency_key).first()
+            if tx:
+                return True, tx.transaction_id
+            return False, None
         Args:
             transaction_id: Transaction ID to retrieve
         

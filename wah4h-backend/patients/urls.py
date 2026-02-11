@@ -46,6 +46,10 @@ urlpatterns = [
     path('wah4pc/transactions/', list_transactions, name='wah4pc_list_transactions'),
     path('wah4pc/transactions/<str:transaction_id>/', get_transaction, name='wah4pc_get_transaction'),
 
+    # Minimal FHIR integration endpoints
+    path('fhir/request/', __import__('patients.views.fhir_views').views.fhir_views.FHIRRequestView.as_view(), name='fhir_request'),
+    path('fhir/webhook/', __import__('patients.views.fhir_views').views.fhir_views.WebhookView.as_view(), name='fhir_webhook'),
+
     # Patient API routes
     path('', include(router.urls)),
 ]
