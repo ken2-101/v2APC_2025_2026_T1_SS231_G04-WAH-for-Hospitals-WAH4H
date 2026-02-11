@@ -1,0 +1,52 @@
+{
+  "resourceType": "StructureDefinition",
+  "id": "ph-core-address-province",
+  "url": "urn://example.com/ph-core/fhir/StructureDefinition/ph-core-address-province",
+  "name": "PHCoreAddressProvince",
+  "title": "PH Core Address Province",
+  "status": "draft",
+  "experimental": true,
+  "description": "Province from the Philippine Standard Geographic Code (PSGC).",
+  "fhirVersion": "4.0.1",
+  "kind": "complex-type",
+  "abstract": false,
+  "context": [
+    {
+      "expression": "Address",
+      "type": "element"
+    }
+  ],
+  "type": "Extension",
+  "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Extension",
+  "derivation": "constraint",
+  "differential": {
+    "element": [
+      {
+        "id": "Extension",
+        "path": "Extension",
+        "short": "Province",
+        "definition": "Province from the Philippine Standard Geographic Code (PSGC)."
+      },
+      {
+        "id": "Extension.extension",
+        "path": "Extension.extension",
+        "max": "0"
+      },
+      {
+        "id": "Extension.url",
+        "path": "Extension.url",
+        "fixedUri": "urn://example.com/ph-core/fhir/StructureDefinition/ph-core-address-province"
+      },
+      {
+        "id": "Extension.value[x]",
+        "path": "Extension.value[x]",
+        "min": 1,
+        "type": [
+          {
+            "code": "CodeableConcept"
+          }
+        ]
+      }
+    ]
+  }
+}

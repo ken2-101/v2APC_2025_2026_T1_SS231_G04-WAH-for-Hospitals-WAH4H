@@ -1,0 +1,56 @@
+{
+  "resourceType": "StructureDefinition",
+  "id": "religion",
+  "url": "urn://example.com/ph-core/fhir/StructureDefinition/religion",
+  "name": "Religion",
+  "title": "Religion",
+  "status": "draft",
+  "experimental": true,
+  "description": "The religious affiliation of the patient.",
+  "fhirVersion": "4.0.1",
+  "kind": "complex-type",
+  "abstract": false,
+  "context": [
+    {
+      "expression": "Patient",
+      "type": "element"
+    }
+  ],
+  "type": "Extension",
+  "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Extension",
+  "derivation": "constraint",
+  "differential": {
+    "element": [
+      {
+        "id": "Extension",
+        "path": "Extension",
+        "short": "Religion",
+        "definition": "The religious affiliation of the patient."
+      },
+      {
+        "id": "Extension.extension",
+        "path": "Extension.extension",
+        "max": "0"
+      },
+      {
+        "id": "Extension.url",
+        "path": "Extension.url",
+        "fixedUri": "urn://example.com/ph-core/fhir/StructureDefinition/religion"
+      },
+      {
+        "id": "Extension.value[x]",
+        "path": "Extension.value[x]",
+        "min": 1,
+        "type": [
+          {
+            "code": "CodeableConcept"
+          }
+        ],
+        "binding": {
+          "strength": "extensible",
+          "valueSet": "urn://example.com/ph-core/fhir/ValueSet/religion"
+        }
+      }
+    ]
+  }
+}

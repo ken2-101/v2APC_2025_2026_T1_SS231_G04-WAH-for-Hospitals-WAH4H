@@ -1,0 +1,35 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "race",
+  "url": "urn://example.com/ph-core/fhir/CodeSystem/race",
+  "name": "Race",
+  "title": "Race",
+  "status": "draft",
+  "experimental": true,
+  "description": "A code system representing race categories for use in the Philippines.",
+  "content": "complete",
+  "caseSensitive": true,
+  "count": 5,
+  "concept": [
+    {
+      "code": "filipino",
+      "display": "Filipino"
+    },
+    {
+      "code": "chinese",
+      "display": "Chinese"
+    },
+    {
+      "code": "spanish",
+      "display": "Spanish"
+    },
+    {
+      "code": "american",
+      "display": "American"
+    },
+    {
+      "code": "other",
+      "display": "Other"
+    }
+  ]
+}

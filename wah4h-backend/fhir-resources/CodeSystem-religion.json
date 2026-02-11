@@ -1,0 +1,24 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "religion",
+  "url": "urn://example.com/ph-core/fhir/CodeSystem/religion",
+  "name": "ReligiousAffiliation",
+  "title": "Religious Affiliation",
+  "status": "active",
+  "experimental": false,
+  "description": "A list of religious affiliations commonly found in the Philippines.",
+  "content": "complete",
+  "concept": [
+    { "code": "1013", "display": "Roman Catholic" },
+    { "code": "1020", "display": "Iglesia ni Cristo" },
+    { "code": "1023", "display": "Islam" },
+    { "code": "1014", "display": "Seventh Day Adventist" },
+    { "code": "1011", "display": "Born Again Christian" },
+    { "code": "1006", "display": "Baptist" },
+    { "code": "1027", "display": "Jehovah's Witness" },
+    { "code": "1036", "display": "Methodist" },
+    { "code": "1003", "display": "Aglipayan" },
+    { "code": "1019", "display": "Evangelical" },
+    { "code": "0000", "display": "None / Atheist" }
+  ]
+}

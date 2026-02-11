@@ -1,0 +1,12 @@
+{
+  "resourceType": "CodeSystem",
+  "status": "draft",
+  "content": "not-present",
+  "name": "PSCED",
+  "id": "PSCED",
+  "title": "Mock PSCED",
+  "description": "Mock of the Philippine Standard Classification of Education.",
+  "url": "urn://example.com/ph-core/fhir/CodeSystem/PSCED",
+  "experimental": true,
+  "caseSensitive": true
+}

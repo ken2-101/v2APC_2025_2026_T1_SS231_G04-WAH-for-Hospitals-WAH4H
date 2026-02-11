@@ -1,0 +1,17 @@
+{
+  "resourceType": "ValueSet",
+  "id": "religion",
+  "url": "urn://example.com/ph-core/fhir/ValueSet/religion",
+  "name": "ReligionValueSet",
+  "title": "Religious Affiliation Value Set",
+  "status": "active",
+  "experimental": false,
+  "description": "A value set of religious affiliations commonly found in the Philippines.",
+  "compose": {
+    "include": [
+      {
+        "system": "urn://example.com/ph-core/fhir/CodeSystem/religion"
+      }
+    ]
+  }
+}

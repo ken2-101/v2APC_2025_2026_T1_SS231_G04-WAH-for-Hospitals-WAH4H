@@ -1,0 +1,63 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "educational-attainment",
+  "url": "urn://example.com/ph-core/fhir/CodeSystem/educational-attainment",
+  "name": "EducationalAttainment",
+  "title": "Educational Attainment",
+  "status": "draft",
+  "experimental": true,
+  "description": "A code system representing educational attainment levels in the Philippines based on the Philippine Standard Classification of Education (PSCED).",
+  "content": "complete",
+  "caseSensitive": true,
+  "count": 12,
+  "concept": [
+    {
+      "code": "no-grade",
+      "display": "No Grade Completed"
+    },
+    {
+      "code": "elementary-undergraduate",
+      "display": "Elementary Undergraduate"
+    },
+    {
+      "code": "elementary-graduate",
+      "display": "Elementary Graduate"
+    },
+    {
+      "code": "highschool-undergraduate",
+      "display": "High School Undergraduate"
+    },
+    {
+      "code": "highschool-graduate",
+      "display": "High School Graduate"
+    },
+    {
+      "code": "vocational",
+      "display": "Vocational/Technical"
+    },
+    {
+      "code": "college-undergraduate",
+      "display": "College Undergraduate"
+    },
+    {
+      "code": "college-graduate",
+      "display": "College Graduate"
+    },
+    {
+      "code": "postgraduate",
+      "display": "Post Graduate"
+    },
+    {
+      "code": "masters",
+      "display": "Master's Degree"
+    },
+    {
+      "code": "doctoral",
+      "display": "Doctoral Degree"
+    },
+    {
+      "code": "other",
+      "display": "Other"
+    }
+  ]
+}

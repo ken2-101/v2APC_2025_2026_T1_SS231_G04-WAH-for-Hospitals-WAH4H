@@ -1,0 +1,52 @@
+{
+  "resourceType": "StructureDefinition",
+  "id": "ph-core-address-municipality",
+  "url": "urn://example.com/ph-core/fhir/StructureDefinition/ph-core-address-municipality",
+  "name": "PHCoreAddressMunicipality",
+  "title": "PH Core Address Municipality",
+  "status": "draft",
+  "experimental": true,
+  "description": "City/Municipality from the Philippine Standard Geographic Code (PSGC).",
+  "fhirVersion": "4.0.1",
+  "kind": "complex-type",
+  "abstract": false,
+  "context": [
+    {
+      "expression": "Address",
+      "type": "element"
+    }
+  ],
+  "type": "Extension",
+  "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Extension",
+  "derivation": "constraint",
+  "differential": {
+    "element": [
+      {
+        "id": "Extension",
+        "path": "Extension",
+        "short": "City/Municipality",
+        "definition": "City/Municipality from the Philippine Standard Geographic Code (PSGC)."
+      },
+      {
+        "id": "Extension.extension",
+        "path": "Extension.extension",
+        "max": "0"
+      },
+      {
+        "id": "Extension.url",
+        "path": "Extension.url",
+        "fixedUri": "urn://example.com/ph-core/fhir/StructureDefinition/ph-core-address-municipality"
+      },
+      {
+        "id": "Extension.value[x]",
+        "path": "Extension.value[x]",
+        "min": 1,
+        "type": [
+          {
+            "code": "CodeableConcept"
+          }
+        ]
+      }
+    ]
+  }
+}

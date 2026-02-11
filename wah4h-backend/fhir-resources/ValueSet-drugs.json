@@ -1,0 +1,20 @@
+{
+  "resourceType": "ValueSet",
+  "id": "drugs",
+  "url": "urn://example.com/ph-core/fhir/ValueSet/drugs",
+  "version": "1.0.0",
+  "name": "PHFDADrugs",
+  "title": "Philippine FDA Drugs",
+  "status": "active",
+  "experimental": false,
+  "date": "2025-01-17",
+  "publisher": "Philippine FDA",
+  "description": "ValueSet containing all registered drug products from the Philippine Food and Drug Administration (FDA).",
+  "compose": {
+    "include": [
+      {
+        "system": "urn://example.com/ph-core/fhir/CodeSystem/drugs"
+      }
+    ]
+  }
+}

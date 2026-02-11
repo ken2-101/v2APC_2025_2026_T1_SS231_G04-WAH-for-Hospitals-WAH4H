@@ -1,0 +1,27 @@
+{
+  "resourceType": "ValueSet",
+  "id": "barangays",
+  "url": "urn://example.com/ph-core/fhir/ValueSet/barangays",
+  "version": "2024",
+  "name": "Barangays",
+  "title": "Philippine Barangays",
+  "status": "active",
+  "experimental": false,
+  "date": "2024-01-01",
+  "publisher": "Philippine Statistics Authority",
+  "description": "All barangays in the Philippines",
+  "compose": {
+    "include": [
+      {
+        "system": "urn://example.com/ph-core/fhir/CodeSystem/PSGC",
+        "filter": [
+          {
+            "property": "level",
+            "op": "=",
+            "value": "barangay"
+          }
+        ]
+      }
+    ]
+  }
+}

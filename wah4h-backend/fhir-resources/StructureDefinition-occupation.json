@@ -1,0 +1,56 @@
+{
+  "resourceType": "StructureDefinition",
+  "id": "occupation",
+  "url": "urn://example.com/ph-core/fhir/StructureDefinition/occupation",
+  "name": "Occupation",
+  "title": "Occupation",
+  "status": "draft",
+  "experimental": true,
+  "description": "Patient's occupation.",
+  "fhirVersion": "4.0.1",
+  "kind": "complex-type",
+  "abstract": false,
+  "context": [
+    {
+      "expression": "Patient",
+      "type": "element"
+    }
+  ],
+  "type": "Extension",
+  "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Extension",
+  "derivation": "constraint",
+  "differential": {
+    "element": [
+      {
+        "id": "Extension",
+        "path": "Extension",
+        "short": "Occupation",
+        "definition": "Patient's occupation."
+      },
+      {
+        "id": "Extension.extension",
+        "path": "Extension.extension",
+        "max": "0"
+      },
+      {
+        "id": "Extension.url",
+        "path": "Extension.url",
+        "fixedUri": "urn://example.com/ph-core/fhir/StructureDefinition/occupation"
+      },
+      {
+        "id": "Extension.value[x]",
+        "path": "Extension.value[x]",
+        "min": 1,
+        "type": [
+          {
+            "code": "CodeableConcept"
+          }
+        ],
+        "binding": {
+          "strength": "extensible",
+          "valueSet": "urn://example.com/ph-core/fhir/ValueSet/occupational-classifications"
+        }
+      }
+    ]
+  }
+}

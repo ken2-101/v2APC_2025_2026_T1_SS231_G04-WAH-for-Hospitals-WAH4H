@@ -1,0 +1,17 @@
+{
+  "resourceType": "ValueSet",
+  "id": "race",
+  "url": "urn://example.com/ph-core/fhir/ValueSet/race",
+  "name": "Race",
+  "title": "Race",
+  "status": "draft",
+  "experimental": true,
+  "description": "A value set representing race categories for use in the Philippines.",
+  "compose": {
+    "include": [
+      {
+        "system": "urn://example.com/ph-core/fhir/CodeSystem/race"
+      }
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "resourceType": "ValueSet",
+  "id": "occupational-classifications",
+  "url": "urn://example.com/ph-core/fhir/ValueSet/occupational-classifications",
+  "version": "2022",
+  "name": "OccupationalClassifications",
+  "title": "Philippine Standard Occupational Classifications",
+  "status": "active",
+  "experimental": false,
+  "date": "2022-01-01",
+  "publisher": "Philippine Statistics Authority",
+  "description": "Value set containing all occupation codes from the 2022 Philippine Standard Occupational Classification (PSOC)",
+  "compose": {
+    "include": [
+      {
+        "system": "urn://example.com/ph-core/fhir/CodeSystem/PSOC"
+      }
+    ]
+  }
+}

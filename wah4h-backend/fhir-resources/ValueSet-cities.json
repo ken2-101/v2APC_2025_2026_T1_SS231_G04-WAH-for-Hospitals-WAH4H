@@ -1,0 +1,27 @@
+{
+  "resourceType": "ValueSet",
+  "id": "cities",
+  "url": "urn://example.com/ph-core/fhir/ValueSet/cities",
+  "version": "2024",
+  "name": "Cities",
+  "title": "Philippine Cities",
+  "status": "active",
+  "experimental": false,
+  "date": "2024-01-01",
+  "publisher": "Philippine Statistics Authority",
+  "description": "All cities in the Philippines",
+  "compose": {
+    "include": [
+      {
+        "system": "urn://example.com/ph-core/fhir/CodeSystem/PSGC",
+        "filter": [
+          {
+            "property": "level",
+            "op": "=",
+            "value": "city"
+          }
+        ]
+      }
+    ]
+  }
+}
