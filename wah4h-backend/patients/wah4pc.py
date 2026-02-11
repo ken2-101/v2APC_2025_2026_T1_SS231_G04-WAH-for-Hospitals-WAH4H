@@ -464,6 +464,29 @@ def gateway_get_transaction(transaction_id):
         }
 
 
+def _parse_marital_status(marital_status):
+    """Extract FHIR v3-MaritalStatus code (S, M, W, D)."""
+    if not marital_status:
+        return None
+    codings = marital_status.get("coding", [])
+    if not codings:
+        # If no coding, try to map text to code
+        text = marital_status.get("text", "").lower()
+        text_map = {
+            "single": "S", "never married": "S",
+            "married": "M",
+            "divorced": "D",
+            "widowed": "W",
+            "separated": "L", "legally separated": "L",
+            "annulled": "A"
+        }
+        return text_map.get(text)
+
+    # Return the code directly (S, M, W, D, L, A)
+    # Our system expects these codes to map them to labels in the frontend
+    return codings[0].get("code")
+
+
 def fhir_to_dict(fhir: dict[str, Any]) -> dict[str, Any]:
     """Convert PH Core FHIR Patient resource to local dict."""
     name: dict[str, Any] = fhir.get("name", [{}])[0]
@@ -501,8 +524,11 @@ def fhir_to_dict(fhir: dict[str, Any]) -> dict[str, Any]:
 
     def _display(val):
         if isinstance(val, dict):
-            codings = val.get("coding", [{}])
-            return codings[0].get("display") if codings else None
+            codings = val.get("coding", [])
+            if codings:
+                return codings[0].get("display") or codings[0].get("code")
+            # Fall back to text representation (used by religion, occupation)
+            return val.get("text")
         return None
 
     # Parse contact
@@ -526,7 +552,7 @@ def fhir_to_dict(fhir: dict[str, Any]) -> dict[str, Any]:
         "education": _display(education_val),
         "indigenous_flag": indigenous_val if isinstance(indigenous_val, bool) else None,
         "indigenous_group": _display(indigenous_group_val),
-        "civil_status": fhir.get("maritalStatus", {}).get("coding", [{}])[0].get("display") if fhir.get("maritalStatus") else None,
+        "civil_status": _parse_marital_status(fhir.get("maritalStatus")),
         "address_line": addr.get("line", [None])[0] if addr.get("line") else None,
         "address_city": addr.get("city"),
         "address_district": addr.get("district"),

@@ -1,0 +1,122 @@
+{
+    "resourceType": "Patient",
+    "active": true,
+    "identifier": [
+        {
+            "type": {
+                "coding": [
+                    {
+                        "system": "http://terminology.hl7.org/CodeSystem/v2-0203",
+                        "code": "SB",
+                        "display": "Social Beneficiary Identifier"
+                    }
+                ]
+            },
+            "system": "http://philhealth.gov.ph",
+            "value": "99-888777666-5"
+        }
+    ],
+    "name": [
+        {
+            "use": "official",
+            "family": "Reyes",
+            "given": [
+                "Maria",
+                "Clara"
+            ],
+            "suffix": []
+        }
+    ],
+    "gender": "female",
+    "birthDate": "1992-03-25",
+    "telecom": [
+        {
+            "system": "phone",
+            "value": "+639181234567",
+            "use": "mobile"
+        }
+    ],
+    "address": [
+        {
+            "use": "home",
+            "line": [
+                "456 Mabini Street, Barangay Poblacion"
+            ],
+            "city": "Makati",
+            "district": "Metro Manila",
+            "state": "NCR",
+            "postalCode": "1200",
+            "country": "Philippines"
+        }
+    ],
+    "maritalStatus": {
+        "coding": [
+            {
+                "system": "http://terminology.hl7.org/CodeSystem/v3-MaritalStatus",
+                "code": "S"
+            }
+        ]
+    },
+    "contact": [
+        {
+            "relationship": [
+                {
+                    "coding": [
+                        {
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-0131",
+                            "code": "N"
+                        }
+                    ],
+                    "text": "Mother"
+                }
+            ],
+            "name": {
+                "family": "Reyes",
+                "given": [
+                    "Ana"
+                ]
+            },
+            "telecom": [
+                {
+                    "system": "phone",
+                    "value": "+639199876543"
+                }
+            ]
+        }
+    ],
+    "extension": [
+        {
+            "url": "http://hl7.org/fhir/StructureDefinition/patient-nationality",
+            "extension": [
+                {
+                    "url": "code",
+                    "valueCodeableConcept": {
+                        "coding": [
+                            {
+                                "system": "urn:iso:std:iso:3166",
+                                "code": "PH",
+                                "display": "Filipino"
+                            }
+                        ]
+                    }
+                }
+            ]
+        },
+        {
+            "url": "http://hl7.org/fhir/StructureDefinition/patient-religion",
+            "valueCodeableConcept": {
+                "text": "Roman Catholic"
+            }
+        },
+        {
+            "url": "urn://example.com/ph-core/fhir/StructureDefinition/occupation",
+            "valueCodeableConcept": {
+                "text": "Nurse"
+            }
+        },
+        {
+            "url": "urn://example.com/ph-core/fhir/StructureDefinition/indigenous-people",
+            "valueBoolean": false
+        }
+    ]
+}
