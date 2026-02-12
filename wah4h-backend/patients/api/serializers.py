@@ -75,6 +75,15 @@ class PatientInputSerializer(serializers.ModelSerializer):
             if len(cleaned) < 10 or len(cleaned) > 15:
                 raise serializers.ValidationError("Mobile number must be between 10 and 15 digits.")
         return value
+    
+    def validate_philhealth_id(self, value):
+        """
+        Normalize PhilHealth ID: convert empty string to None.
+        Prevents empty string from bypassing uniqueness constraint.
+        """
+        if value == "":
+            return None
+        return value
 
 
 class PatientOutputSerializer(serializers.Serializer):

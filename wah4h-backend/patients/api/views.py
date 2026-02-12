@@ -767,6 +767,14 @@ def webhook_receive_push(request):
         # Convert FHIR to dict
         patient_data = mapping_service.fhir_to_local_patient(data)
 
+        # Require PhilHealth ID for synchronization (unique constraint)
+        philhealth_id = patient_data.get('philhealth_id')
+        if not philhealth_id:
+            return Response(
+                {'error': 'PhilHealth ID required for synchronization'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         # Check if patient already exists by PhilHealth ID
         philhealth_id = patient_data.get('philhealth_id')
         if philhealth_id:

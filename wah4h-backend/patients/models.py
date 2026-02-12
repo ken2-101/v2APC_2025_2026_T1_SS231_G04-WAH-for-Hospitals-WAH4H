@@ -24,7 +24,13 @@ class Patient(TimeStampedModel):
     religion = models.CharField(max_length=255, null=True, blank=True)
     
     # Health identifiers
-    philhealth_id = models.CharField(max_length=255, null=True, blank=True)
+    philhealth_id = models.CharField(
+        max_length=255,
+        unique=True,
+        null=True,
+        blank=True,
+        db_index=True
+    )
     blood_type = models.CharField(max_length=100, null=True, blank=True)
     pwd_type = models.CharField(max_length=100, null=True, blank=True)
     
