@@ -17,7 +17,8 @@ from rest_framework.filters import SearchFilter
 
 import requests as http_requests
 
-from patients.wah4pc import request_patient, fhir_to_dict, push_patient, patient_to_fhir, get_providers
+from patients.services.fhir_service import FHIRService
+from patients.services.mapping_service import MappingService
 from patients.models import Patient, WAH4PCTransaction
 
 from patients.api.serializers import (
@@ -37,6 +38,12 @@ from patients.services.patients_services import (
     PatientUpdateService,
     ClinicalDataService,
 )
+
+
+# Initialize services
+fhir_service = FHIRService()
+mapping_service = MappingService()
+
 
 
 # ============================================================================
@@ -619,7 +626,7 @@ def fetch_wah4pc(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    result = request_patient(target_id, philhealth_id)
+    result = fhir_service.request_patient(target_id, philhealth_id)
 
     # Handle error responses
     if 'error' in result:
@@ -631,14 +638,18 @@ def fetch_wah4pc(request):
     txn_id = result.get('data', {}).get('id') if 'data' in result else result.get('id')
     idempotency_key = result.get('idempotency_key')
 
-    if txn_id:
-        WAH4PCTransaction.objects.create(
-            transaction_id=txn_id,
-            type='fetch',
-            status='PENDING',
-            target_provider_id=target_id,
-            idempotency_key=idempotency_key,
-        )
+    if not txn_id:
+        import uuid
+        txn_id = str(uuid.uuid4())
+        logger.warning(f"[Fetch] Gateway did not return transaction ID; generated fallback: {txn_id}")
+    
+    WAH4PCTransaction.objects.create(
+        transaction_id=txn_id,
+        type='fetch',
+        status='PENDING',
+        target_provider_id=target_id,
+        idempotency_key=idempotency_key,
+    )
 
     return Response(result, status=status.HTTP_202_ACCEPTED)
 
@@ -655,11 +666,20 @@ def webhook_receive(request):
     txn = WAH4PCTransaction.objects.filter(transaction_id=txn_id).first() if txn_id else None
 
     if request.data.get('status') == 'SUCCESS':
-        patient_data = fhir_to_dict(request.data['data'])
-        request.session[f"wah4pc_{txn_id}"] = patient_data
-        if txn:
-            txn.status = 'COMPLETED'
-            txn.save()
+        try:
+            patient_data = mapping_service.fhir_to_local_patient(request.data['data'])
+            if txn_id:
+                request.session[f"wah4pc_{txn_id}"] = patient_data
+            if txn:
+                txn.status = 'COMPLETED'
+                txn.save()
+        except (KeyError, TypeError, ValueError) as e:
+            logger.error(f"[Webhook] Error processing patient data: {str(e)}")
+            if txn:
+                txn.status = 'FAILED'
+                txn.error_message = str(e)
+                txn.save()
+            return Response({'error': f'Invalid patient data: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
     else:
         if txn:
             txn.status = 'FAILED'
@@ -684,7 +704,11 @@ def send_to_wah4pc(request):
     except Patient.DoesNotExist:
         return Response({'error': 'Patient not found'}, status=status.HTTP_404_NOT_FOUND)
 
-    result = push_patient(target_id, patient)
+    # Convert patient to FHIR format
+    fhir_resource = mapping_service.local_patient_to_fhir(patient)
+    
+    # Send to gateway
+    result = fhir_service.push_patient(target_id, fhir_resource)
 
     # Handle error responses
     if 'error' in result:
@@ -696,15 +720,19 @@ def send_to_wah4pc(request):
     txn_id = result.get('id')
     idempotency_key = result.get('idempotency_key')
 
-    if txn_id:
-        WAH4PCTransaction.objects.create(
-            transaction_id=txn_id,
-            type='send',
-            status=result.get('status', 'PENDING'),
-            patient_id=patient.id,
-            target_provider_id=target_id,
-            idempotency_key=idempotency_key,
-        )
+    if not txn_id:
+        import uuid
+        txn_id = str(uuid.uuid4())
+        logger.warning(f"[Send] Gateway did not return transaction ID; generated fallback: {txn_id}")
+    
+    WAH4PCTransaction.objects.create(
+        transaction_id=txn_id,
+        type='send',
+        status=result.get('status', 'PENDING'),
+        patient_id=patient.id,
+        target_provider_id=target_id,
+        idempotency_key=idempotency_key,
+    )
 
     return Response(result, status=status.HTTP_202_ACCEPTED)
 
@@ -737,37 +765,40 @@ def webhook_receive_push(request):
 
     try:
         # Convert FHIR to dict
-        patient_data = fhir_to_dict(data)
+        patient_data = mapping_service.fhir_to_local_patient(data)
 
         # Check if patient already exists by PhilHealth ID
         philhealth_id = patient_data.get('philhealth_id')
         if philhealth_id:
-            existing_patient = Patient.objects.filter(philhealth_id=philhealth_id).first()
-            if existing_patient:
-                # Update existing patient
+            # Atomic get_or_create to prevent race condition on duplicate push
+            patient, created = Patient.objects.get_or_create(
+                philhealth_id=philhealth_id,
+                defaults=patient_data
+            )
+            if not created:
+                # Update existing patient if needed
                 for key, value in patient_data.items():
                     if value is not None:
-                        setattr(existing_patient, key, value)
-                existing_patient.save()
-                patient = existing_patient
-                action = 'updated'
-            else:
-                # Create new patient
-                patient = Patient.objects.create(**patient_data)
-                action = 'created'
+                        setattr(patient, key, value)
+                patient.save()
+            action = 'created' if created else 'updated'
         else:
             # No PhilHealth ID, create new patient
             patient = Patient.objects.create(**patient_data)
             action = 'created'
 
-        # Record transaction
-        WAH4PCTransaction.objects.create(
+        # Record transaction with get_or_create to prevent duplicates
+        transaction, created = WAH4PCTransaction.objects.get_or_create(
             transaction_id=txn_id,
-            type='receive_push',
-            status='COMPLETED',
-            patient_id=patient.id,
-            target_provider_id=sender_id,
+            defaults={
+                'type': 'receive_push',
+                'status': 'COMPLETED',
+                'patient_id': patient.id,
+                'target_provider_id': sender_id,
+            }
         )
+        if not created:
+            logger.warning(f"[Webhook] Duplicate push received for transaction {txn_id}")
 
         return Response({
             'message': f'Patient {action} successfully',
@@ -840,6 +871,9 @@ def webhook_process_query(request):
     idempotency_key = str(uuid.uuid4())
 
     try:
+        # Convert patient to FHIR if found
+        fhir_data = mapping_service.local_patient_to_fhir(patient) if patient else {"error": "Not found"}
+        
         http_requests.post(
             return_url,
             headers={
@@ -850,7 +884,7 @@ def webhook_process_query(request):
             json={
                 "transactionId": txn_id,
                 "status": "SUCCESS" if patient else "REJECTED",
-                "data": patient_to_fhir(patient) if patient else {"error": "Not found"},
+                "data": fhir_data,
             },
         )
     except http_requests.RequestException:
@@ -872,7 +906,7 @@ def list_providers(request):
     Returns:
         Response: List of active providers with id, name, type, and isActive fields
     """
-    providers = get_providers()
+    providers = fhir_service.get_providers()
     return Response(providers, status=status.HTTP_200_OK)
 
 

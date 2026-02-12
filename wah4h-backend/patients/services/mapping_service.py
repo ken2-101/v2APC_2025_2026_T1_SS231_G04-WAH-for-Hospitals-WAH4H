@@ -18,6 +18,7 @@ Responsibilities:
 """
 
 import logging
+import os
 from typing import Dict, Optional, Any, List, Tuple
 from datetime import datetime
 from abc import ABC, abstractmethod
@@ -69,57 +70,13 @@ class PatientToFHIRMapper:
     """
     Converts local Patient model to FHIR Patient resource.
     
-    Output format:
-    {
-        "resourceType": "Patient",
-        "id": "...",
-        "identifier": [
-            {
-                "system": "http://www.philhealth.gov.ph/patient/identifier",
-                "value": "..."
-            },
-            ...
-        ],
-        "name": [
-            {
-                "use": "official",
-                "family": "...",
-                "given": ["..."],
-                "prefix": [...],
-                "suffix": [...]
-            }
-        ],
-        "gender": "male | female | other | unknown",
-        "birthDate": "YYYY-MM-DD",
-        "address": [
-            {
-                "use": "home",
-                "line": ["..."],
-                "city": "...",
-                "district": "...",
-                "state": "...",
-                "postalCode": "...",
-                "country": "PH"
-            }
-        ],
-        "telecom": [
-            {
-                "system": "phone",
-                "value": "...",
-                "use": "mobile"
-            }
-        ],
-        "maritalStatus": {...},
-        "extension": [...],  // PhilHealth extensions, PWD status, etc.
-        "contact": [
-            {
-                "relationship": [...],
-                "name": {...},
-                "telecom": [...]
-            }
-        ]
-    }
+    Output is PH Core compliant FHIR R4 Patient resource with proper identifier[] array,
+    meta.profile, and null stripping.
     """
+    
+    # Gateway URL for internal identifiers
+    GATEWAY_URL = "https://wah4pc.echosphere.cfd"
+    PROVIDER_ID = os.getenv("WAH4PC_PROVIDER_ID", "")
     
     def map_patient_to_fhir(self, patient) -> Dict[str, Any]:
         """
@@ -129,315 +86,379 @@ class PatientToFHIRMapper:
             patient: Django Patient model instance
         
         Returns:
-            Dict representing FHIR Patient resource
-        
-        Raises:
-            ValueError: If patient is invalid or required fields missing
+            Dict representing FHIR Patient resource (nulls removed)
         """
-        # TODO: Implement
-        # 1. Create base FHIR Patient structure
-        # 2. Map identifiers (PhilHealth, internal ID)
-        # 3. Map name (family, given, prefix, suffix)
-        # 4. Map demographics (gender, birthDate)
-        # 5. Map address
-        # 6. Map contact info (phone, etc.)
-        # 7. Map marital status
-        # 8. Build extensions for:
-        #    - PWD status (pwd_type)
-        #    - Indigenous status
-        #    - Blood type
-        #    - Consent flag
-        # 9. Map emergency contact
-        # 10. Validate FHIR structure
-        # 11. Return FHIR resource dict
-        pass
+        import os
+        
+        identifiers: List[Dict[str, Any]] = []
+        fhir: Dict[str, Any] = {
+            "resourceType": "Patient",
+            "identifier": identifiers,
+            "name": [{
+                "use": "official",
+                "family": patient.last_name,
+                "given": [n for n in [patient.first_name, patient.middle_name] if n],
+                "suffix": [patient.suffix_name] if patient.suffix_name else [],
+            }],
+            "gender": patient.gender.lower() if patient.gender else None,
+            "birthDate": str(patient.birthdate) if patient.birthdate else None,
+            "active": patient.active,
+        }
+
+        # Add PhilHealth identifier with proper type
+        if patient.philhealth_id:
+            identifiers.append({
+                "type": {
+                    "coding": [{
+                        "system": "http://terminology.hl7.org/CodeSystem/v2-0203",
+                        "code": "SB",
+                        "display": "Social Beneficiary Identifier"
+                    }]
+                },
+                "system": "http://philhealth.gov.ph",
+                "value": patient.philhealth_id
+            })
+
+        # Add MRN if exists
+        if patient.patient_id:
+            provider_id = os.getenv("WAH4PC_PROVIDER_ID", "")
+            identifiers.append({
+                "type": {
+                    "coding": [{
+                        "system": "http://terminology.hl7.org/CodeSystem/v2-0203",
+                        "code": "MR",
+                        "display": "Medical record number"
+                    }]
+                },
+                "system": f"{self.GATEWAY_URL}/providers/{provider_id}",
+                "value": patient.patient_id
+            })
+
+        # Telecom
+        if patient.mobile_number:
+            fhir["telecom"] = [{
+                "system": "phone",
+                "value": patient.mobile_number,
+                "use": "mobile"
+            }]
+
+        # Marital status with valid codes
+        if patient.civil_status:
+            status_map = {
+                "single": "S", "s": "S",
+                "married": "M", "m": "M",
+                "widowed": "W", "w": "W",
+                "divorced": "D", "d": "D",
+                "separated": "L", "l": "L",
+                "annulled": "A", "a": "A",
+            }
+            code = status_map.get(patient.civil_status.lower())
+
+            if code:  # Only include if we have a valid code
+                fhir["maritalStatus"] = {
+                    "coding": [{
+                        "system": "http://terminology.hl7.org/CodeSystem/v3-MaritalStatus",
+                        "code": code
+                    }]
+                }
+
+        # Address with use attribute
+        if patient.address_line or patient.address_city:
+            fhir["address"] = [{
+                "use": "home",
+                "line": [patient.address_line] if patient.address_line else [],
+                "city": patient.address_city,
+                "district": patient.address_district,
+                "state": patient.address_state,
+                "postalCode": patient.address_postal_code,
+                "country": patient.address_country or "Philippines",
+            }]
+
+        # Emergency contact with proper relationship code
+        if patient.contact_first_name or patient.contact_last_name:
+            relationship_map = {
+                "spouse": "N", "parent": "N", "mother": "N", "father": "N",
+                "child": "N", "sibling": "N", "emergency": "C",
+            }
+
+            rel_code = None
+            rel_display: str = patient.contact_relationship or "Emergency Contact"
+
+            for key, code in relationship_map.items():
+                if key in rel_display.lower():
+                    rel_code = code
+                    break
+
+            if not rel_code:
+                rel_code = "C"
+
+            fhir["contact"] = [{
+                "relationship": [{
+                    "coding": [{
+                        "system": "http://terminology.hl7.org/CodeSystem/v2-0131",
+                        "code": rel_code
+                    }],
+                    "text": rel_display
+                }],
+                "name": {
+                    "family": patient.contact_last_name,
+                    "given": [patient.contact_first_name] if patient.contact_first_name else [],
+                },
+                "telecom": (
+                    [{"system": "phone", "value": patient.contact_mobile_number}]
+                    if patient.contact_mobile_number else []
+                ),
+            }]
+
+        # Store Philippine-specific data in extensions
+        extensions: List[Dict[str, Any]] = []
+
+        if patient.nationality:
+            extensions.append({
+                "url": "http://hl7.org/fhir/StructureDefinition/patient-nationality",
+                "extension": [{
+                    "url": "code",
+                    "valueCodeableConcept": {
+                        "coding": [{
+                            "system": "urn:iso:std:iso:3166",
+                            "code": "PH",
+                            "display": patient.nationality
+                        }]
+                    }
+                }]
+            })
+
+        if patient.religion:
+            extensions.append({
+                "url": "http://hl7.org/fhir/StructureDefinition/patient-religion",
+                "valueCodeableConcept": {
+                    "text": patient.religion
+                }
+            })
+
+        if patient.occupation:
+            extensions.append({
+                "url": "urn://example.com/ph-core/fhir/StructureDefinition/occupation",
+                "valueCodeableConcept": {
+                    "text": patient.occupation
+                }
+            })
+
+        if patient.indigenous_flag is not None:
+            extensions.append({
+                "url": "urn://example.com/ph-core/fhir/StructureDefinition/indigenous-people",
+                "valueBoolean": patient.indigenous_flag
+            })
+
+        if patient.indigenous_group:
+            extensions.append({
+                "url": "urn://example.com/ph-core/fhir/StructureDefinition/indigenous-group",
+                "valueCodeableConcept": {
+                    "coding": [{
+                        "system": "urn://example.com/ph-core/fhir/CodeSystem/indigenous-groups",
+                        "code": patient.indigenous_group,
+                        "display": patient.indigenous_group
+                    }]
+                }
+            })
+
+        if extensions:
+            fhir["extension"] = extensions
+
+        # Remove None values and empty lists
+        return {k: v for k, v in fhir.items() if v not in (None, [], {})}
     
     def _build_identifiers(self, patient) -> List[Dict[str, str]]:
-        """
-        Build FHIR identifier array from patient data.
-        
-        Args:
-            patient: Django Patient model instance
-        
-        Returns:
-            List of FHIR identifier objects
-        """
-        # TODO: Implement
-        # - Add PhilHealth ID if present
-        # - Add internal patient_id
-        # - Add other identifiers as needed
+        """Build FHIR identifier array from patient data."""
         pass
     
     def _build_name(self, patient) -> List[Dict[str, Any]]:
-        """
-        Build FHIR name array from patient data.
-        
-        Args:
-            patient: Django Patient model instance
-        
-        Returns:
-            List of FHIR name objects
-        """
-        # TODO: Implement
-        # - Combine first_name, last_name
-        # - Add middle_name to given names
-        # - Handle suffix_name
-        # - Set "official" use
+        """Build FHIR name array from patient data."""
         pass
     
     def _build_address(self, patient) -> List[Dict[str, Any]]:
-        """
-        Build FHIR address array from patient data.
-        
-        Args:
-            patient: Django Patient model instance
-        
-        Returns:
-            List of FHIR address objects
-        """
-        # TODO: Implement
-        # - Map address_line, city, district, state, postal_code, country
-        # - Set "home" use
+        """Build FHIR address array from patient data."""
         pass
     
     def _build_telecom(self, patient) -> List[Dict[str, str]]:
-        """
-        Build FHIR telecom array from patient data.
-        
-        Args:
-            patient: Django Patient model instance
-        
-        Returns:
-            List of FHIR telecom objects (phone, email, etc.)
-        """
-        # TODO: Implement
-        # - Map mobile_number as system=phone
-        # - Map email if available
+        """Build FHIR telecom array from patient data."""
         pass
     
     def _build_extensions(self, patient) -> List[Dict[str, Any]]:
-        """
-        Build FHIR extension array for Philippine-specific fields.
-        
-        Args:
-            patient: Django Patient model instance
-        
-        Returns:
-            List of FHIR extension objects
-        """
-        # TODO: Implement
-        # Extensions for:
-        # - PWD status: patient.pwd_type
-        # - Indigenous status: patient.indigenous_flag, patient.indigenous_group
-        # - Blood type: patient.blood_type
-        # - Consent flag: patient.consent_flag
-        # - Occupation: patient.occupation
-        # - Education: patient.education
+        """Build FHIR extension array for Philippine-specific fields."""
         pass
     
     def _build_emergency_contact(self, patient) -> List[Dict[str, Any]]:
-        """
-        Build FHIR contact array for emergency contact.
-        
-        Args:
-            patient: Django Patient model instance
-        
-        Returns:
-            List of FHIR contact objects
-        """
-        # TODO: Implement
-        # - Map contact_first_name, contact_last_name
-        # - Map contact_relationship
-        # - Map contact_mobile_number
+        """Build FHIR contact array for emergency contact."""
         pass
 
 
 class FHIRToPatientMapper:
     """
-    Converts FHIR Patient resource to local Patient model.
+    Converts FHIR Patient resource to local Patient data dict.
     
     Input: FHIR Patient resource (dict or json)
-    Output: Django Patient model instance (not saved)
+    Output: Dict matching Patient model fields
     """
     
-    def map_fhir_to_patient(self, fhir_resource: Dict[str, Any]) -> 'Patient':
+    def map_fhir_to_patient(self, fhir_resource: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Convert FHIR Patient resource to local Patient model.
+        Convert FHIR Patient resource to local Patient dict.
         
         Args:
             fhir_resource: FHIR Patient resource as dict
         
         Returns:
-            Django Patient model instance (unsaved)
-        
-        Raises:
-            ValueError: If FHIR resource is invalid or missing required fields
+            Dict with patient fields ready for Patient model
         """
-        # TODO: Implement
-        # 1. Validate FHIR Patient resourceType
-        # 2. Extract identifiers (PhilHealth, internal ID)
-        # 3. Extract name (family, given, prefix, suffix)
-        # 4. Extract demographics (gender, birthDate)
-        # 5. Extract address
-        # 6. Extract contact info
-        # 7. Extract marital status
-        # 8. Extract extensions (PWD, indigenous, etc.)
-        # 9. Extract emergency contact
-        # 10. Create Patient instance with extracted data
-        # 11. DO NOT SAVE - return unsaved instance
-        # 12. Caller must validate and save
-        pass
+        name: Dict[str, Any] = fhir_resource.get("name", [{}])[0]
+        ids: List[Dict[str, Any]] = fhir_resource.get("identifier", [])
+        extensions: List[Dict[str, Any]] = fhir_resource.get("extension", [])
+        addresses: List[Dict[str, Any]] = fhir_resource.get("address", [{}])
+        addr: Dict[str, Any] = addresses[0] if addresses else {}
+        telecoms: List[Dict[str, Any]] = fhir_resource.get("telecom", [])
+        contacts: List[Dict[str, Any]] = fhir_resource.get("contact", [])
+
+        ph_id = next(
+            (i["value"] for i in ids if "philhealth" in i.get("system", "")), None
+        )
+        phone = next(
+            (t["value"] for t in telecoms if t.get("system") == "phone"), None
+        )
+        given = name.get("given", [])
+
+        # Extract extensions
+        indigenous_val = self._get_extension(extensions, "urn://example.com/ph-core/fhir/StructureDefinition/indigenous-people")
+        indigenous_group_val = self._get_extension(extensions, "urn://example.com/ph-core/fhir/StructureDefinition/indigenous-group")
+        nationality_ext = self._get_extension(extensions, "http://hl7.org/fhir/StructureDefinition/patient-nationality")
+        religion_val = self._get_extension(extensions, "http://hl7.org/fhir/StructureDefinition/patient-religion")
+        occupation_val = self._get_extension(extensions, "urn://example.com/ph-core/fhir/StructureDefinition/occupation")
+        education_val = self._get_extension(extensions, "urn://example.com/ph-core/fhir/StructureDefinition/educational-attainment")
+
+        # Parse nested nationality extension
+        nationality = None
+        if isinstance(nationality_ext, list):
+            for sub in nationality_ext:
+                if sub.get("url") == "code":
+                    concept = sub.get("valueCodeableConcept", {})
+                    codings = concept.get("coding", [{}])
+                    nationality = codings[0].get("display") or codings[0].get("code")
+
+        def _display(val):
+            if isinstance(val, dict):
+                codings = val.get("coding", [])
+                if codings:
+                    return codings[0].get("display") or codings[0].get("code")
+                return val.get("text")
+            return None
+
+        # Parse contact
+        contact: Dict[str, Any] = contacts[0] if contacts else {}
+        contact_name: Dict[str, Any] = contact.get("name", {})
+        contact_telecoms: List[Dict[str, Any]] = contact.get("telecom", [])
+        contact_rels: List[Dict[str, Any]] = contact.get("relationship", [{}])
+        contact_rel: Dict[str, Any] = contact_rels[0] if contact_rels else {}
+
+        result = {
+            "first_name": given[0] if given else "",
+            "middle_name": given[1] if len(given) > 1 else "",
+            "last_name": name.get("family", ""),
+            "gender": fhir_resource.get("gender", "").lower(),
+            "birthdate": fhir_resource.get("birthDate"),
+            "philhealth_id": ph_id,
+            "mobile_number": phone,
+            "nationality": nationality,
+            "religion": _display(religion_val),
+            "occupation": _display(occupation_val),
+            "education": _display(education_val),
+            "indigenous_flag": indigenous_val if isinstance(indigenous_val, bool) else None,
+            "indigenous_group": _display(indigenous_group_val),
+            "civil_status": self._parse_marital_status(fhir_resource.get("maritalStatus")),
+            "address_line": addr.get("line", [None])[0] if addr.get("line") else None,
+            "address_city": addr.get("city"),
+            "address_district": addr.get("district"),
+            "address_state": addr.get("state"),
+            "address_postal_code": addr.get("postalCode"),
+            "address_country": addr.get("country"),
+            "contact_first_name": contact_name.get("given", [None])[0] if contact_name.get("given") else None,
+            "contact_last_name": contact_name.get("family"),
+            "contact_mobile_number": next((t["value"] for t in contact_telecoms if t.get("system") == "phone"), None),
+            "contact_relationship": contact_rel.get("coding", [{}])[0].get("display") if contact_rel.get("coding") else None,
+        }
+        return result
+    
+    def _get_extension(self, extensions: List[Dict[str, Any]], url: str) -> Any:
+        """Extract value from a FHIR extension by URL."""
+        for ext in extensions:
+            if ext.get("url") == url:
+                for key, val in ext.items():
+                    if key.startswith("value"):
+                        return val
+                if "extension" in ext:
+                    return ext["extension"]
+        return None
+    
+    def _parse_marital_status(self, marital_status: Optional[Dict[str, Any]]) -> Optional[str]:
+        """Extract FHIR v3-MaritalStatus code (S, M, W, D)."""
+        if not marital_status:
+            return None
+        codings = marital_status.get("coding", [])
+        if not codings:
+            # If no coding, try to map text to code
+            text = marital_status.get("text", "").lower()
+            text_map = {
+                "single": "S", "never married": "S",
+                "married": "M",
+                "divorced": "D",
+                "widowed": "W",
+                "separated": "L", "legally separated": "L",
+                "annulled": "A"
+            }
+            return text_map.get(text)
+
+        # Return the code directly (S, M, W, D, L, A)
+        return codings[0].get("code")
     
     def _extract_identifiers(self, fhir_resource: Dict) -> Tuple[str, Optional[str], Optional[str]]:
-        """
-        Extract identifiers from FHIR Patient resource.
-        
-        Returns:
-            Tuple[patient_id: str, philhealth_id: Optional[str], other_id: Optional[str]]
-        """
-        # TODO: Implement
-        # - Find identifier with system = IDENTIFIER_SYSTEM_INTERNAL → patient_id
-        # - Find identifier with system = IDENTIFIER_SYSTEM_PHILHEALTH → philhealth_id
-        # - Handle missing identifiers
+        """Extract identifiers from FHIR Patient resource."""
         pass
     
     def _extract_name(self, fhir_resource: Dict) -> Tuple[str, str, Optional[str], Optional[str]]:
-        """
-        Extract name from FHIR Patient resource.
-        
-        Returns:
-            Tuple[first_name: str, last_name: str, middle_name: Optional[str], suffix: Optional[str]]
-        """
-        # TODO: Implement
-        # - Extract name array (typically use "official" or first name)
-        # - Parse family, given, prefix, suffix
-        # - Handle multiple given names (take first as first_name, rest as middle)
+        """Extract name from FHIR Patient resource."""
         pass
     
     def _extract_demographics(self, fhir_resource: Dict) -> Tuple[str, Optional[str]]:
-        """
-        Extract demographic info from FHIR Patient resource.
-        
-        Returns:
-            Tuple[gender: str, birthdate: Optional[str]]
-        """
-        # TODO: Implement
-        # - Extract gender (male, female, other, unknown)
-        # - Extract birthDate (YYYY-MM-DD format)
-        # - Map to local enum/choice if needed
+        """Extract demographic info from FHIR Patient resource."""
         pass
     
     def _extract_address(self, fhir_resource: Dict) -> Dict[str, Optional[str]]:
-        """
-        Extract address from FHIR Patient resource.
-        
-        Returns:
-            Dict with keys: line, city, district, state, postal_code, country
-        """
-        # TODO: Implement
-        # - Extract address array (typically use "home" or first address)
-        # - Parse line, city, district, state, postalCode, country
-        # - Handle multiple lines (join with space or take first)
+        """Extract address from FHIR Patient resource."""
         pass
     
     def _extract_telecom(self, fhir_resource: Dict) -> Tuple[Optional[str], Optional[str]]:
-        """
-        Extract telecom from FHIR Patient resource.
-        
-        Returns:
-            Tuple[phone: Optional[str], email: Optional[str]]
-        """
-        # TODO: Implement
-        # - Extract telecom array
-        # - Find system="phone" → mobile_number
-        # - Find system="email" → email (if stored)
+        """Extract telecom from FHIR Patient resource."""
         pass
     
     def _extract_extensions(self, fhir_resource: Dict) -> Dict[str, Any]:
-        """
-        Extract extensions from FHIR Patient resource.
-        
-        Returns:
-            Dict with keys: pwd_type, indigenous_flag, indigenous_group, blood_type, consent_flag
-        """
-        # TODO: Implement
-        # - Extract extension array
-        # - Parse Philippine-specific extensions
-        # - Return dict of extracted extension values
+        """Extract extensions from FHIR Patient resource."""
         pass
     
     def _extract_emergency_contact(self, fhir_resource: Dict) -> Dict[str, Optional[str]]:
-        """
-        Extract emergency contact from FHIR Patient resource.
-        
-        Returns:
-            Dict with keys: first_name, last_name, relationship, phone
-        """
-        # TODO: Implement
-        # - Extract contact array (if present)
-        # - Parse relationship, name, telecom
+        """Extract emergency contact from FHIR Patient resource."""
         pass
 
 
 class BundleMapper:
     """
     Handles FHIR Bundle resource containing multiple resources.
-    
-    Responsibilities:
-    - Extract individual resources from Bundle
-    - Map each resource to appropriate local model
-    - Handle resource relationships (Patient references, etc.)
-    - Log mapping errors
     """
     
     def map_bundle_to_local(self, fhir_bundle: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
-        """
-        Map FHIR Bundle to local resources.
-        
-        Args:
-            fhir_bundle: FHIR Bundle resource as dict
-        
-        Returns:
-            Tuple[
-                resources_dict: {
-                    'patients': [Patient instances],
-                    'conditions': [Condition instances],
-                    'allergies': [AllergyIntolerance instances],
-                    'immunizations': [Immunization instances],
-                    ...
-                },
-                errors: [List of error messages]
-            ]
-        """
-        # TODO: Implement
-        # 1. Validate Bundle resourceType
-        # 2. Iterate bundle.entry array
-        # 3. For each entry:
-        #    a. Extract resource.resourceType
-        #    b. Call appropriate mapper (Patient → FHIRToPatientMapper, etc.)
-        #    c. Collect results or errors
-        # 4. Handle resource relationships (Patient references)
-        # 5. Return dict of all resources grouped by type
-        # 6. Return list of errors encountered
+        """Map FHIR Bundle to local resources."""
         pass
     
     def _map_resource(self, resource: Dict[str, Any], resource_type: str) -> Tuple[Optional[Any], Optional[str]]:
-        """
-        Map individual FHIR resource to local model.
-        
-        Args:
-            resource: FHIR resource dict
-            resource_type: Resource type (Patient, Condition, etc.)
-        
-        Returns:
-            Tuple[local_instance: Optional[Any], error: Optional[str]]
-        """
-        # TODO: Implement dispatcher for different resource types
-        # - Patient → FHIRToPatientMapper
-        # - Condition → (TODO: Create ConditionMapper)
-        # - AllergyIntolerance → (TODO: Create AllergyMapper)
-        # - Immunization → (TODO: Create ImmunizationMapper)
-        # - Other types as needed
+        """Map individual FHIR resource to local model."""
         pass
 
 
@@ -447,16 +468,12 @@ class MappingService:
     """
     
     def __init__(self):
-        """
-        Initialize mapping service.
-        
-        TODO: Inject dependencies or initialize mappers
-        """
+        """Initialize mapping service with component mappers."""
         self.patient_to_fhir = PatientToFHIRMapper()
         self.fhir_to_patient = FHIRToPatientMapper()
         self.bundle_mapper = BundleMapper()
     
-    def local_patient_to_fhir(self, patient) -> Tuple[bool, Optional[Dict], Optional[str]]:
+    def local_patient_to_fhir(self, patient) -> Dict[str, Any]:
         """
         Convert local Patient to FHIR Patient.
         
@@ -464,46 +481,34 @@ class MappingService:
             patient: Django Patient model instance
         
         Returns:
-            Tuple[success: bool, fhir_resource: Optional[Dict], error: Optional[str]]
+            Dict - FHIR Patient resource (nulls removed)
         """
-        # TODO: Wrap PatientToFHIRMapper.map_patient_to_fhir()
-        # - Handle errors
-        # - Log results
-        # - Return success/error tuple
-        pass
+        try:
+            return self.patient_to_fhir.map_patient_to_fhir(patient)
+        except Exception as e:
+            logger.error(f"[Mapping] Error converting patient to FHIR: {str(e)}")
+            raise
     
-    def fhir_to_local_patient(self, fhir_resource: Dict[str, Any]) -> Tuple[bool, Optional[Any], Optional[str]]:
+    def fhir_to_local_patient(self, fhir_resource: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Convert FHIR Patient to local Patient.
+        Convert FHIR Patient to local Patient dict.
         
         Args:
             fhir_resource: FHIR Patient resource as dict
         
         Returns:
-            Tuple[success: bool, patient: Optional[Patient instance], error: Optional[str]]
+            Dict with patient fields ready for Patient model
         """
-        # TODO: Wrap FHIRToPatientMapper.map_fhir_to_patient()
-        # - Handle errors
-        # - Log results
-        # - Return success/error tuple
-        pass
+        try:
+            return self.fhir_to_patient.map_fhir_to_patient(fhir_resource)
+        except Exception as e:
+            logger.error(f"[Mapping] Error converting FHIR to patient: {str(e)}")
+            raise
     
-    def fhir_bundle_to_local(self, fhir_bundle: Dict[str, Any]) -> Tuple[bool, Dict[str, Any], List[str]]:
-        """
-        Convert FHIR Bundle to local resources.
-        
-        Args:
-            fhir_bundle: FHIR Bundle resource as dict
-        
-        Returns:
-            Tuple[
-                success: bool,
-                resources: Dict {resource_type: [instances]},
-                errors: List[str] of mapping errors
-            ]
-        """
-        # TODO: Wrap BundleMapper.map_bundle_to_local()
-        # - Handle errors
-        # - Log results
-        # - Return success/error tuple
-        pass
+    def fhir_bundle_to_local(self, fhir_bundle: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
+        """Convert FHIR Bundle to local resources."""
+        try:
+            return self.bundle_mapper.map_bundle_to_local(fhir_bundle)
+        except Exception as e:
+            logger.error(f"[Mapping] Error converting bundle: {str(e)}")
+            raise

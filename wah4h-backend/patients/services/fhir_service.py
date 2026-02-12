@@ -6,9 +6,9 @@ Handles outbound FHIR requests to WAH4PC Gateway:
 - POST /api/v1/fhir/push/{resourceType}
 
 Responsibilities:
-- Build FHIR requests with proper headers (X-API-Key, Idempotency-Key, X-Transaction-ID)
+- Build FHIR requests with proper headers (X-API-Key, Idempotency-Key, X-Provider-ID)
 - Handle request/response serialization
-- Implement retry logic for failed requests
+- Implement error handling for specific status codes (409, 429)
 - Log transactions and errors
 - Track transaction status
 """
@@ -16,6 +16,7 @@ Responsibilities:
 import logging
 import json
 import uuid
+import os
 from typing import Dict, Optional, Any, Tuple
 from datetime import datetime
 from enum import Enum
@@ -43,178 +44,254 @@ class FHIRService:
     Features:
     - Request composition with authentication headers
     - Idempotency key generation and management
-    - Transaction ID propagation
-    - Async processing support (placeholder)
-    - Error handling and logging
+    - Proper error handling for 409 (conflict), 429 (rate limit)
+    - Logging and transaction tracking
+    - No database access (stateless)
     """
     
     BASE_URL = "https://wah4pc.echosphere.cfd"
     REQUEST_TIMEOUT = 30  # seconds
     
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: Optional[str] = None, provider_id: Optional[str] = None):
         """
         Initialize FHIR service.
         
         Args:
-            api_key: WAH4PC API key for authentication
+            api_key: WAH4PC API key for authentication (defaults to env var)
+            provider_id: Provider ID (defaults to env var)
         """
-        self.api_key = api_key
-        # TODO: Inject dependencies
-        # - retry_service
-        # - transaction_service
-        # - logging_service
-        # - transaction_middleware (for X-Transaction-ID context)
+        self.api_key = api_key or os.getenv("WAH4PC_API_KEY")
+        self.provider_id = provider_id or os.getenv("WAH4PC_PROVIDER_ID")
     
-    def send_fhir_request(
+    def request_patient(
         self,
-        resource_type: FHIRResourceType,
-        fhir_resource: Dict[str, Any],
-        target_provider_id: str,
-        transaction_id: Optional[str] = None,
+        target_id: str,
+        philhealth_id: str,
         idempotency_key: Optional[str] = None,
-    ) -> Tuple[bool, Dict[str, Any]]:
+    ) -> Dict[str, Any]:
         """
-        Send FHIR request to WAH4PC Gateway.
-        
-        POST /api/v1/fhir/request/{resourceType}
-        
+        Request patient data from another provider via WAH4PC gateway.
+
         Args:
-            resource_type: FHIR resource type (Patient, Bundle, etc.)
-            fhir_resource: FHIR resource object/dict
-            target_provider_id: Target provider identifier
-            transaction_id: Optional X-Transaction-ID (auto-generated if None)
-            idempotency_key: Optional idempotency key (auto-generated if None)
-        
+            target_id: Target provider UUID
+            philhealth_id: PhilHealth ID to search for
+            idempotency_key: Optional idempotency key for retry safety (generated if not provided)
+
         Returns:
-            Tuple[success: bool, response: Dict]
-            response contains: {
-                'success': bool,
-                'transaction_id': str,
-                'status': str,
-                'data': Dict or None,
-                'error': str or None,
-                'http_status': int or None
+            dict: Response with 'data' key on success, or 'error' and 'status_code' on failure
+        """
+        if not idempotency_key:
+            idempotency_key = str(uuid.uuid4())
+
+        try:
+            response = requests.post(
+                f"{self.BASE_URL}/api/v1/fhir/request/Patient",
+                headers=self._build_headers(idempotency_key),
+                json={
+                    "requesterId": self.provider_id,
+                    "targetId": target_id,
+                    "identifiers": [
+                        {"system": "http://philhealth.gov.ph", "value": philhealth_id}
+                    ],
+                },
+                timeout=self.REQUEST_TIMEOUT,
+            )
+
+            return self._handle_response(response, idempotency_key)
+
+        except requests.RequestException as e:
+            logger.error(f"[FHIR] Network error requesting patient: {str(e)}")
+            return {
+                'error': f'Network error: {str(e)}',
+                'status_code': 500,
+                'idempotency_key': idempotency_key
             }
-        
-            def send_outbound_request(self, patient_data, transaction_id):
-                from patients.services.logging_service import LoggingService
-                from patients.services.transaction_service import TransactionService
-                LoggingService().log_outbound_request(transaction_id, patient_data)
-                TransactionService().update_transaction_status(transaction_id, 'sent')
-                return {
-                    'status': 'success',
-                    'transaction_id': transaction_id,
-                    'message': 'FHIR request sent',
-                    'patient_data': patient_data
-                }
-        # 10. Update Transaction model status
-        # 11. Return result tuple
-        pass
-    
-    def push_fhir_resource(
+
+    def push_patient(
         self,
-        resource_type: FHIRResourceType,
+        target_id: str,
         fhir_resource: Dict[str, Any],
-        target_provider_id: str,
-        transaction_id: Optional[str] = None,
         idempotency_key: Optional[str] = None,
-    ) -> Tuple[bool, Dict[str, Any]]:
+    ) -> Dict[str, Any]:
         """
-        Push FHIR resource to WAH4PC Gateway.
-        
-        POST /api/v1/fhir/push/{resourceType}
-        
+        Push patient data to another provider via WAH4PC gateway.
+
         Args:
-            resource_type: FHIR resource type
-            fhir_resource: FHIR resource object/dict
-            target_provider_id: Target provider identifier
-            transaction_id: Optional X-Transaction-ID (auto-generated if None)
-            idempotency_key: Optional idempotency key (auto-generated if None)
-        
+            target_id: Target provider UUID
+            fhir_resource: FHIR Patient resource to send
+            idempotency_key: Optional idempotency key for retry safety (generated if not provided)
+
         Returns:
-            Tuple[success: bool, response: Dict] (same as send_fhir_request)
+            dict: Response with transaction data on success, or 'error' and 'status_code' on failure
         """
-        # TODO: Implement
-        # Similar to send_fhir_request but:
-        # - POST to /api/v1/fhir/push/{resourceType}
-        # - Used for unsolicited pushes
-        pass
-    
-    def _build_headers(
-        self,
-        transaction_id: Optional[str] = None,
-        idempotency_key: Optional[str] = None,
-    ) -> Dict[str, str]:
+        if not idempotency_key:
+            idempotency_key = str(uuid.uuid4())
+
+        try:
+            response = requests.post(
+                f"{self.BASE_URL}/api/v1/fhir/push/Patient",
+                headers=self._build_headers(idempotency_key),
+                json={
+                    "senderId": self.provider_id,
+                    "targetId": target_id,
+                    "resourceType": "Patient",
+                    "data": fhir_resource,
+                },
+                timeout=self.REQUEST_TIMEOUT,
+            )
+
+            return self._handle_response(response, idempotency_key)
+
+        except requests.RequestException as e:
+            logger.error(f"[FHIR] Network error pushing patient: {str(e)}")
+            return {
+                'error': f'Network error: {str(e)}',
+                'status_code': 500,
+                'idempotency_key': idempotency_key
+            }
+
+    def get_providers(self) -> list:
+        """
+        Fetch all registered providers from WAH4PC gateway (public endpoint).
+
+        Returns:
+            list: List of active provider dictionaries with id, name, type, isActive fields
+        """
+        try:
+            response = requests.get(
+                f"{self.BASE_URL}/api/v1/providers",
+                timeout=self.REQUEST_TIMEOUT
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                # Handle both wrapped {"data": [...]} and flat array formats
+                providers = result.get("data", result) if isinstance(result, dict) else result
+                # Filter to only return active providers
+                return [p for p in providers if p.get("isActive", True)]
+
+            logger.warning(f"[FHIR] Failed to fetch providers: HTTP {response.status_code}")
+            return []
+
+        except requests.RequestException as e:
+            logger.error(f"[FHIR] Error fetching providers: {str(e)}")
+            return []
+
+    def get_transaction_status(self, transaction_id: str) -> Dict[str, Any]:
+        """
+        Get transaction details from WAH4PC gateway.
+
+        Args:
+            transaction_id: Transaction ID to retrieve
+
+        Returns:
+            dict: Response with transaction details, or 'error' and 'status_code' on failure
+        """
+        try:
+            response = requests.get(
+                f"{self.BASE_URL}/api/v1/transactions/{transaction_id}",
+                headers={
+                    "X-API-Key": self.api_key,
+                    "X-Provider-ID": self.provider_id,
+                },
+                timeout=self.REQUEST_TIMEOUT,
+            )
+
+            if response.status_code >= 400:
+                error_msg = response.json().get('error', 'Unknown error') if response.text else 'Unknown error'
+                logger.warning(f"[FHIR] Failed to get transaction {transaction_id}: {error_msg}")
+                return {
+                    'error': error_msg,
+                    'status_code': response.status_code
+                }
+
+            return response.json()
+
+        except requests.RequestException as e:
+            logger.error(f"[FHIR] Network error getting transaction: {str(e)}")
+            return {
+                'error': f'Network error: {str(e)}',
+                'status_code': 500
+            }
+
+    def _build_headers(self, idempotency_key: Optional[str] = None) -> Dict[str, str]:
         """
         Build request headers for WAH4PC Gateway.
         
         Headers:
         - Content-Type: application/json
         - X-API-Key: {api_key}
-        - X-Transaction-ID: {transaction_id} (if provided)
-        - Idempotency-Key: {idempotency_key} (required for idempotency)
+        - X-Provider-ID: {provider_id}
+        - Idempotency-Key: {idempotency_key} (if provided)
         
         Args:
-            transaction_id: Transaction ID for propagation
             idempotency_key: Idempotency key for request
         
         Returns:
             Dict of headers
         """
-        # TODO: Implement header construction
-        # - Always include X-API-Key
-        # - Include X-Transaction-ID if provided
-        # - Include Idempotency-Key if provided
-        # - Set Content-Type to application/fhir+json
-        pass
-    
-    def _handle_response(self, response: requests.Response) -> Dict[str, Any]:
+        headers = {
+            "Content-Type": "application/json",
+            "X-API-Key": self.api_key,
+            "X-Provider-ID": self.provider_id,
+        }
+        
+        if idempotency_key:
+            headers["Idempotency-Key"] = idempotency_key
+            
+        return headers
+
+    def _handle_response(self, response: requests.Response, idempotency_key: Optional[str] = None) -> Dict[str, Any]:
         """
         Handle WAH4PC Gateway response.
         
+        Handles specific error codes:
+        - 409: Request in progress (conflict)
+        - 429: Rate limit exceeded
+        - 4xx/5xx: Other errors
+        
         Args:
             response: requests.Response object
+            idempotency_key: Idempotency key for response tracking
         
         Returns:
             Dict with status, data, error info
         """
-        # TODO: Implement
-        # - Parse JSON response
-        # - Handle status codes (200, 201, 202, 4xx, 5xx)
-        # - Extract transaction_id from response
-        # - Log errors
-        pass
-    
-    def get_providers(self) -> Tuple[bool, Optional[list]]:
-        """
-        Fetch list of registered WAH4PC providers.
+        result = {}
         
-        GET /api/v1/providers
-        
-        Returns:
-            Tuple[success: bool, providers: List or None]
-        """
-        # TODO: Implement
-        # GET /api/v1/providers
-        # Return list of provider objects or error
-        pass
-    
-    def get_transaction_status(self, transaction_id: str) -> Tuple[bool, Optional[Dict]]:
-        """
-        Get status of a transaction from WAH4PC Gateway.
-        
-        GET /api/v1/transactions/{id}
-        
-        Args:
-            transaction_id: Transaction ID to query
-        
-        Returns:
-            Tuple[success: bool, transaction_data: Dict or None]
-        """
-        # TODO: Implement
-        # GET /api/v1/transactions/{transaction_id}
-        # Return transaction details from gateway
-        pass
+        # Handle specific error codes
+        if response.status_code == 409:
+            result['error'] = 'Request in progress, retry later'
+            result['status_code'] = 409
+            logger.warning("[FHIR] Received 409 (conflict)")
+            
+        elif response.status_code == 429:
+            result['error'] = 'Rate limit exceeded or duplicate request'
+            result['status_code'] = 429
+            logger.warning("[FHIR] Received 429 (rate limit)")
+            
+        elif response.status_code >= 400:
+            try:
+                error_msg = response.json().get('error', 'Unknown error') if response.text else 'Unknown error'
+            except (ValueError, KeyError):
+                error_msg = 'Unknown error'
+            result['error'] = error_msg
+            result['status_code'] = response.status_code
+            logger.warning(f"[FHIR] Received {response.status_code}: {error_msg}")
+            
+        else:
+            # Success (2xx status)
+            try:
+                body = response.json()
+                result.update(body)
+            except ValueError:
+                result['error'] = 'Failed to parse response'
+                result['status_code'] = 500
+
+        if idempotency_key:
+            result['idempotency_key'] = idempotency_key
+            
+        return result
 
 
 class FHIRRequestProcessor:
@@ -227,6 +304,7 @@ class FHIRRequestProcessor:
     - Update transaction status
     - Handle timeouts and failures
     """
+
     
     def process_request_async(
         self,
