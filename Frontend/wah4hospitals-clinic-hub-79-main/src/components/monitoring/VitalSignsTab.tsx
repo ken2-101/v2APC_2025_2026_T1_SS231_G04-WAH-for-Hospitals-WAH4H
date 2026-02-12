@@ -11,7 +11,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { VitalSign } from '../../types/monitoring';
 
 interface VitalSignsTabProps {
-    vitals: any[]; // raw API response
+    vitals: VitalSign[];  // Already formatted VitalSign objects from service
     onAddVital: (vital: Omit<VitalSign, 'id'>) => void;
     patientId: string;
 }
@@ -27,21 +27,9 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
     const [temp, setTemp] = useState('');
     const [o2, setO2] = useState('');
 
-    // Map API response to proper VitalSign type, filtered by patientId
+    // Vitals are already properly formatted from the service, just filter by patient
     const mappedVitals: VitalSign[] = useMemo(() => {
-        return vitals
-            .filter(v => String(v.admission) === patientId) // filter per admission/patient
-            .map(v => ({
-                id: String(v.id),
-                admissionId: String(v.admission),
-                dateTime: v.date_time,
-                bloodPressure: v.blood_pressure,
-                heartRate: v.heart_rate,
-                respiratoryRate: v.respiratory_rate,
-                temperature: v.temperature,
-                oxygenSaturation: v.oxygen_saturation,
-                staffName: v.staff_name
-            }));
+        return vitals.filter(v => v.admissionId === patientId);
     }, [vitals, patientId]);
 
     const handleSave = () => {

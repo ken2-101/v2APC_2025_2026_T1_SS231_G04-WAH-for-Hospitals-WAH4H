@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, FileText, AlertCircle, CheckCircle, Clock } from 'lucide-react';
 import { LabRequest, LabResult } from '../../types/monitoring';
 import { useRole } from '@/contexts/RoleContext';
+import monitoringService from '@/services/monitoringService';
 
 interface LaboratoryTabProps {
     labRequests: LabRequest[];
@@ -64,8 +65,9 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
     });
 
     // Permissions
-    const canOrderLabs = canModify('lab-orders'); // Doctor
-    const canEnterResults = canModify('lab-results'); // Lab Technician
+    const canOrderLabs = currentRole === 'doctor';
+    const canSendLabs = currentRole === 'nurse';
+    const canEnterResults = currentRole === 'lab_technician';
     const canViewLabs = currentRole === 'doctor' || currentRole === 'nurse' || currentRole === 'lab_technician';
 
     const handleOrderSubmit = () => {
@@ -88,6 +90,20 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
         onAddRequest?.(newRequest);
         setIsOrderModalOpen(false);
         setOrderForm({ testCode: '', testName: '', priority: 'routine', notes: '' });
+    };
+
+    const handleSendRequest = async (request: LabRequest) => {
+        try {
+            await monitoringService.updateLabRequestStatus(request.id, 'requested');
+            // Optimistically update or trigger refresh (parent handles refresh via state)
+            // Ideally we should have an onUpdateStatus prop, but for now we'll reload page or 
+            // rely on parent re-fetching if we added a callback. 
+            // Since props are read-only, we can't update localliy easily without parent help.
+            // For this implementation, let's assume parent will refresh or we force a reload.
+            window.location.reload(); 
+        } catch (error) {
+            alert('Failed to send request');
+        }
     };
 
     const handleResultSubmit = () => {
@@ -121,7 +137,7 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
     const getStatusBadge = (status: string) => {
         switch (status) {
             case 'ordered':
-                return <Badge className="bg-blue-100 text-blue-800"><Clock className="w-3 h-3 mr-1" />Ordered</Badge>;
+                return <Badge className="bg-blue-100 text-blue-800"><Clock className="w-3 h-3 mr-1" />Ordered (Draft)</Badge>;
             case 'requested':
                 return <Badge className="bg-yellow-100 text-yellow-800"><AlertCircle className="w-3 h-3 mr-1" />In Progress</Badge>;
             case 'completed':
@@ -193,6 +209,7 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
                                     </div>
                                     <div className="text-sm text-gray-600 space-y-1">
                                         <p><span className="font-medium">Test Code:</span> {request.testCode}</p>
+                                        <p className="font-medium text-xs text-blue-600">{request.lifecycleStatus === 'ordered' ? 'Pending nurse review' : ''}</p>
                                         <p><span className="font-medium">Ordered by:</span> {request.orderedBy}</p>
                                         <p><span className="font-medium">Ordered at:</span> {new Date(request.orderedAt).toLocaleString()}</p>
                                         {request.notes && <p><span className="font-medium">Notes:</span> {request.notes}</p>}
@@ -205,6 +222,16 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
                                     </div>
                                 </div>
                                 <div className="ml-4 flex gap-2">
+                                    {canSendLabs && request.lifecycleStatus === 'ordered' && (
+                                        <Button 
+                                            size="sm" 
+                                            className="bg-purple-600 hover:bg-purple-700 text-white"
+                                            onClick={() => handleSendRequest(request)}
+                                        >
+                                            Send Request to Lab
+                                        </Button>
+                                    )}
+
                                     {request.resultContent && (
                                         <Button
                                             size="sm"

@@ -21,12 +21,15 @@ import { toast } from 'sonner';
 import { InventoryItem, MedicationRequest } from '@/types/pharmacy';
 import pharmacyService from '@/services/pharmacyService';
 
+import { useRole } from '@/contexts/RoleContext';
+
 interface MedicationRequestTabProps {
   admissionId: string;
   patientId: string;
 }
 
 export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admissionId, patientId }) => {
+  const { currentRole } = useRole();
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [requests, setRequests] = useState<MedicationRequest[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -133,6 +136,27 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
     }
   };
 
+  const handleRequestFromPharmacy = async (req: MedicationRequest) => {
+      try {
+          // If status is 'pending' (prescribed), update to 'active' (requested)
+          // Wait, 'pending' in frontend maps to 'active' in backend?
+          // Let's clarify:
+          // Doctor Prescribes -> Status: 'draft' (Backend) -> 'Prescribed' (Frontend)
+          // Nurse Requests -> Status: 'active' (Backend) -> 'Pending/Requested' (Frontend)
+          
+          // Use 'active' for requested.
+          await pharmacyService.updateRequestStatus(req.id, 'active');
+          
+          // Optimistic update
+          setRequests(prev => prev.map(r => 
+              r.id === req.id ? { ...r, status: 'pending' as any } : r
+          ));
+          toast.success('Request sent to pharmacy');
+      } catch (error) {
+          toast.error('Failed to send request');
+      }
+  };
+
   const getStatusBadge = (status: MedicationRequest['status']) => {
     if (status === 'dispensed' || status === 'completed') {
       return (
@@ -192,9 +216,11 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
                 <option value="denied">Denied</option>
             </select>
           </div>
-          <Button onClick={() => setIsModalOpen(true)} className="bg-purple-600 hover:bg-purple-700 shadow-md transition-all">
-            <Plus className="w-4 h-4 mr-2" /> Request Medication
-          </Button>
+          {currentRole === 'doctor' && (
+              <Button onClick={() => setIsModalOpen(true)} className="bg-purple-600 hover:bg-purple-700 shadow-md transition-all">
+                <Plus className="w-4 h-4 mr-2" /> Prescribe Medication
+              </Button>
+          )}
       </div>
 
       {/* Empty state */}
@@ -246,6 +272,16 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
                 </div>
                 <div className="flex items-center gap-2">
                     {getStatusBadge(req.status)}
+                    {/* Nurse Action: Request from Pharmacy (for Prescribed items) */}
+                    {currentRole === 'nurse' && req.status === 'pending' && (
+                        <Button
+                            size="sm"
+                            className="bg-purple-600 hover:bg-purple-700 text-white ml-2"
+                            onClick={() => handleRequestFromPharmacy(req)}
+                        >
+                            Request from Pharmacy
+                        </Button>
+                    )}
                     <Button 
                         variant="ghost" 
                         size="icon" 

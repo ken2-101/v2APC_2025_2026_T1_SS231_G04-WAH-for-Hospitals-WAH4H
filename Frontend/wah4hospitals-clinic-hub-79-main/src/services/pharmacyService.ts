@@ -331,6 +331,20 @@ class PharmacyService {
           updated_at: item.updated_at
       };
   }
+    /**
+     * Update medication request status
+     */
+    async updateRequestStatus(id: number, status: string): Promise<MedicationRequest> {
+        try {
+            const response = await api.patch(`${PHARMACY_BASE_URL}/requests/${id}/`, { status });
+            // Re-fetch to return full object with inventory details
+            const updated = await this.getRequests(); // Inefficient but safe for now, better to get by ID
+            return updated.find(r => r.id === id) as MedicationRequest;
+        } catch (error: any) {
+             console.error('Error updating medication request status:', error);
+             throw new Error(error.response?.data?.message || 'Failed to update status');
+        }
+    }
 }
 
 export default new PharmacyService();

@@ -157,7 +157,7 @@ export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({
             </div>
 
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="max-w-3xl">
                     <DialogHeader>
                         <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
                             <FileText className="w-6 h-6 text-blue-600" />
