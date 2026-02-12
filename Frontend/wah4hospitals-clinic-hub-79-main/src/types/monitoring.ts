@@ -88,7 +88,36 @@ export interface LabResult {
     reportedBy: string;
     reportedAt: string;
 }
-   (UI AGGREGATE TYPE)
+
+/* =========================
+   MEDICATION REQUESTS (Lifecycle-enabled)
+   ========================= */
+export interface MedicationRequest {
+    id: number;
+    admissionId: string;
+    medicationName: string;
+    quantity: number;
+    dosage: string;
+    route: string;
+    frequency: string;
+    notes: string;
+    
+    // Lifecycle fields (from reference implementation)
+    lifecycleStatus: 'prescribed' | 'requested' | 'ready-for-admin' | 'administered';
+    intent: 'order' | 'proposal';
+    
+    // Timestamps and actors
+    prescribedBy: string;
+    prescribedAt: string;
+    requestedBy?: string;
+    requestedAt?: string;
+    dispensedAt?: string;
+    administeredBy?: string;
+    administeredAt?: string;
+}
+
+/* =========================
+   MONITORING ADMISSION (UI AGGREGATE TYPE)
    ========================= */
 export interface MonitoringAdmission {
     id: number;                   // admission.id

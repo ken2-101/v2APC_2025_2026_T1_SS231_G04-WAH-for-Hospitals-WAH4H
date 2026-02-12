@@ -10,6 +10,9 @@ export interface InventoryItem {
   expiry_date: string; // ISO string
   batch_number: string;
   manufacturer?: string;
+  category?: string;
+  form?: string;
+  unit_of_measure?: string;
   is_active: boolean;
   is_expired: boolean;
   is_expiring_soon: boolean;
@@ -37,10 +40,12 @@ export interface MedicationRequest {
   inventory_item: number; // ID only
   inventory_item_detail?: InventoryItem; // full inventory info, read-only
   quantity: number;
-  status: 'pending' | 'approved' | 'denied' | 'dispensed' | 'cancelled' | 'completed';
+  status: 'prescribed' | 'draft' | 'pending' | 'active' | 'approved' | 'denied' | 'dispensed' | 'cancelled' | 'completed';
   notes?: string;
   requested_by?: string;
   approved_by?: string;
   requested_at: string;
   updated_at: string;
+  patient_name?: string;
+  practitioner_name?: string;
 }

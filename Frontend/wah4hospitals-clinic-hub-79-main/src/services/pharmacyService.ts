@@ -25,22 +25,25 @@ class PharmacyService {
           return {
             id: item.inventory_id,
             item_code: item.item_code,
-            generic_name: item.item_name, // Mapping item_name -> generic_name for UI
-            brand_name: item.item_name,   // Redundant but required by UI type
-            description: item.category,   // Using category as description
+            generic_name: item.item_name,
+            brand_name: item.item_name,
+            description: item.description,
+            category: item.category,
+            form: item.form,
             quantity: item.current_stock,
             minimum_stock_level: item.reorder_level,
             unit_price: parseFloat(item.unit_cost),
             expiry_date: item.expiry_date,
             batch_number: item.batch_number,
-            manufacturer: 'Unknown',      // Not in backend model
+            unit_of_measure: item.unit_of_measure,
+            manufacturer: item.manufacturer,
             is_active: item.status === 'active',
-            // Derived status flags logic (simplified, ideally backend provides this)
+            // Derived status flags logic
             is_expired: new Date(item.expiry_date) < new Date(),
-            is_expiring_soon: false, // Logic needed
+            is_expiring_soon: false, 
             is_low_stock: item.current_stock <= item.reorder_level,
             is_out_of_stock: item.current_stock === 0,
-            status_indicators: [],      // Populated by frontend helper
+            status_indicators: [], 
             created_at: item.created_at,
             updated_at: item.updated_at
           };
@@ -61,13 +64,16 @@ class PharmacyService {
   async addInventoryItem(data: any): Promise<InventoryItem> {
     // Transform frontend data to backend expected format
     const payload = {
-      item_code: `MED-${Date.now()}`, // Auto-generate code if not provided
+      item_code: data.item_code || `MED-${Date.now()}`,
       item_name: data.generic_name,
-      category: 'Medicine',
+      category: data.category,
+      form: data.form,
+      manufacturer: data.manufacturer,
+      description: data.description,
       batch_number: data.batch_number,
       current_stock: data.quantity,
       reorder_level: data.minimum_stock_level,
-      unit_of_measure: 'unit', // Default
+      unit_of_measure: data.unit_of_measure,
       unit_cost: data.unit_price,
       status: 'active',
       expiry_date: data.expiry_date,
@@ -89,7 +95,10 @@ class PharmacyService {
      // Frontend status: pending, approved, denied, dispensed
      
      // Mapping 'pending' (frontend) -> 'active' (backend)
-     const backendStatus = statusFilter === 'pending' ? 'active' : statusFilter;
+     // Mapping 'prescribed' (frontend) -> 'draft' (backend)
+     let backendStatus = statusFilter;
+     if (statusFilter === 'pending') backendStatus = 'active';
+     if (statusFilter === 'prescribed') backendStatus = 'draft';
 
      const response = await api.get(`${PHARMACY_BASE_URL}/requests/`, {
          params: { status: backendStatus }
@@ -111,7 +120,7 @@ class PharmacyService {
              admission: req.encounter_id,
              admission_info: {
                  id: req.encounter_id,
-                 patient_name: `Patient #${req.subject_id}`,
+                 patient_name: req.patient_name || `Patient #${req.subject_id}`,
                  admission_date: req.authored_on
              },
              inventory_item: inventoryItem?.id || 0,
@@ -136,11 +145,13 @@ class PharmacyService {
                  updated_at: req.updated_at
              },
              quantity: req.dispense_quantity || 0,
-             status: req.status === 'active' ? 'pending' : req.status,
+             status: req.status === 'active' ? 'pending' : (req.status === 'draft' ? 'prescribed' : req.status),
              notes: req.note,
-             requested_by: `Practitioner #${req.requester_id}`,
+             requested_by: req.practitioner_name || `Practitioner #${req.requester_id}`,
              requested_at: req.authored_on,
-             updated_at: req.updated_at
+             updated_at: req.updated_at,
+             patient_name: req.patient_name,
+             practitioner_name: req.practitioner_name
          };
      });
   }
@@ -169,7 +180,7 @@ class PharmacyService {
              admission: req.encounter_id,
              admission_info: {
                  id: req.encounter_id,
-                 patient_name: `Patient #${req.subject_id}`,
+                 patient_name: req.patient_name || `Patient #${req.subject_id}`,
                  admission_date: req.authored_on
              },
              inventory_item: inventoryItem?.id || 0,
@@ -194,11 +205,13 @@ class PharmacyService {
                  updated_at: req.updated_at
              },
              quantity: req.dispense_quantity || 0,
-             status: req.status === 'active' ? 'pending' : req.status,
+             status: req.status === 'active' ? 'pending' : (req.status === 'draft' ? 'prescribed' : req.status),
              notes: req.note,
-             requested_by: `Practitioner #${req.requester_id}`,
+             requested_by: req.practitioner_name || `Practitioner #${req.requester_id}`,
              requested_at: req.authored_on,
-             updated_at: req.updated_at
+             updated_at: req.updated_at,
+             patient_name: req.patient_name,
+             practitioner_name: req.practitioner_name
          };
      });
   }
@@ -223,7 +236,7 @@ class PharmacyService {
      // Transform frontend data to backend expected format
      const payload = {
          identifier: identifier,
-         status: 'active',
+         status: 'draft',
          intent: 'order',
          priority: 'routine',
          subject_id: data.subject_id,
@@ -269,7 +282,7 @@ class PharmacyService {
                updated_at: new Date().toISOString()
            },
            quantity: req.dispense_quantity || 0,
-           status: req.status === 'active' ? 'pending' : req.status,
+           status: req.status === 'active' ? 'pending' : (req.status === 'draft' ? 'prescribed' : req.status),
            notes: req.note,
            requested_by: `Practitioner #${req.requester_id}`,
            requested_at: req.authored_on,
@@ -314,13 +327,16 @@ class PharmacyService {
           item_code: item.item_code,
           generic_name: item.item_name,
           brand_name: item.item_name,
-          description: item.category,
+          description: item.description,
+          category: item.category,
+          form: item.form,
           quantity: item.current_stock,
           minimum_stock_level: item.reorder_level,
           unit_price: parseFloat(item.unit_cost),
           expiry_date: item.expiry_date,
           batch_number: item.batch_number,
-          manufacturer: 'Unknown',
+          unit_of_measure: item.unit_of_measure,
+          manufacturer: item.manufacturer,
           is_active: item.status === 'active',
           is_expired: new Date(item.expiry_date) < new Date(),
           is_expiring_soon: false,
@@ -331,6 +347,20 @@ class PharmacyService {
           updated_at: item.updated_at
       };
   }
+    /**
+     * Update medication request status
+     */
+    async updateRequestStatus(id: number, status: string): Promise<MedicationRequest> {
+        try {
+            const response = await api.patch(`${PHARMACY_BASE_URL}/requests/${id}/`, { status });
+            // Re-fetch to return full object with inventory details
+            const updated = await this.getRequests(); // Inefficient but safe for now, better to get by ID
+            return updated.find(r => r.id === id) as MedicationRequest;
+        } catch (error: any) {
+             console.error('Error updating medication request status:', error);
+             throw new Error(error.response?.data?.message || 'Failed to update status');
+        }
+    }
 }
 
 export default new PharmacyService();

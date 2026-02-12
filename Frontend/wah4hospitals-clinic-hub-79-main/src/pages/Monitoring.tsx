@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Search } from 'lucide-react';
+import { Search, Activity, Users, AlertTriangle, Heart, User, ChevronRight, ArrowLeft, Clock } from 'lucide-react';
 import {
   MonitoringAdmission,
   VitalSign,
@@ -10,15 +10,19 @@ import {
   HistoryEvent,
   LabRequest,
   LabResult,
+  MedicationRequest,
 } from '../types/monitoring';
-import { PatientMonitoringPage } from '@/components/monitoring/PatientMonitoringPage';
-import { MonitoringDashboard } from '@/components/monitoring/MonitoringDashboard';
-import { Activity, Users, AlertTriangle, Heart } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { VitalSignsTab } from '@/components/monitoring/VitalSignsTab';
+import { ClinicalNotesTab } from '@/components/monitoring/ClinicalNotesTab';
+import { DietaryTab } from '@/components/monitoring/DietaryTab';
+import { HistoryTab } from '@/components/monitoring/HistoryTab';
+import { MedicationRequestTab } from '@/components/monitoring/MedicationRequestTab';
+import { LaboratoryTab } from '@/components/monitoring/LaboratoryTab';
 import { admissionService } from '@/services/admissionService';
 import monitoringService from '@/services/monitoringService';
 
 const Monitoring: React.FC = () => {
-  const [currentView, setCurrentView] = useState<'dashboard' | 'patient'>('dashboard');
   const [admissions, setAdmissions] = useState<MonitoringAdmission[]>([]);
   const [selectedAdmission, setSelectedAdmission] = useState<MonitoringAdmission | null>(null);
 
@@ -29,7 +33,7 @@ const Monitoring: React.FC = () => {
   const [labRequests, setLabRequests] = useState<LabRequest[]>([]);
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeFilters, setActiveFilters] = useState({ ward: '', status: '', doctor: '' });
+  const [filterStatus, setFilterStatus] = useState<'all' | 'Stable' | 'Critical'>('all');
 
   // Fetch all admissions
   useEffect(() => {
@@ -38,24 +42,22 @@ const Monitoring: React.FC = () => {
         const data = await admissionService.getAll();
         if (Array.isArray(data)) {
           const mapped: MonitoringAdmission[] = data.map((adm: any) => ({
-            id: adm.encounter_id, // Use encounter_id as primary ID
+            id: adm.encounter_id,
             patientId: adm.subject_id,
-            patientName: adm.patient_summary
-              ? `${adm.patient_summary.last_name}, ${adm.patient_summary.first_name}`
-              : 'Unknown Patient',
-            room: adm.location_summary?.name || '—',
-            doctorName: adm.participant_summary?.[0]?.name || 'Unknown Doctor', // Approximation
+            patientName: adm.patientName || 'Unknown Patient',
+            room: adm.location?.room || '—',
+            doctorName: adm.physician || 'Unassigned',
             nurseName: 'Unknown Nurse',
-            status: adm.status === 'in-progress' ? 'Stable' : 'Observation', // Map status
-            encounterType: adm.class_code,
-            admittingDiagnosis: adm.hospitalization?.admitting_diagnosis_code || 'N/A',
-            reasonForAdmission: adm.reason_code?.[0] || 'N/A',
-            admissionCategory: adm.service_type,
-            modeOfArrival: adm.hospitalization?.admit_source,
-            admissionDate: adm.period_start,
-            attendingPhysician: adm.participant_summary?.[0]?.name,
+            status: adm.status === 'in-progress' ? 'Stable' : 'Observation',
+            encounterType: adm.encounterType || 'IMP',
+            admittingDiagnosis: adm.reasonForAdmission || 'N/A',
+            reasonForAdmission: adm.reasonForAdmission || 'N/A',
+            admissionCategory: adm.serviceType || 'General',
+            modeOfArrival: adm.admitSource || 'Physician Referral',
+            admissionDate: adm.admissionDate || '',
+            attendingPhysician: adm.physician || 'Unassigned',
             assignedNurse: 'Unknown',
-            ward: adm.location_summary?.name || 'General Ward',
+            ward: adm.location?.ward || 'General Ward',
           }));
           setAdmissions(mapped);
         }
@@ -66,22 +68,11 @@ const Monitoring: React.FC = () => {
     fetchAdmissions();
   }, []);
 
-  // Filter handlers
-  const handleFilterChange = (key: string, value: string) => {
-    setActiveFilters(prev => ({ ...prev, [key]: value }));
-  };
-
-  const clearFilters = () => {
-    setActiveFilters({ ward: '', status: '', doctor: '' });
-  };
-
   // Select an admission
   const handleSelectAdmission = async (adm: MonitoringAdmission) => {
     setSelectedAdmission(adm);
-    setCurrentView('patient');
 
     try {
-      // Fetch data using monitoringService
       const [fetchedVitals, fetchedNotes, fetchedDietary, fetchedLabRequests] = await Promise.all([
         monitoringService.getVitals(adm.id),
         monitoringService.getNotes(adm.id),
@@ -93,34 +84,33 @@ const Monitoring: React.FC = () => {
       setNotes(fetchedNotes);
       setDietary(fetchedDietary);
       setLabRequests(fetchedLabRequests);
-      // History not yet implemented in service
       setHistory([]);
     } catch (err) {
       console.error('Error fetching admission details:', err);
     }
   };
 
+  const handleBackToList = () => {
+    setSelectedAdmission(null);
+  };
+
   // Filtered admissions
   const filteredAdmissions = admissions.filter(admission => {
     const matchesSearch =
       admission.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      admission.id.toString().includes(searchTerm);
+      admission.id.toString().includes(searchTerm) ||
+      admission.room.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesWard = !activeFilters.ward || admission.ward === activeFilters.ward;
-    const matchesStatus = !activeFilters.status || admission.status === activeFilters.status;
-    const matchesDoctor = !activeFilters.doctor || admission.attendingPhysician === activeFilters.doctor;
+    const matchesStatus = filterStatus === 'all' || admission.status === filterStatus;
 
-    return matchesSearch && matchesWard && matchesStatus && matchesDoctor;
+    return matchesSearch && matchesStatus;
   });
 
-  const hasActiveFilters = Object.values(activeFilters).some(Boolean);
-
-  // Add new vital (backend-compatible)
+  // Add handlers
   const handleAddVital = async (newVital: Omit<VitalSign, 'id'>) => {
     if (!selectedAdmission) return;
     try {
       await monitoringService.addVital(newVital, selectedAdmission.patientId);
-      // Refresh list
       const updatedVitals = await monitoringService.getVitals(selectedAdmission.id);
       setVitals(updatedVitals);
     } catch (err) {
@@ -128,12 +118,10 @@ const Monitoring: React.FC = () => {
     }
   };
 
-  // Add new clinical note
   const handleAddNote = async (newNote: ClinicalNote) => {
     if (!selectedAdmission) return;
     try {
       await monitoringService.addNote(newNote, selectedAdmission.patientId);
-      // Refresh list
       const updatedNotes = await monitoringService.getNotes(selectedAdmission.id);
       setNotes(updatedNotes);
     } catch (err) {
@@ -141,7 +129,6 @@ const Monitoring: React.FC = () => {
     }
   };
 
-  // Update dietary order
   const handleUpdateDietary = async (order: DietaryOrder) => {
     if (!selectedAdmission) return;
     try {
@@ -153,12 +140,14 @@ const Monitoring: React.FC = () => {
     }
   };
 
-  // Add laboratory request
   const handleAddLabRequest = async (request: Omit<LabRequest, 'id'>) => {
     if (!selectedAdmission) return;
     try {
-      await monitoringService.addLaboratoryRequest(request, selectedAdmission.patientId);
-      // Refresh list
+      const requestWithAdmission = {
+        ...request,
+        admissionId: selectedAdmission.id.toString(),
+      };
+      await monitoringService.addLaboratoryRequest(requestWithAdmission, selectedAdmission.patientId);
       const updatedLabRequests = await monitoringService.getLaboratoryRequests(selectedAdmission.id);
       setLabRequests(updatedLabRequests);
     } catch (err) {
@@ -166,12 +155,10 @@ const Monitoring: React.FC = () => {
     }
   };
 
-  // Update laboratory result  
   const handleUpdateLabResult = async (requestId: string, result: LabResult) => {
     if (!selectedAdmission) return;
     try {
       await monitoringService.updateLabResult(parseInt(requestId), result);
-      // Refresh list
       const updatedLabRequests = await monitoringService.getLaboratoryRequests(selectedAdmission.id);
       setLabRequests(updatedLabRequests);
     } catch (err) {
@@ -179,76 +166,272 @@ const Monitoring: React.FC = () => {
     }
   };
 
-  // Render patient page
-  if (currentView === 'patient' && selectedAdmission) {
-    return (
-      <PatientMonitoringPage
-        patient={selectedAdmission}
-        vitals={vitals}
-        notes={notes}
-        history={history}
-        labRequests={labRequests}
-        dietaryOrder={dietary || undefined}
-        onBack={() => setCurrentView('dashboard')}
-        onAddVital={handleAddVital}
-        onAddNote={handleAddNote}
-        onUpdateDietary={handleUpdateDietary}
-        onAddLabRequest={handleAddLabRequest}
-        onUpdateLabResult={handleUpdateLabResult}
-      />
-    );
-  }
+  const defaultDietaryOrder: DietaryOrder = selectedAdmission ? {
+    admissionId: selectedAdmission.id.toString(),
+    dietType: '',
+    allergies: [],
+    npoResponse: false,
+    activityLevel: '',
+    lastUpdated: new Date().toISOString(),
+    orderedBy: '',
+  } : {
+    admissionId: '',
+    dietType: '',
+    allergies: [],
+    npoResponse: false,
+    activityLevel: '',
+    lastUpdated: new Date().toISOString(),
+    orderedBy: '',
+  };
 
-  // Render dashboard
   return (
-    <div className="space-y-6 pb-8">
-      {/* Enhanced Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg shadow-lg p-8 text-white">
-        <div className="flex items-center gap-4 mb-3">
-          <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 border border-white/30">
-            <Activity className="w-8 h-8" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold">Patient Monitoring</h1>
-            <p className="text-blue-100 text-sm mt-1">Real-time patient care and vital signs tracking</p>
-          </div>
+    <div className="h-[calc(100vh-180px)] flex bg-gray-50 overflow-hidden rounded-lg border border-gray-200">
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Sidebar */}
+        <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
+          {!selectedAdmission ? (
+            <>
+              <div className="p-4 border-b border-gray-100">
+                <h2 className="text-lg font-semibold text-gray-900 mb-3">Admitted Patients</h2>
+                
+                {/* Stats */}
+                <div className="flex gap-2 mb-4 text-xs">
+                  <div className="flex-1 bg-gray-50 rounded-lg p-3 flex flex-col items-center justify-center min-h-[60px]">
+                    <p className="text-gray-500 mb-1">Patients</p>
+                    <p className="text-lg font-bold text-gray-900">{admissions.length}</p>
+                  </div>
+                  <div className="flex-1 bg-red-50 rounded-lg p-3 flex flex-col items-center justify-center min-h-[60px]">
+                    <p className="text-red-600 mb-1">Critical</p>
+                    <p className="text-lg font-bold text-red-600">{admissions.filter(a => a.status === 'Critical').length}</p>
+                  </div>
+                  <div className="flex-1 bg-green-50 rounded-lg p-3 flex flex-col items-center justify-center min-h-[60px]">
+                    <p className="text-green-600 mb-1">Stable</p>
+                    <p className="text-lg font-bold text-green-600">{admissions.filter(a => a.status === 'Stable').length}</p>
+                  </div>
+                </div>
+                
+                <div className="relative mb-3">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                  <input
+                    type="text"
+                    placeholder="Search patients..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  />
+                </div>
+                
+                <div className="flex gap-2 flex-wrap">
+                  {(['all', 'Stable', 'Critical'] as const).map((status) => (
+                    <button
+                      key={status}
+                      onClick={() => setFilterStatus(status)}
+                      className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
+                        filterStatus === status
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {status === 'all' ? 'All' : status}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto">
+                {filteredAdmissions.map((patient) => (
+                  <div
+                    key={patient.id}
+                    onClick={() => handleSelectAdmission(patient)}
+                    className="p-4 border-b border-gray-100 hover:bg-blue-50 cursor-pointer transition-colors"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <h3 className="font-semibold text-gray-900">{patient.patientName}</h3>
+                        <p className="text-sm text-gray-500">ID: {patient.id}</p>
+                      </div>
+                      <span
+                        className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                          patient.status === 'Stable'
+                            ? 'bg-green-100 text-green-700'
+                            : patient.status === 'Critical'
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-yellow-100 text-yellow-700'
+                        }`}
+                      >
+                        {patient.status}
+                      </span>
+                    </div>
+                    <div className="space-y-1 text-xs text-gray-600">
+                      <div className="flex items-center gap-1">
+                        <User size={12} />
+                        <span>{patient.room}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Clock size={12} />
+                        <span>Updated: {patient.admissionDate}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="p-4 border-b border-gray-100">
+                <button
+                  onClick={handleBackToList}
+                  className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium mb-4 text-sm"
+                >
+                  <ArrowLeft size={16} />
+                  Back to List
+                </button>
+                
+                <div className="bg-gradient-to-r from-blue-600 to-blue-500 rounded-lg p-4 text-white">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                      <User size={24} />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold">{selectedAdmission.patientName}</h2>
+                      <p className="text-sm text-blue-100">Patient ID: {selectedAdmission.id}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-blue-200 text-xs">Room</p>
+                      <p className="font-medium">{selectedAdmission.room}</p>
+                    </div>
+                    <div>
+                      <p className="text-blue-200 text-xs">Status</p>
+                      <p className="font-medium capitalize">{selectedAdmission.status}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-blue-200 text-xs">Attending Physician</p>
+                      <p className="font-medium">{selectedAdmission.attendingPhysician}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-blue-200 text-xs">Assigned Nurse</p>
+                      <p className="font-medium">{selectedAdmission.nurseName}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="p-4 space-y-2 text-xs text-gray-600">
+                <div className="flex justify-between">
+                  <span>Encounter ID:</span>
+                  <span className="font-medium">{selectedAdmission.id}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Admitted:</span>
+                  <span className="font-medium">{selectedAdmission.admissionDate}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Ward:</span>
+                  <span className="font-medium">{selectedAdmission.ward}</span>
+                </div>
+              </div>
+            </>
+          )}
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-blue-100 text-xs font-medium uppercase tracking-wide">Active Patients</p>
-                <p className="text-3xl font-bold mt-1">{admissions.length}</p>
+
+        {/* Right Panel */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {!selectedAdmission ? (
+            <div className="flex-1 flex items-center justify-center bg-gray-50">
+              <div className="text-center">
+                <div className="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Activity className="text-gray-400" size={48} />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Select a patient to view details</h3>
+                <p className="text-gray-600">Choose a patient from the list to access their clinical workspace</p>
               </div>
-              <Users className="w-8 h-8 text-white/60" />
             </div>
-          </div>
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-blue-100 text-xs font-medium uppercase tracking-wide">Critical Status</p>
-                <p className="text-3xl font-bold mt-1">
-                  {admissions.filter(a => a.status === 'Critical').length}
-                </p>
-              </div>
-              <AlertTriangle className="w-8 h-8 text-red-300" />
+          ) : (
+            <div className="flex-1 overflow-y-auto bg-gray-50 p-6">
+              <Tabs defaultValue="vitals" className="w-full">
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-1 mb-6 sticky top-0 z-10">
+                  <TabsList className="grid w-full grid-cols-4 bg-transparent gap-1">
+                    <TabsTrigger
+                      value="vitals"
+                      className="data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md rounded-md transition-all"
+                    >
+                      Vitals
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="notes"
+                      className="data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md rounded-md transition-all"
+                    >
+                      Clinical Notes
+                    </TabsTrigger>
+
+                    <TabsTrigger
+                      value="laboratory"
+                      className="data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md rounded-md transition-all"
+                    >
+                      Laboratory
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="medication"
+                      className="data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md rounded-md transition-all"
+                    >
+                      Medication
+                    </TabsTrigger>
+
+                  </TabsList>
+                </div>
+
+                <TabsContent value="vitals">
+                  <VitalSignsTab
+                    vitals={vitals.map(v => ({
+                      ...v,
+                      heartRate: Number(v.heartRate),
+                      respiratoryRate: Number(v.respiratoryRate),
+                      temperature: Number(v.temperature),
+                      oxygenSaturation: Number(v.oxygenSaturation),
+                    }))}
+                    onAddVital={handleAddVital}
+                    patientId={selectedAdmission.id.toString()}
+                  />
+                </TabsContent>
+
+                <TabsContent value="notes">
+                  <ClinicalNotesTab
+                    admissionId={selectedAdmission.id.toString()}
+                    patientId={selectedAdmission.patientId}
+                    notes={notes}
+                    onAddNote={handleAddNote}
+                  />
+                </TabsContent>
+
+
+
+                <TabsContent value="laboratory">
+                  <LaboratoryTab
+                    labRequests={labRequests}
+                    onAddRequest={handleAddLabRequest}
+                    onUpdateResult={handleUpdateLabResult}
+                    onRefresh={() => {
+                        if (selectedAdmission) handleSelectAdmission(selectedAdmission);
+                    }}
+                  />
+                </TabsContent>
+
+                <TabsContent value="medication">
+                  <MedicationRequestTab
+                    admissionId={selectedAdmission.id.toString()}
+                    patientId={selectedAdmission.patientId.toString()}
+                  />
+                </TabsContent>
+
+
+              </Tabs>
             </div>
-          </div>
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-blue-100 text-xs font-medium uppercase tracking-wide">Stable Status</p>
-                <p className="text-3xl font-bold mt-1">
-                  {admissions.filter(a => a.status === 'Stable').length}
-                </p>
-              </div>
-              <Heart className="w-8 h-8 text-green-300" />
-            </div>
-          </div>
+          )}
         </div>
       </div>
-
-      <MonitoringDashboard admissions={admissions} onSelectAdmission={handleSelectAdmission} />
     </div>
   );
 };

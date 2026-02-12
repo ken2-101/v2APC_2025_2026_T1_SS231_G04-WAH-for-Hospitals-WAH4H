@@ -19,7 +19,8 @@ interface Observation {
     value_string?: string;
     note?: string;
 
-    components?: ObservationComponent[];
+    components?: ObservationComponent[];  // For writing (POST/PUT)
+    components_data?: ObservationComponent[];  // For reading (GET)
 }
 
 interface ObservationComponent {
@@ -78,9 +79,10 @@ class MonitoringService {
 
                 const entry = grouped[time];
 
-                if (obs.code === CODES.BP && obs.components) {
-                    const sys = obs.components.find(c => c.code === CODES.BP_SYS)?.value_quantity;
-                    const dia = obs.components.find(c => c.code === CODES.BP_DIA)?.value_quantity;
+                // Use components_data from backend response (read-only field)
+                if (obs.code === CODES.BP && obs.components_data) {
+                    const sys = obs.components_data.find(c => c.code === CODES.BP_SYS)?.value_quantity;
+                    const dia = obs.components_data.find(c => c.code === CODES.BP_DIA)?.value_quantity;
                     if (sys && dia) entry.bloodPressure = `${sys}/${dia}`;
                 } else if (obs.code === CODES.HR) {
                     entry.heartRate = obs.value_quantity;
@@ -425,6 +427,28 @@ class MonitoringService {
             await api.put(`${MONITORING_BASE_URL}/observations/${requestId}/`, payload);
         } catch (error) {
             console.error('Error updating lab result:', error);
+            throw error;
+        }
+    }
+    /**
+     * Update laboratory request status
+     */
+    async updateLabRequestStatus(requestId: string, status: 'ordered' | 'requested'): Promise<void> {
+        try {
+            // 1. Get existing observation
+            const response = await api.get(`${MONITORING_BASE_URL}/observations/${requestId}/`);
+            const observation: Observation = response.data;
+
+            // 2. Update status
+            const payload = {
+                ...observation,
+                status: status
+            };
+
+            // 3. Save
+            await api.put(`${MONITORING_BASE_URL}/observations/${requestId}/`, payload);
+        } catch (error) {
+            console.error('Error updating lab request status:', error);
             throw error;
         }
     }

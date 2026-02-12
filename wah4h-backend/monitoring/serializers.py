@@ -26,7 +26,10 @@ class ObservationSerializer(serializers.ModelSerializer):
     encounter = serializers.SerializerMethodField(read_only=True)
     performer = serializers.SerializerMethodField(read_only=True)
     
-    # Writable nested components field
+    # Components for reading (GET) - returns actual component data
+    components_data = serializers.SerializerMethodField(read_only=True)
+    
+    # Components for writing (POST/PUT) - accepts component array
     components = serializers.ListField(
         child=serializers.DictField(),
         required=False,
@@ -63,8 +66,9 @@ class ObservationSerializer(serializers.ModelSerializer):
             'based_on',
             'part_of',
             'note',
-            # Components (nested array for write, flattened for compatibility)
-            'components',  # Added: Write-only nested components array
+            # Components (nested array for write)
+            'components',
+            'components_data',  # Read-only: returns component data
             # Value fields
             'value_string',
             'value_boolean',
@@ -79,31 +83,6 @@ class ObservationSerializer(serializers.ModelSerializer):
             'value_sampled_data',
             'value_range_low',
             'value_range_high',
-            # Component fields (flattened for backward compatibility)
-            'component_code',
-            'component_value_quantity',
-            'component_value_codeableconcept',
-            'component_value_string',
-            'component_value_boolean',
-            'component_value_integer',
-            'component_value_range_low',
-            'component_value_range_high',
-            'component_value_ratio',
-            'component_value_sampled_data',
-            'component_value_time',
-            'component_value_datetime',
-            'component_value_period_start',
-            'component_value_period_end',
-            'component_data_absent_reason',
-            'component_interpretation',
-            # Component reference range fields
-            'component_reference_range_type',
-            'component_reference_range_text',
-            'component_reference_range_low',
-            'component_reference_range_high',
-            'component_reference_range_age_low',
-            'component_reference_range_age_high',
-            'component_reference_range_applies_to',
             # Reference range fields
             'reference_range_low',
             'reference_range_high',
@@ -161,6 +140,20 @@ class ObservationSerializer(serializers.ModelSerializer):
             }
         except Practitioner.DoesNotExist:
             return None
+    
+    def get_components_data(self, obj):
+        """Return components for this observation."""
+        from monitoring.models import ObservationComponent
+        components = ObservationComponent.objects.filter(observation=obj)
+        return [
+            {
+                "code": comp.code,
+                "value_quantity": float(comp.value_quantity) if comp.value_quantity else None,
+                "value_string": comp.value_string,
+                "value_codeableconcept": comp.value_codeableconcept,
+            }
+            for comp in components
+        ]
     
     def create(self, validated_data):
         """Create observation with nested components."""

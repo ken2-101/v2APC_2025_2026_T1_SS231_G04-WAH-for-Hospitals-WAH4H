@@ -140,6 +140,9 @@ class Inventory(TimeStampedModel):
     expiry_date = models.DateField(null=True, blank=True)
     last_restocked_datetime = models.DateTimeField(null=True, blank=True)
     created_by = models.CharField(max_length=255, null=True, blank=True)
+    manufacturer = models.CharField(max_length=255, null=True, blank=True)
+    form = models.CharField(max_length=100, null=True, blank=True)
+    description = models.TextField(null=True, blank=True) # Optional description
     
     class Meta:
         db_table = 'inventory'

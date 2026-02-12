@@ -30,10 +30,14 @@ export const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
 }) => {
   const [formData, setFormData] = useState({
     generic_name: '',
+    item_code: '',
     brand_name: '',
     description: '',
+    category: '',
+    form: '',
     quantity: 0,
     minimum_stock_level: 10,
+    unit_of_measure: 'tablet',
     unit_price: 0,
     batch_number: '',
     expiry_date: '',
@@ -46,10 +50,14 @@ export const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
     if (item) {
       setFormData({
         generic_name: item.generic_name || '',
+        item_code: item.item_code || '',
         brand_name: item.brand_name || '',
         description: item.description || '',
+        category: item.category || '',
+        form: item.form || '',
         quantity: item.quantity || 0,
         minimum_stock_level: item.minimum_stock_level || 10,
+        unit_of_measure: item.unit_of_measure || '',
         unit_price: item.unit_price || 0,
         batch_number: item.batch_number || '',
         expiry_date: item.expiry_date || '',
@@ -131,16 +139,68 @@ export const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="manufacturer">Manufacturer</Label>
-            <Input
-              id="manufacturer"
-              value={formData.manufacturer}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, manufacturer: e.target.value }))
-              }
-            />
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="category">Category</Label>
+              <Input
+                id="category"
+                value={formData.category}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, category: e.target.value }))
+                }
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="item_code">ATC Code</Label>
+              <Input
+                id="item_code"
+                value={formData.item_code}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, item_code: e.target.value }))
+                }
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="form">Form</Label>
+              <select
+                id="form"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={formData.form}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, form: e.target.value }))
+                }
+              >
+                <option value="Tablet">Tablet</option>
+                <option value="Capsule">Capsule</option>
+                <option value="Syrup">Syrup</option>
+                <option value="Injection">Injection</option>
+                <option value="Cream">Cream</option>
+                <option value="Drops">Drops</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="manufacturer">Manufacturer</Label>
+              <Input
+                id="manufacturer"
+                value={formData.manufacturer}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, manufacturer: e.target.value }))
+                }
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="unit_of_measure">Unit of Measure</Label>
+              <Input
+                id="unit_of_measure"
+                value={formData.unit_of_measure}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, unit_of_measure: e.target.value }))
+                }
+              />
+            </div>
 
           <div className="space-y-2">
             <Label htmlFor="description">Description</Label>

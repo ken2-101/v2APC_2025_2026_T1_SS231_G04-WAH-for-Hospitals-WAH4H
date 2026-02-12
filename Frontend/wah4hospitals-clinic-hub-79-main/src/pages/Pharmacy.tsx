@@ -152,6 +152,7 @@ const Pharmacy: React.FC = () => {
       setRequests(prev => prev.filter(req => req.id !== dispenseRequest.id));
     }
     // Then refresh from server to ensure consistency
+    // Re-fetch pending requests to confirm they are removed from the list
     fetchRequests();
     fetchInventory();
   };
@@ -345,11 +346,14 @@ const Pharmacy: React.FC = () => {
                     >
                       <td className="px-4 py-3">
                         <div className="font-semibold text-gray-900">{item.generic_name}</div>
-                        <div className="text-sm text-gray-600">
-                          {item.brand_name && `Brand: ${item.brand_name}`}
+                        <div className="text-xs text-gray-500">
+                          {item.item_code} • {item.form} • {item.category}
                         </div>
                         {item.manufacturer && (
                           <div className="text-xs text-gray-500">Mfr: {item.manufacturer}</div>
+                        )}
+                        {item.description && (
+                          <div className="text-xs text-gray-400 italic truncate max-w-[200px]">{item.description}</div>
                         )}
                       </td>
                       <td className="px-4 py-3">
@@ -497,6 +501,9 @@ const Pharmacy: React.FC = () => {
                       </div>
                       <div className="text-sm text-gray-600">
                         Patient: {req.admission_info?.patient_name || 'N/A'}
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        Prescribed by: {req.requested_by || 'Unknown'}
                       </div>
                       <div className="flex gap-4 mt-2">
                         <span className="text-sm">

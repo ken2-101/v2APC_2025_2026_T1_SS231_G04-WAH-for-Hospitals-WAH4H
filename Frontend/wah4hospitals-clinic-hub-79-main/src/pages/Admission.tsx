@@ -65,7 +65,11 @@ const CapacityCard = ({ name, type, occupied, total, status }: any) => {
   );
 };
 
-const AdmissionPage = () => {
+interface AdmissionPageProps {
+  onNavigate?: (path: string) => void;
+}
+
+const AdmissionPage: React.FC<AdmissionPageProps> = ({ onNavigate }) => {
   const [admissions, setAdmissions] = useState<Admission[]>([]);
   const [locations, setLocations] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -303,7 +307,7 @@ const AdmissionPage = () => {
       {activeTab === 'rooms' && <RoomManagementView locations={locations} admissions={admissions} />}
 
       {/* Modals */}
-      <AdmitPatientModal isOpen={isAdmitModalOpen} onClose={() => setIsAdmitModalOpen(false)} onSuccess={() => { setIsAdmitModalOpen(false); fetchData(); }} />
+      <AdmitPatientModal isOpen={isAdmitModalOpen} onClose={() => setIsAdmitModalOpen(false)} onSuccess={() => { setIsAdmitModalOpen(false); fetchData(); }} onNavigate={onNavigate} />
       <AdmissionDetailsModal 
         isOpen={isDetailsOpen} 
         onClose={() => setIsDetailsOpen(false)} 
