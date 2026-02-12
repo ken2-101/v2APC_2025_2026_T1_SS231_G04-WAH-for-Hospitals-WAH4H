@@ -15,7 +15,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from '@/components/ui/badge';
-import { Plus, Pill, Trash2 } from 'lucide-react';
+import { Plus, Pill, Trash2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { InventoryItem, MedicationRequest } from '@/types/pharmacy';
@@ -35,6 +35,9 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedInventoryId, setSelectedInventoryId] = useState<number | null>(null);
   const [quantity, setQuantity] = useState<number>(1);
+  const [dosage, setDosage] = useState<string>('');
+  const [route, setRoute] = useState<string>('Oral');
+  const [frequency, setFrequency] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
 
   const [statusFilter, setStatusFilter] = useState('all');
@@ -108,12 +111,27 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
       console.log('- Selected Item:', selectedItem);
       console.log('- Complete Payload:', payload);
 
-      const newReq = await pharmacyService.createRequest(payload);
+      const completePayload = {
+        ...payload,
+        notes: JSON.stringify({
+            dosage,
+            route,
+            frequency,
+            instructions: notes
+        })
+      };
+
+      console.log('Submitting medication request with detailed payload:', completePayload);
+
+      const newReq = await pharmacyService.createRequest(completePayload);
       setRequests((prev) => [...prev, newReq]);
-      toast.success('Request submitted');
+      toast.success('Prescription submitted successfully');
 
       setSelectedInventoryId(null);
       setQuantity(1);
+      setDosage('');
+      setFrequency('');
+      setRoute('Oral');
       setNotes('');
       setIsModalOpen(false);
     } catch (err: any) {
@@ -215,6 +233,9 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
                 <option value="dispensed">Dispensed</option>
                 <option value="denied">Denied</option>
             </select>
+            <Button variant="outline" size="icon" onClick={fetchRequests} title="Reload Requests">
+                <RefreshCw className="w-4 h-4" />
+            </Button>
           </div>
           {currentRole === 'doctor' && (
               <Button onClick={() => setIsModalOpen(true)} className="bg-purple-600 hover:bg-purple-700 shadow-md transition-all">
@@ -246,7 +267,20 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
 
       {/* Requests list */}
       <div className="space-y-3">
-        {filteredRequests.map((req) => (
+        {filteredRequests.map((req) => {
+            let structuredNotes: any = null;
+            let displayNotes = req.notes;
+
+            try {
+                if (req.notes && req.notes.startsWith('{')) {
+                    structuredNotes = JSON.parse(req.notes);
+                    displayNotes = structuredNotes.instructions || '';
+                }
+            } catch (e) {
+                // Not JSON, use as is
+            }
+
+            return (
             <Card key={req.id} className={`shadow-sm hover:shadow-md transition-all border-l-4 ${
                 req.status === 'cancelled' || req.status === 'denied' ? 'border-l-red-500' :
                 req.status === 'completed' || req.status === 'dispensed' ? 'border-l-green-500' :
@@ -295,20 +329,38 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
                 </div>
             </CardHeader>
             <CardContent className="space-y-3 pt-2">
-                <div className="grid grid-cols-2 gap-4">
-                <div className="bg-gray-50 rounded p-2">
-                    <span className="text-[10px] text-gray-500 uppercase tracking-wide font-bold">Quantity</span>
-                    <p className="text-sm font-semibold text-gray-900">{req.quantity}</p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div className="bg-gray-50 rounded p-2">
+                        <span className="text-[10px] text-gray-500 uppercase tracking-wide font-bold block">Quantity</span>
+                        <p className="text-sm font-semibold text-gray-900">{req.quantity}</p>
+                    </div>
+                    {structuredNotes && (
+                        <>
+                            <div className="bg-gray-50 rounded p-2">
+                                <span className="text-[10px] text-gray-500 uppercase tracking-wide font-bold block">Dosage</span>
+                                <p className="text-sm font-semibold text-gray-900">{structuredNotes.dosage || '-'}</p>
+                            </div>
+                            <div className="bg-gray-50 rounded p-2">
+                                <span className="text-[10px] text-gray-500 uppercase tracking-wide font-bold block">Frequency</span>
+                                <p className="text-sm font-semibold text-gray-900">{structuredNotes.frequency || '-'}</p>
+                            </div>
+                            <div className="bg-gray-50 rounded p-2">
+                                <span className="text-[10px] text-gray-500 uppercase tracking-wide font-bold block">Route</span>
+                                <p className="text-sm font-semibold text-gray-900">{structuredNotes.route || '-'}</p>
+                            </div>
+                        </>
+                    )}
+                    {!structuredNotes && (
+                        <div className="bg-gray-50 rounded p-2">
+                            <span className="text-[10px] text-gray-500 uppercase tracking-wide font-bold block">Request ID</span>
+                            <p className="text-sm font-mono text-gray-900">#{req.id}</p>
+                        </div>
+                    )}
                 </div>
-                <div className="bg-gray-50 rounded p-2">
-                    <span className="text-[10px] text-gray-500 uppercase tracking-wide font-bold">Request ID</span>
-                    <p className="text-sm font-mono text-gray-900">#{req.id}</p>
-                </div>
-                </div>
-                {req.notes && (
+                {displayNotes && (
                 <div className="bg-blue-50 rounded p-3 border-l-2 border-blue-300 text-xs">
-                    <span className="font-bold text-blue-700 block mb-1">Notes:</span>
-                    <p className="text-gray-700">{req.notes}</p>
+                    <span className="font-bold text-blue-700 block mb-1">Prescription Notes:</span>
+                    <p className="text-gray-700">{displayNotes}</p>
                 </div>
                 )}
             </CardContent>
@@ -316,7 +368,8 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
                 Requested on {new Date(req.requested_at || '').toLocaleDateString()}
             </CardFooter>
             </Card>
-        ))}
+            );
+        })}
       </div>
 
       {/* Request Modal */}
@@ -325,18 +378,22 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
               <Pill className="w-6 h-6 text-purple-600" />
-              Request Medication
+              Prescribe Medication
             </DialogTitle>
-            <p id="medication-request-description" className="text-sm text-gray-600 mt-2">
-              Select medication from pharmacy inventory and specify quantity needed
-            </p>
           </DialogHeader>
 
-          <div className="space-y-6 py-4">
+          <div className="space-y-4 py-2">
+            
+            {/* Semantic Banner */}
+            <div className="bg-purple-50 border border-purple-100 rounded-md p-3 flex items-center gap-2 text-sm text-purple-700 mb-4">
+                <span dangerouslySetInnerHTML={{ __html: '&#128221;' }} /> 
+                Creating FHIR MedicationRequest with intent: <span className="font-semibold">order (Prescription)</span>
+            </div>
+
             <div className="space-y-2">
               <Label className="text-sm font-semibold text-gray-700">Select Medication</Label>
               <select
-                className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-gray-50"
                 value={selectedInventoryId ?? ''}
                 onChange={(e) => setSelectedInventoryId(Number(e.target.value))}
               >
@@ -349,23 +406,63 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
               </select>
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold text-gray-700">Quantity Needed</Label>
-              <input
-                type="number"
-                className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                value={quantity}
-                onChange={(e) => setQuantity(Number(e.target.value))}
-                min={1}
-                placeholder="Enter quantity"
-              />
+            <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <Label className="text-sm font-semibold text-gray-700">Dosage</Label>
+                    <input
+                        type="text"
+                        className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        placeholder="e.g., 500mg"
+                        value={dosage}
+                        onChange={(e) => setDosage(e.target.value)}
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label className="text-sm font-semibold text-gray-700">Route</Label>
+                    <select
+                        className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
+                        value={route}
+                        onChange={(e) => setRoute(e.target.value)}
+                    >
+                        <option value="Oral">Oral</option>
+                        <option value="IV">IV (Intravenous)</option>
+                        <option value="IM">IM (Intramuscular)</option>
+                        <option value="SC">SC (Subcutaneous)</option>
+                        <option value="Topical">Topical</option>
+                        <option value="Inhalation">Inhalation</option>
+                        <option value="Drops">Drops</option>
+                    </select>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <Label className="text-sm font-semibold text-gray-700">Frequency</Label>
+                    <input
+                        type="text"
+                        className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        placeholder="e.g., TID, BID, QD"
+                        value={frequency}
+                        onChange={(e) => setFrequency(e.target.value)}
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label className="text-sm font-semibold text-gray-700">Quantity</Label>
+                    <input
+                        type="number"
+                        className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        value={quantity}
+                        onChange={(e) => setQuantity(Number(e.target.value))}
+                        min={1}
+                    />
+                </div>
             </div>
 
             <div className="space-y-2">
-              <Label className="text-sm font-semibold text-gray-700">Notes (Optional)</Label>
+              <Label className="text-sm font-semibold text-gray-700">Prescription Notes</Label>
               <textarea
                 className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent min-h-[100px]"
-                placeholder="Add any special instructions or notes for the pharmacist..."
+                placeholder="Add prescription instructions..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
               />
@@ -376,8 +473,8 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
             <Button variant="outline" onClick={() => setIsModalOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleRequest} className="bg-purple-600 hover:bg-purple-700">
-              Submit Request
+            <Button onClick={handleRequest} className="bg-purple-600 hover:bg-purple-700 text-white shadow-md">
+              Submit Prescription
             </Button>
           </DialogFooter>
         </DialogContent>

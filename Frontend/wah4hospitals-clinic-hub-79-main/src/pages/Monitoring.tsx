@@ -143,7 +143,11 @@ const Monitoring: React.FC = () => {
   const handleAddLabRequest = async (request: Omit<LabRequest, 'id'>) => {
     if (!selectedAdmission) return;
     try {
-      await monitoringService.addLaboratoryRequest(request, selectedAdmission.patientId);
+      const requestWithAdmission = {
+        ...request,
+        admissionId: selectedAdmission.id.toString(),
+      };
+      await monitoringService.addLaboratoryRequest(requestWithAdmission, selectedAdmission.patientId);
       const updatedLabRequests = await monitoringService.getLaboratoryRequests(selectedAdmission.id);
       setLabRequests(updatedLabRequests);
     } catch (err) {
@@ -409,6 +413,9 @@ const Monitoring: React.FC = () => {
                     labRequests={labRequests}
                     onAddRequest={handleAddLabRequest}
                     onUpdateResult={handleUpdateLabResult}
+                    onRefresh={() => {
+                        if (selectedAdmission) handleSelectAdmission(selectedAdmission);
+                    }}
                   />
                 </TabsContent>
 

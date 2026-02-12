@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, FileText, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { Plus, FileText, AlertCircle, CheckCircle, Clock, RefreshCw } from 'lucide-react';
 import { LabRequest, LabResult } from '../../types/monitoring';
 import { useRole } from '@/contexts/RoleContext';
 import monitoringService from '@/services/monitoringService';
@@ -16,6 +16,7 @@ interface LaboratoryTabProps {
     labRequests: LabRequest[];
     onAddRequest?: (request: Omit<LabRequest, 'id'>) => void;
     onUpdateResult?: (requestId: string, result: LabResult) => void;
+    onRefresh?: () => void;
 }
 
 const COMMON_LAB_TESTS = [
@@ -40,6 +41,7 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
     labRequests,
     onAddRequest,
     onUpdateResult,
+    onRefresh
 }) => {
     const { currentRole, canModify } = useRole();
 
@@ -176,15 +178,22 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
             {/* Header */}
             <div className="flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-gray-900">Laboratory Requests</h3>
-                {canOrderLabs && (
-                    <Button
-                        onClick={() => setIsOrderModalOpen(true)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white"
-                    >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Order Lab Test
-                    </Button>
-                )}
+                <div className="flex items-center gap-2">
+                    {onRefresh && (
+                        <Button variant="outline" size="icon" onClick={onRefresh} title="Reload Requests">
+                            <RefreshCw className="w-4 h-4" />
+                        </Button>
+                    )}
+                    {canOrderLabs && (
+                        <Button
+                            onClick={() => setIsOrderModalOpen(true)}
+                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                        >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Order Lab Test
+                        </Button>
+                    )}
+                </div>
             </div>
 
             {/* Lab Requests List */}
