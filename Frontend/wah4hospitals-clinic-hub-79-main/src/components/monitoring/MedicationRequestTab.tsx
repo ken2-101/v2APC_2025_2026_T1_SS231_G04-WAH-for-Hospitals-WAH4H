@@ -40,7 +40,18 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
   const [frequency, setFrequency] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
 
+  // Set default filter based on role
   const [statusFilter, setStatusFilter] = useState('all');
+
+  useEffect(() => {
+    if (currentRole === 'doctor') {
+      setStatusFilter('prescribed');
+    } else if (currentRole === 'nurse') {
+      setStatusFilter('pending'); // 'pending' means Requested in frontend
+    } else {
+      setStatusFilter('all');
+    }
+  }, [currentRole]);
   const [requestToDelete, setRequestToDelete] = useState<number | null>(null);
 
   const API_BASE =
@@ -156,13 +167,9 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
 
   const handleRequestFromPharmacy = async (req: MedicationRequest) => {
       try {
-          // If status is 'pending' (prescribed), update to 'active' (requested)
-          // Wait, 'pending' in frontend maps to 'active' in backend?
-          // Let's clarify:
-          // Doctor Prescribes -> Status: 'draft' (Backend) -> 'Prescribed' (Frontend)
-          // Nurse Requests -> Status: 'active' (Backend) -> 'Pending/Requested' (Frontend)
+          // If status is 'prescribed' (draft), update to 'active' (requested)
+          // 'prescribed' in frontend maps to 'draft' in backend
           
-          // Use 'active' for requested.
           await pharmacyService.updateRequestStatus(req.id, 'active');
           
           // Optimistic update
@@ -180,7 +187,7 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
       return (
         <Badge className="bg-green-100 text-green-800 border-green-200 font-semibold px-3 py-1">
           <span className="inline-block w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-          Dispensed
+          Accepted
         </Badge>
       );
     }
@@ -200,10 +207,19 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
         </Badge>
       );
     }
+    if (status === 'pending' || status === 'active') {
+      return (
+        <Badge className="bg-blue-100 text-blue-800 border-blue-200 font-semibold px-3 py-1">
+          <span className="inline-block w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+          Requested
+        </Badge>
+      );
+    }
+    // Default / Prescribed
     return (
       <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 font-semibold px-3 py-1">
-        <span className="inline-block w-2 h-2 bg-yellow-500 rounded-full mr-2 animate-pulse"></span>
-        Pending
+        <span className="inline-block w-2 h-2 bg-yellow-500 rounded-full mr-2"></span>
+        Prescribed
       </Badge>
     );
   };
@@ -228,9 +244,10 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
                 style={{ minWidth: '140px' }}
             >
                 <option value="all">All Requests</option>
-                <option value="pending">Pending</option>
+                <option value="prescribed">Prescribed (Draft)</option>
+                <option value="pending">Requested (Active)</option>
                 <option value="approved">Approved</option>
-                <option value="dispensed">Dispensed</option>
+                <option value="dispensed">Accepted</option>
                 <option value="denied">Denied</option>
             </select>
             <Button variant="outline" size="icon" onClick={fetchRequests} title="Reload Requests">
@@ -307,7 +324,7 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
                 <div className="flex items-center gap-2">
                     {getStatusBadge(req.status)}
                     {/* Nurse Action: Request from Pharmacy (for Prescribed items) */}
-                    {currentRole === 'nurse' && req.status === 'pending' && (
+                    {currentRole === 'nurse' && (req.status === 'prescribed' || req.status === 'draft') && (
                         <Button
                             size="sm"
                             className="bg-purple-600 hover:bg-purple-700 text-white ml-2"
@@ -336,18 +353,24 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
                     </div>
                     {structuredNotes && (
                         <>
+                            {structuredNotes.dosage && (
                             <div className="bg-gray-50 rounded p-2">
                                 <span className="text-[10px] text-gray-500 uppercase tracking-wide font-bold block">Dosage</span>
-                                <p className="text-sm font-semibold text-gray-900">{structuredNotes.dosage || '-'}</p>
+                                <p className="text-sm font-semibold text-gray-900">{structuredNotes.dosage}</p>
                             </div>
+                            )}
+                            {structuredNotes.frequency && (
                             <div className="bg-gray-50 rounded p-2">
                                 <span className="text-[10px] text-gray-500 uppercase tracking-wide font-bold block">Frequency</span>
-                                <p className="text-sm font-semibold text-gray-900">{structuredNotes.frequency || '-'}</p>
+                                <p className="text-sm font-semibold text-gray-900">{structuredNotes.frequency}</p>
                             </div>
+                            )}
+                            {structuredNotes.route && (
                             <div className="bg-gray-50 rounded p-2">
                                 <span className="text-[10px] text-gray-500 uppercase tracking-wide font-bold block">Route</span>
-                                <p className="text-sm font-semibold text-gray-900">{structuredNotes.route || '-'}</p>
+                                <p className="text-sm font-semibold text-gray-900">{structuredNotes.route}</p>
                             </div>
+                            )}
                         </>
                     )}
                     {!structuredNotes && (
@@ -357,15 +380,16 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
                         </div>
                     )}
                 </div>
-                {displayNotes && (
+                {displayNotes && displayNotes.trim() !== '' && (
                 <div className="bg-blue-50 rounded p-3 border-l-2 border-blue-300 text-xs">
                     <span className="font-bold text-blue-700 block mb-1">Prescription Notes:</span>
                     <p className="text-gray-700">{displayNotes}</p>
                 </div>
                 )}
             </CardContent>
-            <CardFooter className="pt-2 pb-2 bg-gray-50/80 text-[10px] text-center text-gray-400">
-                Requested on {new Date(req.requested_at || '').toLocaleDateString()}
+            <CardFooter className="pt-2 pb-2 bg-gray-50/80 text-[10px] text-center text-gray-400 flex justify-between px-4">
+                <span>{req.requested_by ? `Prescribed by: ${req.requested_by}` : 'Prescriber Unknown'}</span>
+                <span>{new Date(req.requested_at || '').toLocaleDateString()}</span>
             </CardFooter>
             </Card>
             );
