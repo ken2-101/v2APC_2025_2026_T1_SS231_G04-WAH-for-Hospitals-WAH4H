@@ -301,24 +301,22 @@ class WebhookService:
         self,
         webhook_data: Dict[str, Any],
         x_gateway_auth: str,
-        def process_webhook(self, request):
-            from patients.services.logging_service import LoggingService
-            from patients.services.transaction_service import TransactionService
-            # Dummy header validation
-            api_key = request.META.get('HTTP_X_API_KEY')
-            if not api_key or api_key != 'dummy-key':
-                return {'status': 'error', 'message': 'Invalid API key'}
-            transaction_id = request.META.get('HTTP_X_TRANSACTION_ID')
-            LoggingService().log_webhook_received(transaction_id, request.body)
-            # Minimal patient match simulation
-            patient_matched = True
-            TransactionService().update_transaction_status(transaction_id, 'received')
-            return {
-                'status': 'success',
-                'transaction_id': transaction_id,
-                'patient_matched': patient_matched,
-                'message': 'Webhook processed'
-            }
+    ) -> Tuple[bool, Dict]:
+        """
+        Handle POST /fhir/process-query request.
+        
+        Args:
+            webhook_data: Request body as dict
+            x_gateway_auth: X-Gateway-Auth header value
+        
+        Returns:
+            Tuple[success: bool, response: Dict]
+        """
+        # TODO: Implement
+        # 1. Validate X-Gateway-Auth signature
+        # 2. Log incoming webhook to InteroperabilityLog
+        # 3. Call ProcessQueryWebhookProcessor.process()
+        # 4. Handle async processing (queue task)
         # 5. Return success response immediately (202 Accepted)
         pass
     

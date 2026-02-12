@@ -62,15 +62,17 @@ class TransactionService:
     TRANSACTION_TIMEOUT_SECONDS = 3600  # 1 hour
     
     def __init__(self):
-            from patients.models import WAH4PCTransaction
-            self.model = WAH4PCTransaction
         """
         Initialize transaction service.
         
         TODO: Import and inject models:
         - from patients.models import WAH4PCTransaction
         """
-        pass
+        try:
+            from patients.models import WAH4PCTransaction
+            self.model = WAH4PCTransaction
+        except ImportError:
+            self.model = None
     
     def create_outbound_transaction(
         self,
@@ -110,22 +112,6 @@ class TransactionService:
         # 3. Create WAH4PCTransaction record:
         #    - transaction_id: str
         #    - type: transaction_type.value
-            import uuid
-            # Idempotency check
-            if idempotency_key:
-                existing = self.model.objects.filter(idempotency_key=idempotency_key).first()
-                if existing:
-                    return True, existing.transaction_id, None
-            transaction_id = str(uuid.uuid4())
-            tx = self.model.objects.create(
-                transaction_id=transaction_id,
-                type=transaction_type.value,
-                status='PENDING',
-                patient_id=patient_id,
-                target_provider_id=target_provider_id,
-                idempotency_key=idempotency_key
-            )
-            return True, transaction_id, None
         #    - patient_id: patient_id
         #    - target_provider_id: target_provider_id
         #    - idempotency_key: idempotency_key
@@ -166,14 +152,6 @@ class TransactionService:
         #    - transaction_id: str
         #    - type: transaction_type.value
         #    - status: RECEIVED
-            tx = self.model.objects.filter(transaction_id=transaction_id).first()
-            if not tx:
-                return False, "Transaction not found"
-            tx.status = new_status.value
-            if error_message:
-                tx.error_message = error_message
-            tx.save()
-            return True, None
         #    - created_at: now
         # 3. Save to database
         # 4. Log creation to InteroperabilityLog
