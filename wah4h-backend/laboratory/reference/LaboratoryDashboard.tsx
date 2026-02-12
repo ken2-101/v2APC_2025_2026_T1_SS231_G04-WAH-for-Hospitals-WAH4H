@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import {
+import { 
   FlaskConical, Beaker, Clock, AlertCircle, Check, X, ChevronRight,
   Plus, Search, Eye, Printer, Send, CheckCircle, PlayCircle, FileText,
   User, Calendar, AlertTriangle, Microscope, ClipboardCheck, Activity
@@ -25,11 +25,11 @@ interface DiagnosticReport {
   conclusion?: string;
   effective_datetime?: string;
   issued_datetime?: string;
-
+  
   // Lifecycle tracking (custom)
   lifecycleStatus: 'pending' | 'received' | 'in-progress' | 'completed' | 'released';
   priority: 'routine' | 'urgent' | 'stat';
-
+  
   // Lab technician who released results
   releasedBy?: string;
   orderedBy: string; // Doctor name
@@ -42,7 +42,7 @@ interface DiagnosticReport {
   processedAt?: string;
   releasedAt?: string;
   clinicalReason?: string;
-
+  
   // Results
   results?: DiagnosticReportResult[];
 }
@@ -76,7 +76,7 @@ interface ResultFormState {
   wbc?: string;
   hematocrit?: string;
   platelets?: string;
-
+  
   // Urinalysis specific
   color?: string;
   clarity?: string;
@@ -87,11 +87,11 @@ interface ResultFormState {
   ketones?: string;
   blood?: string;
   leukocytes?: string;
-
+  
   // Generic
   findings?: string;
   interpretation?: string;
-
+  
   // Technician details
   technicianName?: string;
   technicianLicense?: string;
@@ -286,11 +286,11 @@ export default function LaboratoryDashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<'all' | 'routine' | 'urgent' | 'stat'>('all');
   const [selectedRequest, setSelectedRequest] = useState<DiagnosticReport | null>(null);
-
+  
   // Modal states
   const [showEncodeModal, setShowEncodeModal] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
-
+  
   // Result form state
   const [resultForm, setResultForm] = useState<ResultFormState>({
     technicianName: '',
@@ -307,11 +307,11 @@ export default function LaboratoryDashboard() {
     const updatedRequests = labRequests.map(req =>
       req.diagnostic_report_id === requestId
         ? {
-          ...req,
-          lifecycleStatus: 'received' as const,
-          receivedBy: 'Med Tech Sarah Lee',
-          receivedAt: new Date().toISOString()
-        }
+            ...req,
+            lifecycleStatus: 'received' as const,
+            receivedBy: 'Med Tech Sarah Lee',
+            receivedAt: new Date().toISOString()
+          }
         : req
     );
     setLabRequests(updatedRequests);
@@ -415,15 +415,15 @@ export default function LaboratoryDashboard() {
     const updatedRequests = labRequests.map(req =>
       req.diagnostic_report_id === selectedRequest.diagnostic_report_id
         ? {
-          ...req,
-          status: 'final' as const,
-          lifecycleStatus: 'completed' as const,
-          processedBy: resultForm.technicianName,
-          processedAt: new Date().toISOString(),
-          issued_datetime: new Date().toISOString(),
-          conclusion,
-          results
-        }
+            ...req,
+            status: 'final' as const,
+            lifecycleStatus: 'completed' as const,
+            processedBy: resultForm.technicianName,
+            processedAt: new Date().toISOString(),
+            issued_datetime: new Date().toISOString(),
+            conclusion,
+            results
+          }
         : req
     );
 
@@ -442,11 +442,11 @@ export default function LaboratoryDashboard() {
     const updatedRequests = labRequests.map(req =>
       req.diagnostic_report_id === requestId
         ? {
-          ...req,
-          lifecycleStatus: 'released' as const,
-          releasedAt: new Date().toISOString(),
-          releasedBy: 'Med Tech Sarah Lee'
-        }
+            ...req,
+            lifecycleStatus: 'released' as const,
+            releasedAt: new Date().toISOString(),
+            releasedBy: 'Med Tech Sarah Lee'
+          }
         : req
     );
     setLabRequests(updatedRequests);
@@ -467,7 +467,7 @@ export default function LaboratoryDashboard() {
   }).length;
 
   const filteredRequests = labRequests.filter(req => {
-    const matchesSearch =
+    const matchesSearch = 
       req.subject_display.toLowerCase().includes(searchTerm.toLowerCase()) ||
       req.subject_patient_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       req.identifier.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -475,7 +475,7 @@ export default function LaboratoryDashboard() {
 
     const matchesPriority = priorityFilter === 'all' || req.priority === priorityFilter;
 
-    const matchesTab =
+    const matchesTab = 
       (activeTab === 'pending' && req.lifecycleStatus === 'pending') ||
       (activeTab === 'in-progress' && (req.lifecycleStatus === 'received' || req.lifecycleStatus === 'in-progress')) ||
       (activeTab === 'completed' && req.lifecycleStatus === 'completed') ||
@@ -488,9 +488,42 @@ export default function LaboratoryDashboard() {
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
+      {/* Header */}
+      <header className="bg-white border-b border-gray-200 px-6 py-4 flex-shrink-0">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-purple-400 rounded-lg flex items-center justify-center">
+                <Beaker className="text-white" size={24} />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">WAH4H Laboratory</h1>
+                <p className="text-xs text-gray-500">FHIR DiagnosticReport Processing</p>
+              </div>
+            </div>
+            
+            <div className="ml-8 flex items-center gap-2 text-sm text-gray-600">
+              <span className="cursor-pointer hover:text-gray-900">Dashboard</span>
+              <ChevronRight size={16} />
+              <span className="font-medium text-purple-600">Laboratory</span>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-white font-medium text-sm">
+              DU
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-medium text-gray-900">Demo User</p>
+              <p className="text-xs text-gray-500">Administrator</p>
+            </div>
+          </div>
+        </div>
+      </header>
+
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden p-2">
-        <div className="h-full flex flex-col">
+      <div className="flex-1 overflow-hidden p-6">
+        <div className="max-w-7xl mx-auto h-full flex flex-col">
           {/* Page Title */}
           <div className="mb-6">
             <h2 className="text-2xl font-bold text-gray-900">Laboratory Information System</h2>
@@ -569,17 +602,19 @@ export default function LaboratoryDashboard() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setActiveTab('pending')}
-                className={`px-6 py-2.5 rounded-lg font-medium transition-all ${activeTab === 'pending'
-                  ? 'bg-orange-500 text-white shadow-md'
-                  : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
-                  }`}
+                className={`px-6 py-2.5 rounded-lg font-medium transition-all ${
+                  activeTab === 'pending'
+                    ? 'bg-orange-500 text-white shadow-md'
+                    : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+                }`}
               >
                 <div className="flex items-center gap-2">
                   <Clock size={18} />
                   <span>Pending</span>
                   {pendingCount > 0 && (
-                    <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-semibold ${activeTab === 'pending' ? 'bg-orange-600 text-white' : 'bg-orange-100 text-orange-700'
-                      }`}>
+                    <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                      activeTab === 'pending' ? 'bg-orange-600 text-white' : 'bg-orange-100 text-orange-700'
+                    }`}>
                       {pendingCount}
                     </span>
                   )}
@@ -587,17 +622,19 @@ export default function LaboratoryDashboard() {
               </button>
               <button
                 onClick={() => setActiveTab('in-progress')}
-                className={`px-6 py-2.5 rounded-lg font-medium transition-all ${activeTab === 'in-progress'
-                  ? 'bg-blue-500 text-white shadow-md'
-                  : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
-                  }`}
+                className={`px-6 py-2.5 rounded-lg font-medium transition-all ${
+                  activeTab === 'in-progress'
+                    ? 'bg-blue-500 text-white shadow-md'
+                    : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+                }`}
               >
                 <div className="flex items-center gap-2">
                   <Activity size={18} />
                   <span>In-Progress</span>
                   {inProgressCount > 0 && (
-                    <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-semibold ${activeTab === 'in-progress' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700'
-                      }`}>
+                    <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                      activeTab === 'in-progress' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700'
+                    }`}>
                       {inProgressCount}
                     </span>
                   )}
@@ -605,17 +642,19 @@ export default function LaboratoryDashboard() {
               </button>
               <button
                 onClick={() => setActiveTab('completed')}
-                className={`px-6 py-2.5 rounded-lg font-medium transition-all ${activeTab === 'completed'
-                  ? 'bg-purple-500 text-white shadow-md'
-                  : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
-                  }`}
+                className={`px-6 py-2.5 rounded-lg font-medium transition-all ${
+                  activeTab === 'completed'
+                    ? 'bg-purple-500 text-white shadow-md'
+                    : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+                }`}
               >
                 <div className="flex items-center gap-2">
                   <ClipboardCheck size={18} />
                   <span>Completed</span>
                   {completedCount > 0 && (
-                    <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-semibold ${activeTab === 'completed' ? 'bg-purple-600 text-white' : 'bg-purple-100 text-purple-700'
-                      }`}>
+                    <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                      activeTab === 'completed' ? 'bg-purple-600 text-white' : 'bg-purple-100 text-purple-700'
+                    }`}>
                       {completedCount}
                     </span>
                   )}
@@ -623,10 +662,11 @@ export default function LaboratoryDashboard() {
               </button>
               <button
                 onClick={() => setActiveTab('released')}
-                className={`px-6 py-2.5 rounded-lg font-medium transition-all ${activeTab === 'released'
-                  ? 'bg-green-500 text-white shadow-md'
-                  : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
-                  }`}
+                className={`px-6 py-2.5 rounded-lg font-medium transition-all ${
+                  activeTab === 'released'
+                    ? 'bg-green-500 text-white shadow-md'
+                    : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+                }`}
               >
                 <div className="flex items-center gap-2">
                   <Send size={18} />
@@ -709,18 +749,20 @@ export default function LaboratoryDashboard() {
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {filteredRequests.map((request) => (
-                      <tr
-                        key={request.diagnostic_report_id}
-                        className={`hover:bg-gray-50 ${request.priority === 'stat' ? 'border-l-4 border-red-500 bg-red-50' : ''
-                          }`}
+                      <tr 
+                        key={request.diagnostic_report_id} 
+                        className={`hover:bg-gray-50 ${
+                          request.priority === 'stat' ? 'border-l-4 border-red-500 bg-red-50' : ''
+                        }`}
                       >
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-purple-600">{request.identifier}</span>
-                            <span className={`px-2 py-0.5 rounded text-xs font-semibold ${request.code_code === 'CBC' ? 'bg-blue-100 text-blue-700' :
+                            <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                              request.code_code === 'CBC' ? 'bg-blue-100 text-blue-700' :
                               request.code_code === 'URINALYSIS' ? 'bg-yellow-100 text-yellow-700' :
-                                'bg-gray-100 text-gray-700'
-                              }`}>
+                              'bg-gray-100 text-gray-700'
+                            }`}>
                               {request.code_code}
                             </span>
                           </div>
@@ -738,10 +780,11 @@ export default function LaboratoryDashboard() {
                           )}
                         </td>
                         <td className="px-6 py-4">
-                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${request.priority === 'stat' ? 'bg-red-100 text-red-700' :
+                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                            request.priority === 'stat' ? 'bg-red-100 text-red-700' :
                             request.priority === 'urgent' ? 'bg-orange-100 text-orange-700' :
-                              'bg-blue-100 text-blue-700'
-                            }`}>
+                            'bg-blue-100 text-blue-700'
+                          }`}>
                             {request.priority.toUpperCase()}
                           </span>
                         </td>
@@ -1181,10 +1224,11 @@ export default function LaboratoryDashboard() {
                     </div>
                     <div className="flex">
                       <span className="font-semibold text-gray-700 w-32">Priority:</span>
-                      <span className={`font-medium ${selectedRequest.priority === 'stat' ? 'text-red-600' :
+                      <span className={`font-medium ${
+                        selectedRequest.priority === 'stat' ? 'text-red-600' :
                         selectedRequest.priority === 'urgent' ? 'text-orange-600' :
-                          'text-blue-600'
-                        }`}>
+                        'text-blue-600'
+                      }`}>
                         {selectedRequest.priority.toUpperCase()}
                       </span>
                     </div>
@@ -1195,15 +1239,15 @@ export default function LaboratoryDashboard() {
                     <div className="flex">
                       <span className="font-semibold text-gray-700 w-32">Completed At:</span>
                       <span className="text-gray-900">
-                        {selectedRequest.processedAt
+                        {selectedRequest.processedAt 
                           ? new Date(selectedRequest.processedAt).toLocaleString('en-US', {
-                            year: 'numeric',
-                            month: '2-digit',
-                            day: '2-digit',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            hour12: false
-                          })
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: false
+                            })
                           : 'N/A'}
                       </span>
                     </div>
@@ -1243,11 +1287,12 @@ export default function LaboratoryDashboard() {
                         </thead>
                         <tbody>
                           {selectedRequest.results.map((result, index) => (
-                            <tr
+                            <tr 
                               key={index}
-                              className={`border-b border-gray-200 ${result.flag === 'HIGH' || result.flag === 'LOW' ? 'bg-red-50' :
+                              className={`border-b border-gray-200 ${
+                                result.flag === 'HIGH' || result.flag === 'LOW' ? 'bg-red-50' : 
                                 index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                                }`}
+                              }`}
                             >
                               <td className="px-4 py-2.5 font-medium text-gray-900">
                                 {result.parameter}
@@ -1263,11 +1308,12 @@ export default function LaboratoryDashboard() {
                               </td>
                               <td className="px-4 py-2.5 text-center">
                                 {result.flag && result.flag !== 'NORMAL' ? (
-                                  <span className={`inline-block px-3 py-1 rounded text-xs font-bold ${result.flag === 'HIGH' ? 'bg-red-600 text-white' :
+                                  <span className={`inline-block px-3 py-1 rounded text-xs font-bold ${
+                                    result.flag === 'HIGH' ? 'bg-red-600 text-white' :
                                     result.flag === 'LOW' ? 'bg-orange-600 text-white' :
-                                      result.flag === 'CRITICAL' ? 'bg-red-700 text-white' :
-                                        'bg-gray-200 text-gray-700'
-                                    }`}>
+                                    result.flag === 'CRITICAL' ? 'bg-red-700 text-white' :
+                                    'bg-gray-200 text-gray-700'
+                                  }`}>
                                     {result.flag}
                                   </span>
                                 ) : null}
@@ -1321,16 +1367,16 @@ export default function LaboratoryDashboard() {
                     <div className="flex justify-between items-center text-xs text-gray-500">
                       <div>
                         <p>Reported by: {selectedRequest.processedBy || 'Lab Tech Maria Santos'}</p>
-                        <p>Report Date: {selectedRequest.processedAt
+                        <p>Report Date: {selectedRequest.processedAt 
                           ? new Date(selectedRequest.processedAt).toLocaleString('en-US', {
-                            year: 'numeric',
-                            month: '2-digit',
-                            day: '2-digit',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            second: '2-digit',
-                            hour12: false
-                          }) + 'Z'
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit',
+                              hour12: false
+                            }) + 'Z'
                           : 'N/A'}</p>
                       </div>
                       <div className="text-right">
