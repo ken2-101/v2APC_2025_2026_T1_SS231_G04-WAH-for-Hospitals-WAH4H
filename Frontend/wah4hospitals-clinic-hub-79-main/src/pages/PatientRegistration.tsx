@@ -15,7 +15,7 @@ import type { Patient, PatientFormData } from '../types/patient';
 import axios from 'axios';
 
 // NOTE: Ensure trailing slash for Django
-const API_URL = 'https://refactored-space-acorn-5vgw47g7rwr39v5-8000.app.github.dev/api/patients/';
+const API_URL = import.meta.env.BACKEND_PATIENTS;
 
 export const PatientRegistration: React.FC = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
