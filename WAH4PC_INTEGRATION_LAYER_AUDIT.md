@@ -279,7 +279,7 @@ def send_to_wah4pc(request):
         return Response({'error': 'Patient not found'}, status=status.HTTP_404_NOT_FOUND)
 ```
 
-**Expected Request Body:**
+**Expected Request Body:    
 ```json
 {
   "patientId": 123,
@@ -2069,4 +2069,481 @@ def get_transaction(request, transaction_id):
   "error": "PhilHealth ID required for synchronization"
 }
 ```
+
+---
+
+# APPENDIX B: WAH4PC v1.0.0 TRANSACTION FLOW — EXACT JSON STRUCTURES
+
+**Alignment:** WAH4PC Gateway v1.0.0 Transaction Flow API  
+**Focus:** Request/Response JSON structures per specification  
+**Scope:** No refactoring, documentation alignment only
+
+---
+
+## TASK 1: OUTBOUND REQUEST STRUCTURE
+
+### Scenario A: WAH4H requests Patient from WAH4Clinic
+
+**HTTP Request:**
+```
+POST https://wah4pc.echosphere.cfd/api/v1/fhir/request/Patient
+Content-Type: application/json
+X-API-Key: (WAH4PC_API_KEY from env)
+X-Provider-ID: (WAH4PC_PROVIDER_ID of WAH4H)
+Idempotency-Key: (uuid auto-generated)
+```
+
+**Request Body JSON:**
+```json
+{
+  "requesterId": "wah4h-provider-uuid",
+  "targetId": "wah4clinic-provider-uuid",
+  "identifiers": [
+    {
+      "system": "http://philhealth.gov.ph",
+      "value": "PHI-00001234567"
+    }
+  ],
+  "resourceType": "Patient"
+}
+```
+
+**Code Source:** [patients/services/fhir_service.py: request_patient()](patients/services/fhir_service.py#L74-L103)
+
+---
+
+### Scenario B: WAH4H requests Patient from WAH4H2
+
+**HTTP Request:**
+```
+POST https://wah4pc.echosphere.cfd/api/v1/fhir/request/Patient
+Content-Type: application/json
+X-API-Key: (WAH4PC_API_KEY)
+X-Provider-ID: (WAH4PC_PROVIDER_ID of WAH4H)
+Idempotency-Key: (uuid auto-generated)
+```
+
+**Request Body JSON:**
+```json
+{
+  "requesterId": "wah4h-provider-uuid",
+  "targetId": "wah4h2-provider-uuid",
+  "identifiers": [
+    {
+      "system": "http://philhealth.gov.ph",
+      "value": "PHI-00001234567"
+    }
+  ],
+  "resourceType": "Patient"
+}
+```
+
+---
+
+### Scenario C: WAH4P requests Patient from WAH4H
+
+**HTTP Request (Gateway to WAH4H):**
+```
+POST https://wah4h-backend/fhir/process-query
+Content-Type: application/json
+X-Gateway-Auth: (GATEWAY_AUTH_KEY from env)
+```
+
+**Request Body JSON:**
+```json
+{
+  "transactionId": "gateway-query-txn-uuid",
+  "identifiers": [
+    {
+      "system": "http://philhealth.gov.ph",
+      "value": "PHI-00001234567"
+    }
+  ],
+  "requesterId": "wah4p-provider-uuid",
+  "resourceType": "Patient",
+  "gatewayReturnUrl": "https://wah4pc.echosphere.cfd/api/v1/fhir/receive/Patient"
+}
+```
+
+**Note:** This is webhook FROM gateway TO us, not outbound request.
+
+---
+
+## TASK 2: GATEWAY RESPONSE STRUCTURE — 202 Accepted
+
+### When WAH4H sends request to gateway
+
+**HTTP Response:**
+```
+HTTP/1.1 202 Accepted
+Content-Type: application/json
+```
+
+**Response Body JSON:**
+```json
+{
+  "id": "gateway-transaction-uuid-12345",
+  "status": "PROCESSING",
+  "requesterId": "wah4h-provider-uuid",
+  "targetId": "wah4h2-provider-uuid",
+  "resourceType": "Patient",
+  "metadata": {
+    "identifiers": [
+      {
+        "system": "http://philhealth.gov.ph",
+        "value": "PHI-00001234567"
+      }
+    ]
+  },
+  "createdAt": "2025-02-13T10:00:00Z",
+  "expiresAt": "2025-02-13T10:30:00Z"
+}
+```
+
+**WAH4H Transaction Created:**
+```json
+{
+  "id": 1,
+  "transaction_id": "gateway-transaction-uuid-12345",
+  "type": "fetch",
+  "status": "PENDING",
+  "target_provider_id": "wah4h2-provider-uuid",
+  "idempotency_key": "auto-generated-uuid",
+  "created_at": "2025-02-13T10:00:00Z"
+}
+```
+
+**Code Source:** [patients/api/views.py: fetch_wah4pc()](patients/api/views.py#L619-L652)
+
+---
+
+## TASK 3: WEBHOOK — /fhir/process-query (When We Are Target)
+
+### Scenario A: WAH4H2 requests from us
+
+**HTTP Webhook:**
+```
+POST https://wah4h-backend/fhir/process-query
+Content-Type: application/json
+X-Gateway-Auth: (GATEWAY_AUTH_KEY)
+X-Request-ID: (request tracking ID)
+```
+
+**Webhook Payload JSON:**
+```json
+{
+  "transactionId": "gateway-query-txn-uuid",
+  "requesterId": "wah4h2-provider-uuid",
+  "resourceType": "Patient",
+  "identifiers": [
+    {
+      "system": "http://philhealth.gov.ph",
+      "value": "PHI-00001234567"
+    }
+  ],
+  "callbackUrl": "https://wah4pc.echosphere.cfd/api/v1/fhir/receive/Patient",
+  "requestedAt": "2025-02-13T10:00:00Z"
+}
+```
+
+**Code Source:** [patients/api/views.py: webhook_process_query()](patients/api/views.py#L826-L905)
+
+---
+
+### Scenario B: WAH4P requests from us
+
+**HTTP Webhook:**
+```
+POST https://wah4h-backend/fhir/process-query
+Content-Type: application/json
+X-Gateway-Auth: (GATEWAY_AUTH_KEY)
+```
+
+**Webhook Payload JSON:**
+```json
+{
+  "transactionId": "gateway-query-txn-uuid-from-wah4p",
+  "requesterId": "wah4p-provider-uuid",
+  "resourceType": "Patient",
+  "identifiers": [
+    {
+      "system": "http://philhealth.gov.ph",
+      "value": "PHI-00001234567"
+    },
+    {
+      "system": "urn:example:mrn",
+      "value": "MRN-98765"
+    }
+  ],
+  "callbackUrl": "https://wah4pc.echosphere.cfd/api/v1/fhir/receive/Patient",
+  "requestedAt": "2025-02-13T10:05:00Z"
+}
+```
+
+---
+
+## TASK 4: CALLBACK TO GATEWAY — POST /api/v1/fhir/receive/Patient
+
+### When We Return Patient Data to Gateway
+
+**HTTP Callback Request (We send this):**
+```
+POST https://wah4pc.echosphere.cfd/api/v1/fhir/receive/Patient
+Content-Type: application/json
+X-API-Key: (WAH4PC_API_KEY)
+X-Provider-ID: (WAH4PC_PROVIDER_ID)
+Idempotency-Key: (auto-generated uuid)
+```
+
+**Request Body JSON (Success Case):**
+```json
+{
+  "transactionId": "gateway-query-txn-uuid",
+  "status": "success",
+  "resourceType": "Patient",
+  "data": {
+    "resourceType": "Bundle",
+    "type": "searchset",
+    "total": 1,
+    "entry": [
+      {
+        "resource": {
+          "resourceType": "Patient",
+          "id": "123",
+          "identifier": [
+            {
+              "type": {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/v2-0203",
+                    "code": "SB",
+                    "display": "Social Beneficiary Identifier"
+                  }
+                ]
+              },
+              "system": "http://philhealth.gov.ph",
+              "value": "PHI-00001234567"
+            },
+            {
+              "type": {
+                "coding": [
+                  {
+                    "system": "http://terminology.hl7.org/CodeSystem/v2-0203",
+                    "code": "MR",
+                    "display": "Medical record number"
+                  }
+                ]
+              },
+              "system": "https://wah4pc.echosphere.cfd/providers/wah4h-provider-uuid",
+              "value": "123"
+            }
+          ],
+          "name": [
+            {
+              "use": "official",
+              "family": "Doe",
+              "given": ["John", "M"]
+            }
+          ],
+          "gender": "male",
+          "birthDate": "1990-01-15",
+          "active": true,
+          "telecom": [
+            {
+              "system": "phone",
+              "value": "+63912345678",
+              "use": "mobile"
+            }
+          ],
+          "address": [
+            {
+              "use": "home",
+              "line": ["123 Main Street"],
+              "city": "Manila",
+              "district": "NCR",
+              "state": "National Capital Region",
+              "postalCode": "1000",
+              "country": "Philippines"
+            }
+          ],
+          "maritalStatus": {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/v3-MaritalStatus",
+                "code": "M"
+              }
+            ]
+          },
+          "contact": [
+            {
+              "relationship": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://terminology.hl7.org/CodeSystem/v2-0131",
+                      "code": "C"
+                    }
+                  ],
+                  "text": "Emergency Contact"
+                }
+              ],
+              "name": {
+                "family": "Doe",
+                "given": ["Jane"]
+              },
+              "telecom": [
+                {
+                  "system": "phone",
+                  "value": "+63912345679"
+                }
+              ]
+            }
+          ],
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/patient-religion",
+              "valueCodeableConcept": {
+                "text": "Catholic"
+              }
+            },
+            {
+              "url": "urn://example.com/ph-core/fhir/StructureDefinition/occupation",
+              "valueCodeableConcept": {
+                "text": "Engineer"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
+```
+
+**Code Source:** [patients/api/views.py: webhook_process_query()](patients/api/views.py#L875-L904)
+
+---
+
+### When We Return "Not Found" to Gateway
+
+**HTTP Callback Request (We send this):**
+```
+POST https://wah4pc.echosphere.cfd/api/v1/fhir/receive/Patient
+Content-Type: application/json
+X-API-Key: (WAH4PC_API_KEY)
+X-Provider-ID: (WAH4PC_PROVIDER_ID)
+Idempotency-Key: (auto-generated uuid)
+```
+
+**Request Body JSON (Not Found Case):**
+```json
+{
+  "transactionId": "gateway-query-txn-uuid",
+  "status": "rejected",
+  "resourceType": "Patient",
+  "data": {
+    "error": "Patient not found",
+    "identifiers": [
+      {
+        "system": "http://philhealth.gov.ph",
+        "value": "PHI-00001234567"
+      }
+    ]
+  }
+}
+```
+
+---
+
+## TASK 5: FINAL STATUS POLL RESPONSE
+
+### GET /api/v1/transactions/{transactionId} — Status = COMPLETED
+
+**HTTP Request (Gateway sends):**
+```
+GET https://wah4h-backend/api/patients/wah4pc/transactions/gateway-transaction-uuid-12345
+Content-Type: application/json
+```
+
+**WAH4H Transaction Record (Current State):**
+```json
+{
+  "id": 1,
+  "transaction_id": "gateway-transaction-uuid-12345",
+  "type": "fetch",
+  "status": "COMPLETED",
+  "patient_id": 123,
+  "target_provider_id": "wah4h2-provider-uuid",
+  "idempotency_key": "auto-generated-uuid",
+  "error_message": null,
+  "created_at": "2025-02-13T10:00:00Z",
+  "updated_at": "2025-02-13T10:05:30Z"
+}
+```
+
+**HTTP Response (From WAH4H):**
+```
+HTTP/1.1 200 OK
+Content-Type: application/json
+```
+
+**Response Body JSON:**
+```json
+{
+  "id": "gateway-transaction-uuid-12345",
+  "type": "fetch",
+  "status": "COMPLETED",
+  "patientId": 123,
+  "targetProviderId": "wah4h2-provider-uuid",
+  "error": null,
+  "idempotencyKey": "auto-generated-uuid",
+  "createdAt": "2025-02-13T10:00:00Z",
+  "updatedAt": "2025-02-13T10:05:30Z"
+}
+```
+
+**Code Source:** [patients/api/views.py: get_transaction()](patients/api/views.py#L971-L988)
+
+---
+
+### GET /api/v1/transactions/{transactionId} — Status = FAILED
+
+**HTTP Request (Gateway sends):**
+```
+GET https://wah4h-backend/api/patients/wah4pc/transactions/gateway-transaction-uuid-failed
+```
+
+**HTTP Response (From WAH4H):**
+```
+HTTP/1.1 200 OK
+Content-Type: application/json
+```
+
+**Response Body JSON:**
+```json
+{
+  "id": "gateway-transaction-uuid-failed",
+  "type": "fetch",
+  "status": "FAILED",
+  "patientId": null,
+  "targetProviderId": "wah4h2-provider-uuid",
+  "error": "Patient not found at target provider",
+  "idempotencyKey": "auto-generated-uuid",
+  "createdAt": "2025-02-13T10:00:00Z",
+  "updatedAt": "2025-02-13T10:03:45Z"
+}
+```
+
+---
+
+## SUMMARY: WAH4PC v1.0.0 INTEGRATION POINTS
+
+| Flow | Endpoint | Method | Body | Response |
+|------|----------|--------|------|----------|
+| **Request Patient (We →)** | `/api/v1/fhir/request/Patient` | POST | requesterId, targetId, identifiers, resourceType | 202 {id, status, resourceType} |
+| **Query Request (← We)** | `/fhir/process-query` | POST | transactionId, requesterId, identifiers, callbackUrl | 200 {message} |
+| **Query Response (We →)** | `/api/v1/fhir/receive/Patient` | POST | transactionId, status, resourceType, data (Bundle) | 202 Accepted |
+| **Poll Transaction** | `/api/v1/transactions/{id}` | GET | (none) | 200 {id, status, error, data} |
+
+All JSON structures align to WAH4PC Gateway v1.0.0 specification.
 
