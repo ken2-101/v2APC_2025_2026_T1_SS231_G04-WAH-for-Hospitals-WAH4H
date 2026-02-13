@@ -1,5 +1,5 @@
 // PatientRegistration.tsx
-import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
+import React, { useState, useEffect, useCallback, useRef, ChangeEvent, FormEvent } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,14 +32,14 @@ export const PatientRegistration: React.FC = () => {
     last_name: '',
     middle_name: '',
     suffix_name: '',
-    gender: 'M',
+    gender: 'unknown',
     birthdate: '',
-    civil_status: '',
+    civil_status: 'S',
     nationality: '',
     religion: '',
     philhealth_id: '',
-    blood_type: '',
-    pwd_type: '',
+    blood_type: undefined,
+    pwd_type: undefined,
     occupation: '',
     education: '',
     mobile_number: '',
@@ -72,8 +72,27 @@ export const PatientRegistration: React.FC = () => {
   const [transactionError, setTransactionError] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
   const [pollTimeoutError, setPollTimeoutError] = useState(false);
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fetch providers from WAH4PC gateway
+  // Fetch patients - defined before useEffect that calls it
+  const fetchPatients = useCallback(async () => {
+    try {
+      const res = await axios.get<Patient[]>(API_URL);
+      setPatients(Array.isArray(res.data) ? res.data : []);
+      setFilteredPatients(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error('Error fetching patients:', err);
+      setPatients([]);
+      setFilteredPatients([]);
+    }
+  }, []);
+
+  // Fetch initial patients on mount
+  useEffect(() => {
+    fetchPatients();
+  }, [fetchPatients]);
+
+  // Fetch providers from WAH4PC gateway (only once on mount)
   useEffect(() => {
     const fetchProviders = async () => {
       try {
@@ -87,6 +106,16 @@ export const PatientRegistration: React.FC = () => {
     fetchProviders();
   }, []);
 
+  // Cleanup polling interval on component unmount
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, []);
+
   /**
    * Poll transaction status until COMPLETED, FAILED, or timeout (60 seconds)
    * Polls every 3 seconds
@@ -97,7 +126,13 @@ export const PatientRegistration: React.FC = () => {
     let pollCount = 0;
     const maxPolls = 20; // 20 * 3 seconds = 60 seconds timeout
 
-    const pollInterval = setInterval(async () => {
+    // Clear any existing interval first
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+
+    pollIntervalRef.current = setInterval(async () => {
       try {
         pollCount++;
 
@@ -109,7 +144,10 @@ export const PatientRegistration: React.FC = () => {
 
         // Handle COMPLETED - fetch and load patient
         if (status === 'COMPLETED' && patientId) {
-          clearInterval(pollInterval);
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+          }
           setIsPolling(false);
 
           try {
@@ -145,7 +183,10 @@ export const PatientRegistration: React.FC = () => {
 
         // Handle FAILED
         if (status === 'FAILED') {
-          clearInterval(pollInterval);
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+          }
           setIsPolling(false);
           setTransactionError(error || 'Transaction failed');
           return;
@@ -153,7 +194,10 @@ export const PatientRegistration: React.FC = () => {
 
         // Check timeout (60 seconds)
         if (pollCount >= maxPolls) {
-          clearInterval(pollInterval);
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+          }
           setIsPolling(false);
           setPollTimeoutError(true);
           setTransactionError('Fetch request timed out. Please try again.');
@@ -172,16 +216,16 @@ export const PatientRegistration: React.FC = () => {
 
         // On critical error, stop polling
         if (pollCount >= maxPolls || err.response?.status === 500) {
-          clearInterval(pollInterval);
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+          }
           setIsPolling(false);
           setTransactionError('Failed to poll transaction status');
           return;
         }
       }
     }, 3000); // Poll every 3 seconds
-
-    // Cleanup function for component unmount
-    return () => clearInterval(pollInterval);
   };
 
   const fetchFromWAH4PC = async () => {
@@ -237,20 +281,6 @@ export const PatientRegistration: React.FC = () => {
     department: [] as string[],
     civilStatus: [] as string[],
   });
-
-  // Fetch patients
-  useEffect(() => { fetchPatients(); }, []);
-  const fetchPatients = async () => {
-    try {
-      const res = await axios.get<Patient[]>(API_URL);
-      setPatients(Array.isArray(res.data) ? res.data : []);
-      setFilteredPatients(Array.isArray(res.data) ? res.data : []);
-    } catch (err) {
-      console.error('Error fetching patients:', err);
-      setPatients([]);
-      setFilteredPatients([]);
-    }
-  };
 
   // Filter & search
   useEffect(() => {
@@ -487,7 +517,6 @@ export const PatientRegistration: React.FC = () => {
           patient={editPatient}
           isOpen={!!editPatient}
           onClose={() => setEditPatient(null)}
-          fetchPatients={fetchPatients}
         />
       )}
 
