@@ -13,9 +13,16 @@ import { EditPatientModal } from '@/components/patients/EditPatientModal';
 import { DeletePatientModal } from '@/components/patients/DeletePatientModal';
 import type { Patient, PatientFormData } from '../types/patient';
 import axios from 'axios';
+import api from '@/services/api';
 
-// NOTE: Ensure trailing slash for Django
-const API_URL = import.meta.env.BACKEND_PATIENTS;
+// Use api service's baseURL + relative patients endpoint (ensures auth headers are added)
+const API_BASE =
+  import.meta.env.STURDY_ADVENTURE_BASE_8000 ||
+  import.meta.env.LOCAL_8000 ||
+  import.meta.env.STURDY_ADVENTURE_BASE;
+  
+// Relative path to patients endpoint
+const PATIENTS_ENDPOINT = '/api/patients/';
 
 export const PatientRegistration: React.FC = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -71,13 +78,16 @@ export const PatientRegistration: React.FC = () => {
   const [transactionStatus, setTransactionStatus] = useState<'PENDING' | 'COMPLETED' | 'FAILED' | null>(null);
   const [transactionError, setTransactionError] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
+  const [wah4pcReason, setWah4pcReason] = useState('Patient data request');
+  const [wah4pcNotes, setWah4pcNotes] = useState('');
+  const [wah4pcResourceType, setWah4pcResourceType] = useState('Patient');
   const [pollTimeoutError, setPollTimeoutError] = useState(false);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Fetch patients - defined before useEffect that calls it
   const fetchPatients = useCallback(async () => {
     try {
-      const res = await axios.get<Patient[]>(API_URL);
+      const res = await api.get<Patient[]>(PATIENTS_ENDPOINT);
       setPatients(Array.isArray(res.data) ? res.data : []);
       setFilteredPatients(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
@@ -96,7 +106,7 @@ export const PatientRegistration: React.FC = () => {
   useEffect(() => {
     const fetchProviders = async () => {
       try {
-        const res = await axios.get(`${API_URL}wah4pc/providers/`);
+        const res = await api.get(`${PATIENTS_ENDPOINT}wah4pc/providers/`);
         setProviders(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
         console.error('Failed to load WAH4PC providers:', err);
@@ -136,8 +146,8 @@ export const PatientRegistration: React.FC = () => {
       try {
         pollCount++;
 
-        // Fetch transaction status
-        const res = await axios.get(`${API_URL}wah4pc/transactions/${txnId}/`);
+        // Fetch transaction status (uses authenticated api service)
+        const res = await api.get(`${PATIENTS_ENDPOINT}wah4pc/transactions/${txnId}/`);
         const { status, error, patientId } = res.data;
 
         setTransactionStatus(status);
@@ -152,7 +162,7 @@ export const PatientRegistration: React.FC = () => {
 
           try {
             // Fetch the patient data
-            const patientRes = await axios.get(`${API_URL}${patientId}/`);
+            const patientRes = await api.get(`${PATIENTS_ENDPOINT}${patientId}/`);
             const newPatient = patientRes.data;
 
             // Add to patients list if not already there
@@ -244,10 +254,13 @@ export const PatientRegistration: React.FC = () => {
     setPollTimeoutError(false);
 
     try {
-      // Send fetch request to backend
-      const res = await axios.post(`${API_URL}wah4pc/fetch`, {
+      // Send fetch request to backend (uses authenticated api service)
+      const res = await api.post(`${PATIENTS_ENDPOINT}wah4pc/fetch`, {
         targetProviderId: targetProvider,
         philHealthId,
+        resourceType: wah4pcResourceType,
+        reason: wah4pcReason || 'Patient data request',
+        notes: wah4pcNotes || undefined,
       });
 
       const { transactionId: txnId } = res.data;
@@ -315,7 +328,7 @@ export const PatientRegistration: React.FC = () => {
     setFormError('');
     setFormSuccess('');
     try {
-      const res = await axios.post(API_URL, patientData);
+      const res = await api.post(PATIENTS_ENDPOINT, patientData);
       const registeredPatient: Patient = res.data;
       setFormSuccess(`Patient registered successfully! ID: ${registeredPatient.patient_id}`);
       // Don't close modal here - let modal close itself on success
@@ -405,6 +418,40 @@ export const PatientRegistration: React.FC = () => {
                   )}
                 </SelectContent>
               </Select>
+              
+              {/* Resource Type Selector */}
+              <Select value={wah4pcResourceType} onValueChange={setWah4pcResourceType} disabled={isPolling}>
+                <SelectTrigger className="max-w-xs">
+                  <SelectValue placeholder="Select Resource Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Patient">Patient</SelectItem>
+                  <SelectItem value="Condition">Condition</SelectItem>
+                  <SelectItem value="AllergyIntolerance">Allergy Intolerance</SelectItem>
+                  <SelectItem value="Immunization">Immunization</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              {/* Optional reason field */}
+              <Input
+                type="text"
+                placeholder="Reason for request (optional)"
+                value={wah4pcReason}
+                onChange={(e) => setWah4pcReason(e.target.value)}
+                disabled={isPolling}
+                className="max-w-xs"
+              />
+              
+              {/* Optional notes field */}
+              <Input
+                type="text"
+                placeholder="Additional notes (optional)"
+                value={wah4pcNotes}
+                onChange={(e) => setWah4pcNotes(e.target.value)}
+                disabled={isPolling}
+                className="max-w-xs"
+              />
+              
               <Button
                 onClick={fetchFromWAH4PC}
                 disabled={wah4pcLoading || isPolling || !philHealthId || !targetProvider}
@@ -471,6 +518,9 @@ export const PatientRegistration: React.FC = () => {
                   setPollTimeoutError(false);
                   setPhilHealthId('');
                   setTargetProvider('');
+                  setWah4pcResourceType('Patient');
+                  setWah4pcReason('Patient data request');
+                  setWah4pcNotes('');
                 }}
                 variant="outline"
                 size="sm"

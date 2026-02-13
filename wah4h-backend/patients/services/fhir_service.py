@@ -67,15 +67,21 @@ class FHIRService:
         self,
         target_id: str,
         philhealth_id: str,
+        resource_type: str = "Patient",
         idempotency_key: Optional[str] = None,
+        reason: str = "Patient data request",
+        notes: str = None,
     ) -> Dict[str, Any]:
         """
-        Request patient data from another provider via WAH4PC gateway.
+        Request FHIR resource data from another provider via WAH4PC gateway.
 
         Args:
             target_id: Target provider UUID
             philhealth_id: PhilHealth ID to search for
+            resource_type: FHIR resource type to request (defaults to "Patient")
             idempotency_key: Optional idempotency key for retry safety (generated if not provided)
+            reason: Reason for request (optional, defaults to "Patient data request")
+            notes: Additional notes about the request (optional)
 
         Returns:
             dict: Response with 'data' key on success, or 'error' and 'status_code' on failure
@@ -84,16 +90,24 @@ class FHIRService:
             idempotency_key = str(uuid.uuid4())
 
         try:
+            # Build request body with optional reason and notes
+            request_body = {
+                "requesterId": self.provider_id,
+                "targetId": target_id,
+                "identifiers": [
+                    {"system": "http://philhealth.gov.ph", "value": philhealth_id}
+                ],
+                "resourceType": resource_type,
+                "reason": reason,
+            }
+            
+            if notes:
+                request_body["notes"] = notes
+            
             response = requests.post(
-                f"{self.BASE_URL}/api/v1/fhir/request/Patient",
+                f"{self.BASE_URL}/api/v1/fhir/request/{resource_type}",
                 headers=self._build_headers(idempotency_key),
-                json={
-                    "requesterId": self.provider_id,
-                    "targetId": target_id,
-                    "identifiers": [
-                        {"system": "http://philhealth.gov.ph", "value": philhealth_id}
-                    ],
-                },
+                json=request_body,
                 timeout=self.REQUEST_TIMEOUT,
             )
 

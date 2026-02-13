@@ -8,10 +8,14 @@ Reads (GET): Delegate to PatientACL -> Format with OutputSerializer
 """
 
 import os
+import logging
+import uuid
+from django.utils import timezone
 
 from rest_framework import viewsets, status
 from rest_framework.response import Response
-from rest_framework.decorators import action, api_view
+from rest_framework.decorators import action, api_view, permission_classes, throttle_classes
+from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 
@@ -39,6 +43,7 @@ from patients.services.patients_services import (
     ClinicalDataService,
 )
 
+logger = logging.getLogger(__name__)
 
 # Initialize services
 fhir_service = FHIRService()
@@ -616,33 +621,44 @@ class ImmunizationViewSet(viewsets.ModelViewSet):
 # ============================================================================
 
 @api_view(['POST'])
+@throttle_classes([])  # Exempt WAH4PC endpoints from rate limiting
 def fetch_wah4pc(request):
-    """Fetch patient data from WAH4PC gateway."""
+    """
+    Fetch FHIR resource data from WAH4PC gateway.
+    
+    Request body:
+        targetProviderId: str (required)
+        philHealthId: str (required)
+        resourceType: str (optional, defaults to 'Patient')
+        reason: str (optional) - Why data is being requested
+        notes: str (optional) - Additional context/notes
+    """
     target_id = request.data.get('targetProviderId')
     philhealth_id = request.data.get('philHealthId')
+    resource_type = request.data.get('resourceType', 'Patient')
+    reason = request.data.get('reason', 'Patient data request')
+    notes = request.data.get('notes')
+
     if not target_id or not philhealth_id:
         return Response(
             {'error': 'targetProviderId and philHealthId are required'},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    result = fhir_service.request_patient(target_id, philhealth_id)
+    # Generate deterministic idempotency key based on target + philhealth to avoid duplicates
+    idempotency_key = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{target_id}:{philhealth_id}"))
 
-    # Handle error responses
-    if 'error' in result:
-        return Response(
-            {'error': result['error']},
-            status=result.get('status_code', 500)
-        )
+    # Idempotency guard: if there's an existing PENDING txn for same target + idempotency_key, return it
+    existing = WAH4PCTransaction.objects.filter(
+        status='PENDING',
+        target_provider_id=target_id,
+        idempotency_key=idempotency_key,
+    ).first()
+    if existing:
+        return Response({'transactionId': existing.transaction_id}, status=status.HTTP_202_ACCEPTED)
 
-    txn_id = result.get('data', {}).get('id') if 'data' in result else result.get('id')
-    idempotency_key = result.get('idempotency_key')
-
-    if not txn_id:
-        import uuid
-        txn_id = str(uuid.uuid4())
-        logger.warning(f"[Fetch] Gateway did not return transaction ID; generated fallback: {txn_id}")
-    
+    # Create local transaction BEFORE calling external gateway
+    txn_id = str(uuid.uuid4())
     WAH4PCTransaction.objects.create(
         transaction_id=txn_id,
         type='fetch',
@@ -651,10 +667,38 @@ def fetch_wah4pc(request):
         idempotency_key=idempotency_key,
     )
 
-    return Response(result, status=status.HTTP_202_ACCEPTED)
+    # Call outbound service with idempotency key
+    result = fhir_service.request_patient(
+        target_id,
+        philhealth_id,
+        resource_type=resource_type,
+        reason=reason,
+        notes=notes,
+        idempotency_key=idempotency_key,
+    )
+
+    # If outbound failed, mark transaction as FAILED and return error
+    if isinstance(result, dict) and 'error' in result:
+        try:
+            txn = WAH4PCTransaction.objects.get(transaction_id=txn_id)
+            txn.status = 'FAILED'
+            txn.error_message = result.get('error')
+            txn.save()
+        except Exception:
+            logger.exception("Failed to mark transaction as FAILED")
+
+        return Response({'error': result['error']}, status=result.get('status_code', 500))
+
+    # Keep locally generated txn_id as canonical even if gateway returns a different id
+    response_data = result.copy() if isinstance(result, dict) else {}
+    response_data['transactionId'] = txn_id
+    # Preserve idempotency_key in response if available
+    response_data['idempotency_key'] = idempotency_key
+    return Response(response_data, status=status.HTTP_202_ACCEPTED)
 
 
 @api_view(['POST'])
+@throttle_classes([])  # Exempt WAH4PC endpoints from rate limiting
 def webhook_receive(request):
     """Receive webhook from WAH4PC gateway."""
     gateway_key = os.getenv('GATEWAY_AUTH_KEY')
@@ -663,47 +707,70 @@ def webhook_receive(request):
         return Response({'error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
 
     txn_id = request.data.get('transactionId')
-    txn = WAH4PCTransaction.objects.filter(transaction_id=txn_id).first() if txn_id else None
+
+    if not txn_id:
+        return Response({'error': 'transactionId is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Ensure transaction exists and mark as RECEIVED (idempotent)
+    txn, created = WAH4PCTransaction.objects.get_or_create(
+        transaction_id=txn_id,
+        defaults={
+            'type': 'receive',
+            'status': 'RECEIVED',
+            'target_provider_id': request.data.get('senderId') or request.data.get('requesterId')
+        }
+    )
+
+    if not created:
+        # Duplicate webhook: if already completed, return 200
+        if txn.status == 'COMPLETED':
+            return Response({'message': 'Already processed'}, status=status.HTTP_200_OK)
+        # Otherwise, mark as RECEIVED to indicate we've accepted the payload
+        txn.status = 'RECEIVED'
+        txn.save()
 
     if request.data.get('status') == 'SUCCESS':
         try:
             # Parse FHIR data to local patient model
             patient_data = mapping_service.fhir_to_local_patient(request.data['data'])
-            
+
             # Extract philhealth_id (required for uniqueness constraint)
             philhealth_id = patient_data.get('philhealth_id')
             if not philhealth_id:
                 raise ValueError("PhilHealth ID is required and missing from FHIR data")
-            
+
             # Create or update patient in database (idempotent via get_or_create)
-            patient, created = Patient.objects.get_or_create(
+            patient, created_patient = Patient.objects.get_or_create(
                 philhealth_id=philhealth_id,
                 defaults=patient_data
             )
-            
+            if not created_patient:
+                for key, value in patient_data.items():
+                    if value is not None:
+                        setattr(patient, key, value)
+                patient.save()
+
             # Link patient to transaction and mark as completed
-            if txn:
-                txn.patient_id = patient.id
-                txn.status = 'COMPLETED'
-                txn.save()
-            
+            txn.patient_id = patient.id
+            txn.status = 'COMPLETED'
+            txn.save()
+
         except (KeyError, TypeError, ValueError) as e:
             logger.error(f"[Webhook] Error processing patient data: {str(e)}")
-            if txn:
-                txn.status = 'FAILED'
-                txn.error_message = str(e)
-                txn.save()
+            txn.status = 'FAILED'
+            txn.error_message = str(e)
+            txn.save()
             return Response({'error': f'Invalid patient data: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
     else:
-        if txn:
-            txn.status = 'FAILED'
-            txn.error_message = request.data.get('data', {}).get('error', 'Unknown')
-            txn.save()
+        txn.status = 'FAILED'
+        txn.error_message = request.data.get('data', {}).get('error', 'Unknown')
+        txn.save()
 
     return Response({'message': 'Received'})
 
 
 @api_view(['POST'])
+@throttle_classes([])  # Exempt WAH4PC endpoints from rate limiting
 def send_to_wah4pc(request):
     """Send local patient data to another provider via WAH4PC gateway."""
     patient_id = request.data.get('patientId')
@@ -720,38 +787,55 @@ def send_to_wah4pc(request):
 
     # Convert patient to FHIR format
     fhir_resource = mapping_service.local_patient_to_fhir(patient)
-    
-    # Send to gateway
-    result = fhir_service.push_patient(target_id, fhir_resource)
 
-    # Handle error responses
-    if 'error' in result:
-        return Response(
-            {'error': result['error']},
-            status=result.get('status_code', 500)
-        )
+    # Generate deterministic idempotency key based on target + patient to avoid duplicate sends
+    idempotency_key = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{target_id}:{patient.id}"))
 
-    txn_id = result.get('id')
-    idempotency_key = result.get('idempotency_key')
+    # Idempotency guard: return existing pending transaction if present
+    existing = WAH4PCTransaction.objects.filter(
+        status='PENDING',
+        target_provider_id=target_id,
+        idempotency_key=idempotency_key,
+        patient_id=patient.id,
+    ).first()
+    if existing:
+        return Response({'transactionId': existing.transaction_id}, status=status.HTTP_202_ACCEPTED)
 
-    if not txn_id:
-        import uuid
-        txn_id = str(uuid.uuid4())
-        logger.warning(f"[Send] Gateway did not return transaction ID; generated fallback: {txn_id}")
-    
+    # Create local transaction BEFORE calling external gateway
+    txn_id = str(uuid.uuid4())
     WAH4PCTransaction.objects.create(
         transaction_id=txn_id,
         type='send',
-        status=result.get('status', 'PENDING'),
+        status='PENDING',
         patient_id=patient.id,
         target_provider_id=target_id,
         idempotency_key=idempotency_key,
     )
 
-    return Response(result, status=status.HTTP_202_ACCEPTED)
+    # Send to gateway with idempotency key
+    result = fhir_service.push_patient(target_id, fhir_resource, idempotency_key=idempotency_key)
+
+    # If outbound failed, mark transaction as FAILED and return error
+    if isinstance(result, dict) and 'error' in result:
+        try:
+            txn = WAH4PCTransaction.objects.get(transaction_id=txn_id)
+            txn.status = 'FAILED'
+            txn.error_message = result.get('error')
+            txn.save()
+        except Exception:
+            logger.exception("Failed to mark send transaction as FAILED")
+
+        return Response({'error': result['error']}, status=result.get('status_code', 500))
+
+    # Keep locally generated txn_id as canonical
+    response_data = result.copy() if isinstance(result, dict) else {}
+    response_data['transactionId'] = txn_id
+    response_data['idempotency_key'] = idempotency_key
+    return Response(response_data, status=status.HTTP_202_ACCEPTED)
 
 
 @api_view(['POST'])
+@throttle_classes([])  # Exempt WAH4PC endpoints from rate limiting
 def webhook_receive_push(request):
     """Receive pushed patient data from another provider via WAH4PC gateway."""
     gateway_key = os.getenv('GATEWAY_AUTH_KEY')
@@ -778,49 +862,58 @@ def webhook_receive_push(request):
         )
 
     try:
+        # Ensure transaction exists and mark as RECEIVED
+        txn, created = WAH4PCTransaction.objects.get_or_create(
+            transaction_id=txn_id,
+            defaults={
+                'type': 'receive_push',
+                'status': 'RECEIVED',
+                'target_provider_id': sender_id,
+            }
+        )
+
+        if not created:
+            if txn.status == 'COMPLETED':
+                return Response({'message': 'Already processed'}, status=status.HTTP_200_OK)
+            txn.status = 'RECEIVED'
+            txn.save()
+
         # Convert FHIR to dict
         patient_data = mapping_service.fhir_to_local_patient(data)
 
         # Require PhilHealth ID for synchronization (unique constraint)
         philhealth_id = patient_data.get('philhealth_id')
         if not philhealth_id:
+            txn.status = 'FAILED'
+            txn.error_message = 'PhilHealth ID required for synchronization'
+            txn.save()
             return Response(
                 {'error': 'PhilHealth ID required for synchronization'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         # Check if patient already exists by PhilHealth ID
-        philhealth_id = patient_data.get('philhealth_id')
         if philhealth_id:
             # Atomic get_or_create to prevent race condition on duplicate push
-            patient, created = Patient.objects.get_or_create(
+            patient, created_patient = Patient.objects.get_or_create(
                 philhealth_id=philhealth_id,
                 defaults=patient_data
             )
-            if not created:
-                # Update existing patient if needed
+            if not created_patient:
                 for key, value in patient_data.items():
                     if value is not None:
                         setattr(patient, key, value)
                 patient.save()
-            action = 'created' if created else 'updated'
+            action = 'created' if created_patient else 'updated'
         else:
             # No PhilHealth ID, create new patient
             patient = Patient.objects.create(**patient_data)
             action = 'created'
 
-        # Record transaction with get_or_create to prevent duplicates
-        transaction, created = WAH4PCTransaction.objects.get_or_create(
-            transaction_id=txn_id,
-            defaults={
-                'type': 'receive_push',
-                'status': 'COMPLETED',
-                'patient_id': patient.id,
-                'target_provider_id': sender_id,
-            }
-        )
-        if not created:
-            logger.warning(f"[Webhook] Duplicate push received for transaction {txn_id}")
+        # Link patient and mark transaction completed
+        txn.patient_id = patient.id
+        txn.status = 'COMPLETED'
+        txn.save()
 
         return Response({
             'message': f'Patient {action} successfully',
@@ -829,14 +922,13 @@ def webhook_receive_push(request):
         }, status=status.HTTP_200_OK)
 
     except Exception as e:
-        # Record failed transaction
-        WAH4PCTransaction.objects.create(
-            transaction_id=txn_id,
-            type='receive_push',
-            status='FAILED',
-            target_provider_id=sender_id,
-            error_message=str(e),
-        )
+        logger.exception(f"[Webhook] Failed processing pushed patient: {str(e)}")
+        try:
+            txn.status = 'FAILED'
+            txn.error_message = str(e)
+            txn.save()
+        except Exception:
+            logger.exception("Failed to record failed transaction for webhook push")
 
         return Response(
             {'error': f'Failed to process pushed patient: {str(e)}'},
@@ -845,10 +937,24 @@ def webhook_receive_push(request):
 
 
 @api_view(['POST'])
+@throttle_classes([])  # Exempt WAH4PC endpoints from rate limiting
 def webhook_process_query(request):
-    """Process incoming query from another provider via WAH4PC gateway."""
-    import uuid
-
+    """
+    Process incoming query from another provider via WAH4PC gateway.
+    
+    Per WAH4PC spec: "Respond with 200 OK immediately to acknowledge receipt.
+    Process the request asynchronously and send results to the gatewayReturnUrl."
+    
+    This endpoint:
+    1. Validates X-Gateway-Auth header
+    2. Queues an async task to search database and respond to gateway
+    3. Returns 200 OK immediately (non-blocking)
+    
+    The async task handles:
+    - Patient database search by identifiers
+    - FHIR resource conversion
+    - HTTP response to gateway with retry logic
+    """
     gateway_key = os.getenv('GATEWAY_AUTH_KEY')
     auth_header = request.headers.get('X-Gateway-Auth')
     if not gateway_key or not auth_header or auth_header != gateway_key:
@@ -857,6 +963,7 @@ def webhook_process_query(request):
     txn_id = request.data.get('transactionId')
     identifiers = request.data.get('identifiers', [])
     return_url = request.data.get('gatewayReturnUrl')
+    requester_id = request.data.get('requesterId')
 
     if not txn_id or not return_url:
         return Response(
@@ -864,61 +971,31 @@ def webhook_process_query(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    # Enhanced identifier matching - supports multiple identifier systems
-    patient = None
-    for ident in identifiers:
-        system = ident.get('system', '').lower()
-        value = ident.get('value')
-
-        if not value:
-            continue
-
-        # PhilHealth ID
-        if 'philhealth' in system:
-            patient = Patient.objects.filter(philhealth_id=value).first()
-
-        # Medical Record Number (MRN) - matches patient_id field
-        elif 'mrn' in system or 'medical-record' in system:
-            patient = Patient.objects.filter(patient_id=value).first()
-
-        # Mobile number (for additional matching)
-        elif 'phone' in system or 'mobile' in system:
-            patient = Patient.objects.filter(mobile_number=value).first()
-
-        # If patient found, stop searching
-        if patient:
-            break
-
-    # Generate idempotency key for the response
-    idempotency_key = str(uuid.uuid4())
-
     try:
-        # Convert patient to FHIR if found
-        fhir_data = mapping_service.local_patient_to_fhir(patient) if patient else {"error": "Not found"}
+        # Import here to allow running without Celery during development
+        from patients.tasks import process_gateway_query_async
         
-        http_requests.post(
-            return_url,
-            headers={
-                "X-API-Key": os.getenv('WAH4PC_API_KEY'),
-                "X-Provider-ID": os.getenv('WAH4PC_PROVIDER_ID'),
-                "Idempotency-Key": idempotency_key,
-            },
-            json={
-                "transactionId": txn_id,
-                "status": "SUCCESS" if patient else "REJECTED",
-                "data": fhir_data,
-            },
+        # Queue async task to process query and respond to gateway
+        process_gateway_query_async.delay(
+            transaction_id=txn_id,
+            identifiers=identifiers,
+            return_url=return_url,
+            requester_id=requester_id,
         )
-    except http_requests.RequestException:
-        return Response(
-            {'error': 'Failed to send response to gateway'},
-            status=status.HTTP_502_BAD_GATEWAY,
-        )
+        
+        logger.info(f"[Webhook] Queued async query processing for transaction {txn_id}")
+        
+    except Exception as e:
+        logger.error(f"[Webhook] Failed to queue async task: {str(e)}")
+        # Still return 200 OK to acknowledge receipt per spec
+        # Task will be retried if needed
 
+    # Return 200 OK immediately per WAH4PC specification
     return Response({'message': 'Processing'})
 
 
 @api_view(['GET'])
+@throttle_classes([])  # Exempt WAH4PC endpoints from rate limiting
 def list_providers(request):
     """List all active WAH4PC providers.
 
@@ -933,6 +1010,7 @@ def list_providers(request):
 
 
 @api_view(['GET'])
+@throttle_classes([])  # Exempt WAH4PC endpoints from rate limiting
 def list_transactions(request):
     """List WAH4PC transactions with optional filters.
 
@@ -972,6 +1050,7 @@ def list_transactions(request):
 
 
 @api_view(['GET'])
+@throttle_classes([])  # Exempt WAH4PC endpoints from rate limiting
 def get_transaction(request, transaction_id):
     """Get detailed information about a specific WAH4PC transaction.
 

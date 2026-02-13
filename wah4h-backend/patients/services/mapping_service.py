@@ -82,6 +82,11 @@ class PatientToFHIRMapper:
         """
         Convert local Patient model to FHIR Patient resource.
         
+        Complies with WAH4PC v1.0.0 PH Core Patient profile requiring:
+        - meta.profile with PH Core Patient structure definition
+        - Required extension:indigenousPeople boolean
+        - Optional extensions: nationality, religion, race, occupation, educationalAttainment
+        
         Args:
             patient: Django Patient model instance
         
@@ -91,8 +96,16 @@ class PatientToFHIRMapper:
         import os
         
         identifiers: List[Dict[str, Any]] = []
+        
+        # Build FHIR Patient with required meta.profile
         fhir: Dict[str, Any] = {
             "resourceType": "Patient",
+            "id": str(patient.id) if hasattr(patient, 'id') else None,
+            "meta": {
+                "profile": [
+                    "urn://example.com/ph-core/fhir/StructureDefinition/ph-core-patient"
+                ]
+            },
             "identifier": identifiers,
             "name": [{
                 "use": "official",
@@ -103,6 +116,14 @@ class PatientToFHIRMapper:
             "gender": patient.gender.lower() if patient.gender else None,
             "birthDate": str(patient.birthdate) if patient.birthdate else None,
             "active": patient.active,
+        }
+        
+        # Add narrative text for readability
+        given_names = " ".join([patient.first_name, patient.middle_name] if patient.middle_name else [patient.first_name])
+        full_name = f"{given_names} {patient.last_name}".strip()
+        fhir["text"] = {
+            "status": "generated",
+            "div": f"<div xmlns=\"http://www.w3.org/1999/xhtml\">{full_name} is a patient with PhilHealth ID {patient.philhealth_id or 'not provided'}.</div>"
         }
 
         # Add PhilHealth identifier with proper type
@@ -211,7 +232,21 @@ class PatientToFHIRMapper:
             }]
 
         # Store Philippine-specific data in extensions
+        # Note: extension:indigenousPeople is REQUIRED per WAH4PC spec
         extensions: List[Dict[str, Any]] = []
+
+        # REQUIRED: Indigenous people extension
+        if patient.indigenous_flag is not None:
+            extensions.append({
+                "url": "urn://example.com/ph-core/fhir/StructureDefinition/indigenous-people",
+                "valueBoolean": patient.indigenous_flag
+            })
+        else:
+            # Default to false if not set (required field)
+            extensions.append({
+                "url": "urn://example.com/ph-core/fhir/StructureDefinition/indigenous-people",
+                "valueBoolean": False
+            })
 
         if patient.nationality:
             extensions.append({
@@ -232,22 +267,50 @@ class PatientToFHIRMapper:
             extensions.append({
                 "url": "http://hl7.org/fhir/StructureDefinition/patient-religion",
                 "valueCodeableConcept": {
-                    "text": patient.religion
+                    "coding": [{
+                        "system": "http://terminology.hl7.org/CodeSystem/v3-ReligiousAffiliation",
+                        "code": "1041",
+                        "display": patient.religion
+                    }]
                 }
             })
+
+        # Race extension with proper PH coding system
+        # Note: We default to "Filipino" for Philippine patients
+        extensions.append({
+            "url": "urn://example.com/ph-core/fhir/StructureDefinition/race",
+            "valueCodeableConcept": {
+                "coding": [{
+                    "system": "urn://example.com/ph-core/fhir/CodeSystem/race",
+                    "code": "filipino",
+                    "display": "Filipino"
+                }]
+            }
+        })
 
         if patient.occupation:
             extensions.append({
                 "url": "urn://example.com/ph-core/fhir/StructureDefinition/occupation",
                 "valueCodeableConcept": {
-                    "text": patient.occupation
+                    "coding": [{
+                        "system": "urn://example.com/ph-core/fhir/CodeSystem/occupational-classifications",
+                        "code": patient.occupation,
+                        "display": patient.occupation
+                    }]
                 }
             })
 
-        if patient.indigenous_flag is not None:
+        # Educational attainment (PH-specific)
+        if patient.education:
             extensions.append({
-                "url": "urn://example.com/ph-core/fhir/StructureDefinition/indigenous-people",
-                "valueBoolean": patient.indigenous_flag
+                "url": "urn://example.com/ph-core/fhir/StructureDefinition/educational-attainment",
+                "valueCodeableConcept": {
+                    "coding": [{
+                        "system": "urn://example.com/ph-core/fhir/CodeSystem/educational-attainment",
+                        "code": patient.education,
+                        "display": patient.education
+                    }]
+                }
             })
 
         if patient.indigenous_group:
