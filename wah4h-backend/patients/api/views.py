@@ -667,12 +667,26 @@ def webhook_receive(request):
 
     if request.data.get('status') == 'SUCCESS':
         try:
+            # Parse FHIR data to local patient model
             patient_data = mapping_service.fhir_to_local_patient(request.data['data'])
-            if txn_id:
-                request.session[f"wah4pc_{txn_id}"] = patient_data
+            
+            # Extract philhealth_id (required for uniqueness constraint)
+            philhealth_id = patient_data.get('philhealth_id')
+            if not philhealth_id:
+                raise ValueError("PhilHealth ID is required and missing from FHIR data")
+            
+            # Create or update patient in database (idempotent via get_or_create)
+            patient, created = Patient.objects.get_or_create(
+                philhealth_id=philhealth_id,
+                defaults=patient_data
+            )
+            
+            # Link patient to transaction and mark as completed
             if txn:
+                txn.patient_id = patient.id
                 txn.status = 'COMPLETED'
                 txn.save()
+            
         except (KeyError, TypeError, ValueError) as e:
             logger.error(f"[Webhook] Error processing patient data: {str(e)}")
             if txn:
