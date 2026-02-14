@@ -22,10 +22,43 @@ class LabTestDefinition(FHIRResourceModel):
 
 
 class DiagnosticReport(FHIRResourceModel):
+    """
+    FHIR DiagnosticReport - Unified Order-to-Result Model (Trinity Approach).
+    Handles complete lifecycle: Order (registered) → In-Progress (partial) → Complete (final).
+    No separate ServiceRequest/Order model needed.
+    """
     diagnostic_report_id = models.AutoField(primary_key=True)
     subject_id = models.BigIntegerField(db_index=True)
     encounter_id = models.BigIntegerField(db_index=True)
-    performer_id = models.BigIntegerField(db_index=True, null=True, blank=True)
+    
+    # Trinity Approach: Requester vs Performer
+    requester_id = models.BigIntegerField(
+        db_index=True, 
+        null=True, 
+        blank=True,
+        help_text="Doctor/Nurse who ordered the test (from Monitoring module)"
+    )
+    performer_id = models.BigIntegerField(
+        db_index=True, 
+        null=True, 
+        blank=True,
+        help_text="Lab technician who performed/processed the test"
+    )
+    
+    # Priority field for urgent test flagging
+    PRIORITY_CHOICES = [
+        ('routine', 'Routine'),
+        ('urgent', 'Urgent'),
+        ('stat', 'STAT'),
+    ]
+    priority = models.CharField(
+        max_length=20,
+        choices=PRIORITY_CHOICES,
+        default='routine',
+        db_index=True,
+        help_text="Test priority level"
+    )
+    
     results_interpreter_id = models.BigIntegerField(db_index=True, null=True, blank=True)
     specimen_id = models.BigIntegerField(db_index=True, null=True, blank=True)
     based_on_id = models.BigIntegerField(db_index=True, null=True, blank=True)
@@ -41,11 +74,18 @@ class DiagnosticReport(FHIRResourceModel):
     effective_period_start = models.DateField(null=True, blank=True)
     effective_period_end = models.DateField(null=True, blank=True)
     issued_datetime = models.DateTimeField(null=True, blank=True)
-    media_comment = models.CharField(max_length=255, null=True, blank=True)
-    presented_form_url = models.URLField(max_length=255, null=True, blank=True)
+    issued_datetime = models.DateTimeField(null=True, blank=True)
+    
+    # Flexible field to store the full result payload (parameters + metadata)
+    # This allows storing the exact form data from the frontend without complex observation mapping
+    result_data = models.JSONField(null=True, blank=True)
 
     class Meta:
         db_table = 'laboratory_diagnostic_report'
+        indexes = [
+            models.Index(fields=['status', 'priority'], name='lab_status_priority_idx'),
+            models.Index(fields=['encounter_id', 'status'], name='lab_encounter_status_idx'),
+        ]
 
 
 class DiagnosticReportResult(models.Model):

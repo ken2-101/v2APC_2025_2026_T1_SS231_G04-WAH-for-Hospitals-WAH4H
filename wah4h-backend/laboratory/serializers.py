@@ -1,7 +1,13 @@
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers
-from .models import DiagnosticReport, DiagnosticReportResult
+from .models import (
+    DiagnosticReport,
+    DiagnosticReportResult,
+    LabTestDefinition,
+    Specimen,
+    ImagingStudy
+)
 
 
 class DiagnosticReportResultSerializer(serializers.Serializer):
@@ -122,6 +128,20 @@ class DiagnosticReportSerializer(serializers.ModelSerializer):
         model = DiagnosticReport
         fields = '__all__'
 
+    def to_representation(self, instance):
+        """
+        Override to merge legacy 'results' (DiagnosticReportResult) with new 'result_data' (JSONField).
+        Prioritize 'result_data' if it exists as it contains the structured form data.
+        """
+        representation = super().to_representation(instance)
+        
+        # If result_data exists, use it directly as the 'results' field in the API response
+        # This matches what the frontend expects (list of parameters or object with meta)
+        if instance.result_data:
+            representation['results'] = instance.result_data.get('results', instance.result_data)
+        
+        return representation
+
     def get_subject_display(self, obj):
         """Fetch patient name from Patient model."""
         from patients.models import Patient
@@ -159,19 +179,31 @@ class DiagnosticReportSerializer(serializers.ModelSerializer):
 
     def get_priority(self, obj):
         """
-        Extract priority from conclusion or return default.
-        In a real system, this might be a separate field or derived from ServiceRequest.
+        Return the priority field from the model.
+        Maps to frontend: 'routine', 'urgent', 'stat'
         """
-        # For now, return a default. Could be enhanced to parse from conclusion or other fields
-        return 'routine'
+        return obj.priority if obj.priority else 'routine'
 
     def get_orderedBy(self, obj):
         """
-        Get ordering physician name.
-        In a real system, this would link to Practitioner via performer_id.
+        Get ordering physician name from requester_id.
+        requester_id represents the doctor/nurse who ordered the test.
         """
-        # Placeholder - could fetch from User/Practitioner model via performer_id
-        return "Dr. Ordering Physician"
+        if not obj.requester_id:
+            return None
+        try:
+            from accounts.models import Practitioner
+            from django.contrib.auth.models import User
+            # Try to fetch practitioner by ID
+            try:
+                practitioner = Practitioner.objects.get(practitioner_id=obj.requester_id)
+                return f"Dr. {practitioner.first_name} {practitioner.last_name}".strip()
+            except Practitioner.DoesNotExist:
+                # Fallback to User model
+                user = User.objects.get(id=obj.requester_id)
+                return f"{user.first_name} {user.last_name}".strip() or user.username
+        except Exception:
+            return None
 
     def get_orderedAt(self, obj):
         """Use effective_datetime as order time."""
@@ -196,10 +228,20 @@ class DiagnosticReportSerializer(serializers.ModelSerializer):
         return None
 
     def get_processedBy(self, obj):
-        """Placeholder for lab tech who processed results."""
-        if obj.status in ['final', 'amended', 'corrected']:
-            return "Lab Technician"
-        return None
+        """Get lab technician name from performer_id."""
+        if not obj.performer_id or obj.status not in ['final', 'amended', 'corrected']:
+            return None
+        try:
+            from accounts.models import Practitioner
+            from django.contrib.auth.models import User
+            try:
+                practitioner = Practitioner.objects.get(practitioner_id=obj.performer_id)
+                return f"{practitioner.first_name} {practitioner.last_name}".strip()
+            except Practitioner.DoesNotExist:
+                user = User.objects.get(id=obj.performer_id)
+                return f"{user.first_name} {user.last_name}".strip() or user.username
+        except Exception:
+            return None
 
     def get_processedAt(self, obj):
         """Use issued_datetime as processing completion time."""
@@ -236,17 +278,24 @@ class DiagnosticReportSerializer(serializers.ModelSerializer):
 
         # Validate nested results from initial_data (preserve input shape)
         incoming_results = self.initial_data.get('results', [])
-        sequences = set()
-        for idx, r in enumerate(incoming_results):
-            seq = r.get('item_sequence')
-            obs = r.get('observation_id')
-            if seq is None:
-                raise serializers.ValidationError({'results': f'Result at index {idx} missing item_sequence.'})
-            if seq in sequences:
-                raise serializers.ValidationError({'results': 'Duplicate item_sequence values are not allowed.'})
-            sequences.add(seq)
-            if obs is None or not isinstance(obs, int) or obs < 0:
-                raise serializers.ValidationError({'results': f'Invalid observation_id at index {idx}.'})
+        
+        # If the input is the new JSON structure (dict), just validate basic keys
+        if isinstance(incoming_results, dict):
+            # It's a structured JSON payload
+            pass 
+        elif isinstance(incoming_results, list):
+            # Legacy validation for list of observations
+            sequences = set()
+            for idx, r in enumerate(incoming_results):
+                seq = r.get('item_sequence')
+                obs = r.get('observation_id')
+                if seq is None:
+                    raise serializers.ValidationError({'results': f'Result at index {idx} missing item_sequence.'})
+                if seq in sequences:
+                    raise serializers.ValidationError({'results': 'Duplicate item_sequence values are not allowed.'})
+                sequences.add(seq)
+                if obs is None or not isinstance(obs, int) or obs < 0:
+                    raise serializers.ValidationError({'results': f'Invalid observation_id at index {idx}.'})
 
         return data
 
@@ -277,15 +326,30 @@ class DiagnosticReportSerializer(serializers.ModelSerializer):
                 setattr(instance, attr, value)
             instance.save()
 
-            # If results were provided, replace them (explicit behavior)
+            # If results were provided, save them to the JSONField
             if results_input is not None:
-                instance.results.all().delete()
-                for r in results_input:
-                    DiagnosticReportResult.objects.create(
-                        diagnostic_report=instance,
-                        observation_id=r['observation_id'],
-                        item_sequence=r['item_sequence']
-                    )
+                # Save the raw payload to result_data
+                instance.result_data = results_input
+                instance.save()
+                
+                # Also try to map to DiagnosticReportResult for backward compatibility if possible
+                # But primarily rely on result_data for read operations
+                try:
+                    instance.results.all().delete()
+                    # Only map if results_input is a list (legacy format)
+                    if isinstance(results_input, list):
+                        for r in results_input:
+                            # Skip if not structured correctly for legacy model
+                            if 'observation_id' not in r or 'item_sequence' not in r:
+                                continue
+                            DiagnosticReportResult.objects.create(
+                                diagnostic_report=instance,
+                                observation_id=r['observation_id'],
+                                item_sequence=r['item_sequence']
+                            )
+                except Exception:
+                    # Ignore errors in legacy mapping, main data is in result_data
+                    pass
 
             return instance
 
@@ -295,3 +359,155 @@ class DiagnosticReportSerializer(serializers.ModelSerializer):
             instance.issued_datetime = timezone.now()
             instance.save()
         return instance
+
+class LabTestDefinitionSerializer(serializers.ModelSerializer):
+    """
+    Serializer for LabTestDefinition (test catalog/lookup table).
+    """
+    class Meta:
+        model = LabTestDefinition
+        fields = '__all__'
+
+
+class SpecimenSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Specimen (specimen tracking).
+    
+    Includes resolved foreign key references for subject and collector.
+    """
+    subject = serializers.SerializerMethodField(read_only=True)
+    collector = serializers.SerializerMethodField(read_only=True)
+    
+    class Meta:
+        model = Specimen
+        fields = [
+            'specimen_id',
+            'identifier',
+            'status',
+            # Foreign Key IDs (writable)
+            'subject_id',
+            'collector_id',
+            # Resolved foreign keys (read-only)
+            'subject',
+            'collector',
+            # Specimen details
+            'type',
+            'collection_datetime',
+            'collection_method',
+            'collection_body_site',
+            'received_time',
+            'note',
+            # Timestamps
+            'created_at',
+            'updated_at',
+        ]
+    
+    def get_subject(self, obj):
+        """Resolve patient reference using direct ORM."""
+        if not obj.subject_id:
+            return None
+        try:
+            from patients.models import Patient
+            patient = Patient.objects.get(id=obj.subject_id)
+            return {
+                "id": patient.id,
+                "patient_id": patient.patient_id,
+                "name": f"{patient.first_name} {patient.last_name}"
+            }
+        except:
+            return None
+    
+    def get_collector(self, obj):
+        """Resolve collector practitioner reference using direct ORM."""
+        if not obj.collector_id:
+            return None
+        try:
+            from accounts.models import Practitioner
+            practitioner = Practitioner.objects.get(practitioner_id=obj.collector_id)
+            return {
+                "practitioner_id": practitioner.practitioner_id,
+                "name": f"{practitioner.first_name} {practitioner.last_name}"
+            }
+        except:
+            return None
+
+
+class ImagingStudySerializer(serializers.ModelSerializer):
+    """
+    Serializer for ImagingStudy (imaging study records).
+    
+    Includes resolved foreign key references for subject, encounter, and interpreter.
+    """
+    subject = serializers.SerializerMethodField(read_only=True)
+    encounter = serializers.SerializerMethodField(read_only=True)
+    interpreter = serializers.SerializerMethodField(read_only=True)
+    
+    class Meta:
+        model = ImagingStudy
+        fields = [
+            'imaging_study_id',
+            'identifier',
+            'status',
+            # Foreign Key IDs (writable)
+            'subject_id',
+            'encounter_id',
+            'interpreter_id',
+            # Resolved foreign keys (read-only)
+            'subject',
+            'encounter',
+            'interpreter',
+            # Imaging study details
+            'started',
+            'modality',
+            'description',
+            'number_of_series',
+            'number_of_instances',
+            'note',
+            # Timestamps
+            'created_at',
+            'updated_at',
+        ]
+    
+    def get_subject(self, obj):
+        """Resolve patient reference using direct ORM."""
+        if not obj.subject_id:
+            return None
+        try:
+            from patients.models import Patient
+            patient = Patient.objects.get(id=obj.subject_id)
+            return {
+                "id": patient.id,
+                "patient_id": patient.patient_id,
+                "name": f"{patient.first_name} {patient.last_name}"
+            }
+        except:
+            return None
+    
+    def get_encounter(self, obj):
+        """Resolve encounter reference using direct ORM."""
+        if not obj.encounter_id:
+            return None
+        try:
+            from admission.models import Encounter
+            encounter = Encounter.objects.get(encounter_id=obj.encounter_id)
+            return {
+                "encounter_id": encounter.encounter_id,
+                "identifier": encounter.identifier,
+                "status": encounter.status
+            }
+        except:
+            return None
+    
+    def get_interpreter(self, obj):
+        """Resolve interpreter practitioner reference using direct ORM."""
+        if not obj.interpreter_id:
+            return None
+        try:
+            from accounts.models import Practitioner
+            practitioner = Practitioner.objects.get(practitioner_id=obj.interpreter_id)
+            return {
+                "practitioner_id": practitioner.practitioner_id,
+                "name": f"{practitioner.first_name} {practitioner.last_name}"
+            }
+        except:
+            return None

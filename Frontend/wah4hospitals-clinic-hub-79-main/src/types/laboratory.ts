@@ -1,5 +1,17 @@
 // Lab Request Types
-export type LabTestType = 'cbc' | 'urinalysis' | 'fecalysis' | 'xray' | 'ultrasound' | 'ecg' | 'blood_chemistry';
+export type LabTestType =
+  // Hematology
+  | 'cbc' | 'platelet_count' | 'blood_typing' | 'clotting_time' | 'bleeding_time'
+  // Clinical Microscopy
+  | 'urinalysis' | 'fecalysis' | 'pregnancy_test'
+  // Blood Chemistry
+  | 'fbs' | 'rbs' | 'lipid_profile' | 'creatinine' | 'bua' | 'bun' | 'sgpt' | 'sgot' | 'electrolytes' | 'blood_chemistry'
+  // Serology & Immunology
+  | 'hbsag' | 'syphilis' | 'dengue_duo' | 'typhoid'
+  // Microbiology
+  | 'gram_stain' | 'afb_stain'
+  // Legacy/Group placeholders
+  | 'lipid_panel';
 export type LabPriority = 'routine' | 'stat';
 export type LabStatus = 'pending' | 'in_progress' | 'completed';
 export type LabInterpretation = 'normal' | 'high' | 'low';
@@ -59,6 +71,11 @@ export interface LabRequest {
   patient_id: string;
   patient_name: string;
   ward_room_bed: string;
+  admission_details?: {
+    ward: string;
+    room: string;
+    bed: string;
+  };
   patient_details?: {
     patient_id: string;
     full_name: string;
@@ -70,6 +87,8 @@ export interface LabRequest {
   doctor_name: string | null;
   test_type: LabTestType;
   test_type_display: string;
+  code_code?: string; // LOINC code (e.g., "58410-2" for CBC)
+  code_display?: string; // Display name (e.g., "Complete Blood Count")
   priority: LabPriority;
   priority_display: string;
   clinical_reason: string;
@@ -84,7 +103,7 @@ export interface LabRequest {
 export interface LabRequestFormData {
   subject_id: number;
   admission: number;
-  requesting_doctor: number;
+  requesting_doctor?: number | null;  // Optional - backend can set from current user
   test_type: LabTestType;
   priority: LabPriority;
   clinical_reason?: string;
@@ -105,8 +124,8 @@ export interface PaginatedResponse<T> {
   results: T[];
 }
 
-export interface LabRequestListResponse extends PaginatedResponse<LabRequest> {}
-export interface LabResultListResponse extends PaginatedResponse<LabResult> {}
+export interface LabRequestListResponse extends PaginatedResponse<LabRequest> { }
+export interface LabResultListResponse extends PaginatedResponse<LabResult> { }
 
 // Filter/Search Params
 export interface LabRequestFilters {
@@ -114,6 +133,8 @@ export interface LabRequestFilters {
   priority?: LabPriority;
   test_type?: LabTestType;
   requesting_doctor?: number;
+  subject_id?: number;  // Filter by patient ID
+  encounter_id?: number;  // Filter by encounter/admission ID
   search?: string;
   ordering?: string;
   page?: number;

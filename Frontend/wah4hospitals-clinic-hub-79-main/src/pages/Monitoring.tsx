@@ -21,6 +21,7 @@ import { MedicationRequestTab } from '@/components/monitoring/MedicationRequestT
 import { LaboratoryTab } from '@/components/monitoring/LaboratoryTab';
 import { admissionService } from '@/services/admissionService';
 import monitoringService from '@/services/monitoringService';
+import laboratoryService from '@/services/laboratoryService';  // For lab requests/results
 
 const Monitoring: React.FC = () => {
   const [admissions, setAdmissions] = useState<MonitoringAdmission[]>([]);
@@ -73,17 +74,54 @@ const Monitoring: React.FC = () => {
     setSelectedAdmission(adm);
 
     try {
-      const [fetchedVitals, fetchedNotes, fetchedDietary, fetchedLabRequests] = await Promise.all([
+      // Fetch monitoring data (vitals, notes, dietary)
+      const [fetchedVitals, fetchedNotes, fetchedDietary] = await Promise.all([
         monitoringService.getVitals(adm.id),
         monitoringService.getNotes(adm.id),
         monitoringService.getDietary(adm.id),
-        monitoringService.getLaboratoryRequests(adm.id)
       ]);
 
       setVitals(fetchedVitals);
       setNotes(fetchedNotes);
       setDietary(fetchedDietary);
-      setLabRequests(fetchedLabRequests);
+
+      // Fetch lab results from laboratory module (finalized only for monitoring view)
+      try {
+        const labResponse = await laboratoryService.getLabRequests({
+          subject_id: adm.patientId,  // Filter by patient ID
+          encounter_id: adm.id,
+          status: 'final'
+        } as any);  // Type assertion: cross-module integration with laboratory filters
+
+        // API returns paginated response with results array
+        const labResults = labResponse.results || [];
+
+        // Map laboratory DiagnosticReport to monitoring LabRequest format
+        const mappedLabs: LabRequest[] = labResults.map((report: any) => ({
+          id: report.request_id,
+          admissionId: report.admission_id,
+          testName: report.test_type_display || report.test_type,
+          testCode: report.test_type,
+          priority: report.priority || 'routine',
+          notes: report.clinical_reason || '',
+          lifecycleStatus: 'completed' as const,
+          orderedBy: report.doctor_name || 'Unknown',
+          orderedAt: report.created_at,
+          completedAt: report.updated_at,
+          resultContent: {
+            findings: 'Results available in Laboratory module',
+            values: [],
+            interpretation: 'See Laboratory page for detailed results',
+            reportedBy: 'Lab',
+            reportedAt: report.updated_at
+          }
+        }));
+        setLabRequests(mappedLabs);
+      } catch (labErr) {
+        console.error('Error fetching lab results:', labErr);
+        setLabRequests([]);
+      }
+
       setHistory([]);
     } catch (err) {
       console.error('Error fetching admission details:', err);
@@ -143,27 +181,61 @@ const Monitoring: React.FC = () => {
   const handleAddLabRequest = async (request: Omit<LabRequest, 'id'>) => {
     if (!selectedAdmission) return;
     try {
-      const requestWithAdmission = {
-        ...request,
-        admissionId: selectedAdmission.id.toString(),
+      // Map monitoring LabRequest format to laboratory DiagnosticReport format
+      const labRequestPayload = {
+        subject_id: selectedAdmission.patientId,
+        admission: selectedAdmission.id,  // Backend expects 'admission', not 'encounter_id'
+        requesting_doctor: null,  // Will be set by backend based on current user
+        test_type: request.testCode as any,  // Type assertion for cross-module integration
+        priority: request.priority as any,  // Type assertion for cross-module integration
+        clinical_reason: request.notes
       };
-      await monitoringService.addLaboratoryRequest(requestWithAdmission, selectedAdmission.patientId);
-      const updatedLabRequests = await monitoringService.getLaboratoryRequests(selectedAdmission.id);
-      setLabRequests(updatedLabRequests);
-    } catch (err) {
+
+      console.log('Creating lab request with payload:', labRequestPayload);
+      console.log('Selected admission:', selectedAdmission);
+
+      await laboratoryService.createLabRequest(labRequestPayload);
+
+      // Refresh lab requests - handle paginated response
+      const labResponse = await laboratoryService.getLabRequests({
+        subject_id: selectedAdmission.patientId,  // Filter by patient ID
+        encounter_id: selectedAdmission.id,
+        status: 'final'
+      } as any);  // Type assertion for cross-module filters
+
+      const labResults = labResponse.results || [];
+      const mappedLabs: LabRequest[] = labResults.map((report: any) => ({
+        id: report.request_id,
+        admissionId: report.admission_id,
+        testName: report.test_type_display || report.test_type,
+        testCode: report.test_type,
+        priority: report.priority || 'routine',
+        notes: report.clinical_reason || '',
+        lifecycleStatus: 'completed' as const,
+        orderedBy: report.doctor_name || 'Unknown',
+        orderedAt: report.created_at,
+        completedAt: report.updated_at,
+        resultContent: {
+          findings: 'Results available in Laboratory module',
+          values: [],
+          interpretation: 'See Laboratory page for detailed results',
+          reportedBy: 'Lab',
+          reportedAt: report.updated_at
+        }
+      }));
+      setLabRequests(mappedLabs);
+    } catch (err: any) {
       console.error('Error adding lab request:', err);
+      console.error('Error response data:', err.response?.data);
+      alert(`Failed to create lab request: ${JSON.stringify(err.response?.data || err.message)}`);
     }
   };
 
   const handleUpdateLabResult = async (requestId: string, result: LabResult) => {
-    if (!selectedAdmission) return;
-    try {
-      await monitoringService.updateLabResult(parseInt(requestId), result);
-      const updatedLabRequests = await monitoringService.getLaboratoryRequests(selectedAdmission.id);
-      setLabRequests(updatedLabRequests);
-    } catch (err) {
-      console.error('Error updating lab result:', err);
-    }
+    // Lab results are managed in Laboratory module
+    // This is view-only in monitoring
+    console.log('Lab results should be entered in the Laboratory module');
+    alert('Please use the Laboratory page to enter/update lab results');
   };
 
   const defaultDietaryOrder: DietaryOrder = selectedAdmission ? {
@@ -193,7 +265,7 @@ const Monitoring: React.FC = () => {
             <>
               <div className="p-4 border-b border-gray-100">
                 <h2 className="text-lg font-semibold text-gray-900 mb-3">Admitted Patients</h2>
-                
+
                 {/* Stats */}
                 <div className="flex gap-2 mb-4 text-xs">
                   <div className="flex-1 bg-gray-50 rounded-lg p-3 flex flex-col items-center justify-center min-h-[60px]">
@@ -209,7 +281,7 @@ const Monitoring: React.FC = () => {
                     <p className="text-lg font-bold text-green-600">{admissions.filter(a => a.status === 'Stable').length}</p>
                   </div>
                 </div>
-                
+
                 <div className="relative mb-3">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                   <input
@@ -220,24 +292,23 @@ const Monitoring: React.FC = () => {
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                   />
                 </div>
-                
+
                 <div className="flex gap-2 flex-wrap">
                   {(['all', 'Stable', 'Critical'] as const).map((status) => (
                     <button
                       key={status}
                       onClick={() => setFilterStatus(status)}
-                      className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
-                        filterStatus === status
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
+                      className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${filterStatus === status
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
                     >
                       {status === 'all' ? 'All' : status}
                     </button>
                   ))}
                 </div>
               </div>
-              
+
               <div className="flex-1 overflow-y-auto">
                 {filteredAdmissions.map((patient) => (
                   <div
@@ -251,13 +322,12 @@ const Monitoring: React.FC = () => {
                         <p className="text-sm text-gray-500">ID: {patient.id}</p>
                       </div>
                       <span
-                        className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                          patient.status === 'Stable'
-                            ? 'bg-green-100 text-green-700'
-                            : patient.status === 'Critical'
+                        className={`px-2 py-1 text-xs font-semibold rounded-full ${patient.status === 'Stable'
+                          ? 'bg-green-100 text-green-700'
+                          : patient.status === 'Critical'
                             ? 'bg-red-100 text-red-700'
                             : 'bg-yellow-100 text-yellow-700'
-                        }`}
+                          }`}
                       >
                         {patient.status}
                       </span>
@@ -286,7 +356,7 @@ const Monitoring: React.FC = () => {
                   <ArrowLeft size={16} />
                   Back to List
                 </button>
-                
+
                 <div className="bg-gradient-to-r from-blue-600 to-blue-500 rounded-lg p-4 text-white">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
@@ -297,7 +367,7 @@ const Monitoring: React.FC = () => {
                       <p className="text-sm text-blue-100">Patient ID: {selectedAdmission.id}</p>
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
                       <p className="text-blue-200 text-xs">Room</p>
@@ -318,7 +388,7 @@ const Monitoring: React.FC = () => {
                   </div>
                 </div>
               </div>
-              
+
               <div className="p-4 space-y-2 text-xs text-gray-600">
                 <div className="flex justify-between">
                   <span>Encounter ID:</span>
@@ -414,7 +484,7 @@ const Monitoring: React.FC = () => {
                     onAddRequest={handleAddLabRequest}
                     onUpdateResult={handleUpdateLabResult}
                     onRefresh={() => {
-                        if (selectedAdmission) handleSelectAdmission(selectedAdmission);
+                      if (selectedAdmission) handleSelectAdmission(selectedAdmission);
                     }}
                   />
                 </TabsContent>

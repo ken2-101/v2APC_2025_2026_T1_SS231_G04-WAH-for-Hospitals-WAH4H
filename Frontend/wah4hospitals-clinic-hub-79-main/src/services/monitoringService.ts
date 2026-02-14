@@ -1,6 +1,7 @@
 
 import api from './api';
-import { VitalSign, ClinicalNote, DietaryOrder, HistoryEvent, LabRequest, LabResult } from '../types/monitoring';
+import { VitalSign, ClinicalNote, DietaryOrder, HistoryEvent } from '../types/monitoring';
+// LabRequest and LabResult removed - use laboratoryService.ts for lab operations
 
 // Define the backend Observation interface
 interface Observation {
@@ -311,147 +312,9 @@ class MonitoringService {
             throw new Error(JSON.stringify(error.response?.data) || 'Failed to save dietary order');
         }
     }
-
-    /**
-     * Get Laboratory Requests by querying Observations with category 'laboratory'
-     */
-    async getLaboratoryRequests(encounterId: number): Promise<LabRequest[]> {
-        try {
-            const response = await api.get(`${MONITORING_BASE_URL}/observations/`, {
-                params: {
-                    encounter_id: encounterId,
-                    category: 'laboratory',
-                }
-            });
-
-            const observations: Observation[] = response.data.results || response.data;
-
-            return observations.map(obs => {
-                let resultContent = undefined;
-                if (obs.note) {
-                    try {
-                        const parsed = JSON.parse(obs.note);
-                        if (parsed.resultContent) {
-                            resultContent = parsed.resultContent;
-                        }
-                    } catch (e) {
-                        // Not JSON or no resultContent
-                    }
-                }
-
-                const labRequest: LabRequest = {
-                    id: obs.observation_id?.toString() || '',
-                    admissionId: encounterId.toString(),
-                    testName: obs.value_string || 'Unknown Test',
-                    testCode: obs.code,
-                    priority: 'routine', // Default, could be stored in observation
-                    notes: typeof obs.note === 'string' ? obs.note : '',
-                    lifecycleStatus: obs.status as 'ordered' | 'requested' | 'completed',
-                    orderedBy: 'Unknown', // Could be retrieved from performer_id
-                    orderedAt: obs.effective_datetime || obs.issued || '',
-                    resultContent,
-                };
-
-                return labRequest;
-            });
-        } catch (error) {
-            console.error('Error fetching laboratory requests:', error);
-            return [];
-        }
-    }
-
-    /**
-     * Add a new laboratory request
-     */
-    async addLaboratoryRequest(request: Omit<LabRequest, 'id'>, subjectId: number): Promise<void> {
-        try {
-            const timestamp = Date.now();
-            const identifier = `LAB-${timestamp}-${Math.random().toString(36).substr(2, 9)}`;
-
-            const payload: Observation = {
-                identifier,
-                subject_id: subjectId,
-                encounter_id: parseInt(request.admissionId),
-                code: request.testCode,
-                status: request.lifecycleStatus,
-                category: 'laboratory',
-                effective_datetime: request.orderedAt,
-                issued: new Date().toISOString(),
-                value_string: request.testName,
-                note: JSON.stringify({
-                    priority: request.priority,
-                    notes: request.notes,
-                    orderedBy: request.orderedBy,
-                }),
-            };
-
-            await api.post(`${MONITORING_BASE_URL}/observations/`, payload);
-        } catch (error) {
-            console.error('Error adding laboratory request:', error);
-            throw error;
-        }
-    }
-
-    /**
-     * Update laboratory request with results
-     */
-    async updateLabResult(requestId: number, result: LabResult): Promise<void> {
-        try {
-            // Fetch the existing observation
-            const response = await api.get(`${MONITORING_BASE_URL}/observations/${requestId}/`);
-            const observation: Observation = response.data;
-
-            // Parse existing note to preserve priority and notes
-            let existingData: any = {};
-            if (observation.note) {
-                try {
-                    existingData = JSON.parse(observation.note);
-                } catch (e) {
-                    existingData = { notes: observation.note };
-                }
-            }
-
-            // Update with result content
-            const updatedNote = {
-                ...existingData,
-                resultContent: result,
-            };
-
-            // Update the observation
-            const payload = {
-                ...observation,
-                status: 'completed',
-                note: JSON.stringify(updatedNote),
-            };
-
-            await api.put(`${MONITORING_BASE_URL}/observations/${requestId}/`, payload);
-        } catch (error) {
-            console.error('Error updating lab result:', error);
-            throw error;
-        }
-    }
-    /**
-     * Update laboratory request status
-     */
-    async updateLabRequestStatus(requestId: string, status: 'ordered' | 'requested'): Promise<void> {
-        try {
-            // 1. Get existing observation
-            const response = await api.get(`${MONITORING_BASE_URL}/observations/${requestId}/`);
-            const observation: Observation = response.data;
-
-            // 2. Update status
-            const payload = {
-                ...observation,
-                status: status
-            };
-
-            // 3. Save
-            await api.put(`${MONITORING_BASE_URL}/observations/${requestId}/`, payload);
-        } catch (error) {
-            console.error('Error updating lab request status:', error);
-            throw error;
-        }
-    }
+    // LABORATORY REQUEST METHODS REMOVED
+    // Use laboratoryService.ts instead for all laboratory operations
+    // Laboratory requests should use DiagnosticReport model, not Observation
 }
 
 export default new MonitoringService();

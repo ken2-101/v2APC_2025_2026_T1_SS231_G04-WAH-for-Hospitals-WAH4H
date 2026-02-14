@@ -5,3 +5,5 @@ django-filter
 djangorestframework-simplejwt
 python-dotenv
 requests
+weasyprint
+django-weasyprint

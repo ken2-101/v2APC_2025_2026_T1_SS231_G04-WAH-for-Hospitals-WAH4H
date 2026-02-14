@@ -58,7 +58,11 @@ export interface HistoryEvent {
 
 /* =========================
    LABORATORY REQUESTS
-   ========================= */
+   ========================= 
+   NOTE: Laboratory operations should use laboratoryService.ts
+   These types are kept for monitoring UI compatibility only.
+   For actual lab operations, import from laboratory types.
+   */
 export interface LabRequest {
     id: string;
     admissionId: string;
@@ -101,11 +105,11 @@ export interface MedicationRequest {
     route: string;
     frequency: string;
     notes: string;
-    
+
     // Lifecycle fields (from reference implementation)
     lifecycleStatus: 'prescribed' | 'requested' | 'ready-for-admin' | 'administered';
     intent: 'order' | 'proposal';
-    
+
     // Timestamps and actors
     prescribedBy: string;
     prescribedAt: string;

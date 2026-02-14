@@ -7,10 +7,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, FileText, AlertCircle, CheckCircle, Clock, RefreshCw } from 'lucide-react';
+import { Plus, FileText, AlertCircle, CheckCircle, Clock, RefreshCw, ExternalLink } from 'lucide-react';
 import { LabRequest, LabResult } from '../../types/monitoring';
 import { useRole } from '@/contexts/RoleContext';
-import monitoringService from '@/services/monitoringService';
 
 interface LaboratoryTabProps {
     labRequests: LabRequest[];
@@ -20,21 +19,35 @@ interface LaboratoryTabProps {
 }
 
 const COMMON_LAB_TESTS = [
-    { code: '58410-2', name: 'Complete Blood Count (CBC)' },
-    { code: '24323-8', name: 'Comprehensive Metabolic Panel' },
-    { code: '2085-9', name: 'HDL Cholesterol' },
-    { code: '2089-1', name: 'LDL Cholesterol' },
-    { code: '2571-8', name: 'Triglycerides' },
-    { code: '1920-8', name: 'Aspartate Aminotransferase (AST)' },
-    { code: '1742-6', name: 'Alanine Aminotransferase (ALT)' },
-    { code: '2160-0', name: 'Creatinine' },
-    { code: '3094-0', name: 'Blood Urea Nitrogen (BUN)' },
-    { code: '2345-7', name: 'Glucose' },
-    { code: '17861-6', name: 'Calcium' },
-    { code: '2777-1', name: 'Phosphorus' },
-    { code: '2951-2', name: 'Sodium' },
-    { code: '2823-3', name: 'Potassium' },
-    { code: '2075-0', name: 'Chloride' },
+    // Hematology
+    { code: 'cbc', name: 'Complete Blood Count (CBC)' },
+    { code: 'platelet_count', name: 'Platelet Count' },
+    { code: 'blood_typing', name: 'Blood Typing' },
+    { code: 'clotting_time', name: 'Clotting Time' },
+    { code: 'bleeding_time', name: 'Bleeding Time' },
+    // Microscopy
+    { code: 'urinalysis', name: 'Urinalysis' },
+    { code: 'fecalysis', name: 'Fecalysis' },
+    { code: 'pregnancy_test', name: 'Pregnancy Test' },
+    // Chemistry
+    { code: 'fbs', name: 'Fasting Blood Sugar (FBS)' },
+    { code: 'rbs', name: 'Random Blood Sugar (RBS)' },
+    { code: 'lipid_profile', name: 'Lipid Profile' },
+    { code: 'creatinine', name: 'Creatinine' },
+    { code: 'bua', name: 'Blood Uric Acid' },
+    { code: 'bun', name: 'Blood Urea Nitrogen' },
+    { code: 'sgpt', name: 'SGPT (ALT)' },
+    { code: 'sgot', name: 'SGOT (AST)' },
+    { code: 'electrolytes', name: 'Electrolytes' },
+    { code: 'blood_chemistry', name: 'Blood Chemistry (Package)' },
+    // Serology
+    { code: 'hbsag', name: 'HBsAg' },
+    { code: 'syphilis', name: 'Syphilis (RPR/VDRL)' },
+    { code: 'dengue_duo', name: 'Dengue Duo' },
+    { code: 'typhoid', name: 'Typhoid Test' },
+    // Microbiology
+    { code: 'gram_stain', name: 'Gram Stain' },
+    { code: 'afb_stain', name: 'AFB Stain' },
 ];
 
 export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
@@ -68,8 +81,6 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
 
     // Permissions
     const canOrderLabs = currentRole === 'doctor';
-    const canSendLabs = currentRole === 'nurse';
-    const canEnterResults = currentRole === 'lab_technician';
     const canViewLabs = currentRole === 'doctor' || currentRole === 'nurse' || currentRole === 'lab_technician';
 
     const handleOrderSubmit = () => {
@@ -94,59 +105,9 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
         setOrderForm({ testCode: '', testName: '', priority: 'routine', notes: '' });
     };
 
-    const handleSendRequest = async (request: LabRequest) => {
-        try {
-            await monitoringService.updateLabRequestStatus(request.id, 'requested');
-            // Optimistically update or trigger refresh (parent handles refresh via state)
-            // Ideally we should have an onUpdateStatus prop, but for now we'll reload page or 
-            // rely on parent re-fetching if we added a callback. 
-            // Since props are read-only, we can't update localliy easily without parent help.
-            // For this implementation, let's assume parent will refresh or we force a reload.
-            window.location.reload(); 
-        } catch (error) {
-            alert('Failed to send request');
-        }
-    };
-
-    const handleResultSubmit = () => {
-        if (!selectedRequest) return;
-
-        if (!resultForm.findings || !resultForm.interpretation || !resultForm.reportedBy) {
-            alert('Please fill in all required fields');
-            return;
-        }
-
-        onUpdateResult?.(selectedRequest.id, resultForm);
-        setIsResultModalOpen(false);
-        setSelectedRequest(null);
-        setResultForm({
-            findings: '',
-            values: [],
-            interpretation: '',
-            reportedBy: '',
-            reportedAt: new Date().toISOString(),
-        });
-    };
-
-    const openResultModal = (request: LabRequest) => {
-        setSelectedRequest(request);
-        if (request.resultContent) {
-            setResultForm(request.resultContent);
-        }
-        setIsResultModalOpen(true);
-    };
-
     const getStatusBadge = (status: string) => {
-        switch (status) {
-            case 'ordered':
-                return <Badge className="bg-blue-100 text-blue-800"><Clock className="w-3 h-3 mr-1" />Ordered (Draft)</Badge>;
-            case 'requested':
-                return <Badge className="bg-yellow-100 text-yellow-800"><AlertCircle className="w-3 h-3 mr-1" />In Progress</Badge>;
-            case 'completed':
-                return <Badge className="bg-green-100 text-green-800"><CheckCircle className="w-3 h-3 mr-1" />Completed</Badge>;
-            default:
-                return <Badge>{status}</Badge>;
-        }
+        // In monitoring, we only show completed results
+        return <Badge className="bg-green-100 text-green-800"><CheckCircle className="w-3 h-3 mr-1" />Completed</Badge>;
     };
 
     const getPriorityBadge = (priority: string) => {
@@ -177,7 +138,7 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
         <div className="space-y-4">
             {/* Header */}
             <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold text-gray-900">Laboratory Requests</h3>
+                <h3 className="text-lg font-semibold text-gray-900">Laboratory Results</h3>
                 <div className="flex items-center gap-2">
                     {onRefresh && (
                         <Button variant="outline" size="icon" onClick={onRefresh} title="Reload Requests">
@@ -190,9 +151,18 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
                             className="bg-blue-600 hover:bg-blue-700 text-white"
                         >
                             <Plus className="w-4 h-4 mr-2" />
-                            Order Lab Test
+                            Request Lab Test
                         </Button>
                     )}
+                </div>
+            </div>
+
+            {/* Info Banner */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
+                <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-blue-900">
+                    <p className="font-medium">Monitoring View (Read-Only)</p>
+                    <p className="text-blue-700">This shows finalized lab results only. To process lab tests or view detailed results, visit the <a href="/laboratory" className="underline font-medium">Laboratory page</a>.</p>
                 </div>
             </div>
 
@@ -201,9 +171,9 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
                 {labRequests.length === 0 ? (
                     <Card className="p-8 text-center">
                         <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                        <p className="text-gray-600">No laboratory requests found</p>
+                        <p className="text-gray-600">No completed laboratory results found</p>
                         {canOrderLabs && (
-                            <p className="text-sm text-gray-500 mt-2">Click "Order Lab Test" to create a new request</p>
+                            <p className="text-sm text-gray-500 mt-2">Click "Request Lab Test" to create a new request</p>
                         )}
                     </Card>
                 ) : (
@@ -218,47 +188,28 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
                                     </div>
                                     <div className="text-sm text-gray-600 space-y-1">
                                         <p><span className="font-medium">Test Code:</span> {request.testCode}</p>
-                                        <p className="font-medium text-xs text-blue-600">{request.lifecycleStatus === 'ordered' ? 'Pending nurse review' : ''}</p>
                                         <p><span className="font-medium">Ordered by:</span> {request.orderedBy}</p>
                                         <p><span className="font-medium">Ordered at:</span> {new Date(request.orderedAt).toLocaleString()}</p>
+                                        {request.completedAt && (
+                                            <p><span className="font-medium">Completed at:</span> {new Date(request.completedAt).toLocaleString()}</p>
+                                        )}
                                         {request.notes && <p><span className="font-medium">Notes:</span> {request.notes}</p>}
                                         {request.resultContent && (
                                             <div className="mt-3 p-3 bg-green-50 rounded border border-green-200">
-                                                <p className="font-medium text-green-900 mb-1">Results Available</p>
+                                                <p className="font-medium text-green-900 mb-1">✓ Results Available</p>
                                                 <p className="text-sm text-green-800">{request.resultContent.interpretation}</p>
                                             </div>
                                         )}
                                     </div>
                                 </div>
-                                <div className="ml-4 flex gap-2">
-                                    {canSendLabs && request.lifecycleStatus === 'ordered' && (
-                                        <Button 
-                                            size="sm" 
-                                            className="bg-purple-600 hover:bg-purple-700 text-white"
-                                            onClick={() => handleSendRequest(request)}
-                                        >
-                                            Send Request to Lab
-                                        </Button>
-                                    )}
-
+                                <div className="ml-4">
                                     {request.resultContent && (
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => openResultModal(request)}
-                                        >
-                                            <FileText className="w-4 h-4 mr-1" />
-                                            View Results
-                                        </Button>
-                                    )}
-                                    {canEnterResults && request.lifecycleStatus !== 'completed' && (
-                                        <Button
-                                            size="sm"
-                                            onClick={() => openResultModal(request)}
-                                            className="bg-green-600 hover:bg-green-700 text-white"
-                                        >
-                                            Enter Results
-                                        </Button>
+                                        <a href="/laboratory" target="_blank" rel="noopener noreferrer">
+                                            <Button size="sm" variant="outline">
+                                                <ExternalLink className="w-4 h-4 mr-1" />
+                                                View in Laboratory
+                                            </Button>
+                                        </a>
                                     )}
                                 </div>
                             </div>
@@ -271,7 +222,7 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
             <Dialog open={isOrderModalOpen} onOpenChange={setIsOrderModalOpen}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Order Laboratory Test</DialogTitle>
+                        <DialogTitle>Request Laboratory Test</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4">
                         <div>
@@ -329,63 +280,8 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
                             Cancel
                         </Button>
                         <Button onClick={handleOrderSubmit} className="bg-blue-600 hover:bg-blue-700 text-white">
-                            Order Test
+                            Request Test
                         </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* Lab Results Modal */}
-            <Dialog open={isResultModalOpen} onOpenChange={setIsResultModalOpen}>
-                <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle>
-                            {selectedRequest?.resultContent ? 'View' : 'Enter'} Lab Results - {selectedRequest?.testName}
-                        </DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                        <div>
-                            <Label htmlFor="findings">Findings</Label>
-                            <Textarea
-                                id="findings"
-                                value={resultForm.findings}
-                                onChange={(e) => setResultForm({ ...resultForm, findings: e.target.value })}
-                                placeholder="Describe the laboratory findings..."
-                                rows={3}
-                                disabled={!!selectedRequest?.resultContent && !canEnterResults}
-                            />
-                        </div>
-                        <div>
-                            <Label htmlFor="interpretation">Interpretation</Label>
-                            <Textarea
-                                id="interpretation"
-                                value={resultForm.interpretation}
-                                onChange={(e) => setResultForm({ ...resultForm, interpretation: e.target.value })}
-                                placeholder="Clinical interpretation of results..."
-                                rows={3}
-                                disabled={!!selectedRequest?.resultContent && !canEnterResults}
-                            />
-                        </div>
-                        <div>
-                            <Label htmlFor="reportedBy">Reported By</Label>
-                            <Input
-                                id="reportedBy"
-                                value={resultForm.reportedBy}
-                                onChange={(e) => setResultForm({ ...resultForm, reportedBy: e.target.value })}
-                                placeholder="Enter your name"
-                                disabled={!!selectedRequest?.resultContent && !canEnterResults}
-                            />
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsResultModalOpen(false)}>
-                            Close
-                        </Button>
-                        {canEnterResults && !selectedRequest?.resultContent && (
-                            <Button onClick={handleResultSubmit} className="bg-green-600 hover:bg-green-700 text-white">
-                                Submit Results
-                            </Button>
-                        )}
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

@@ -8,17 +8,17 @@ import { admissionService } from '../../services/admissionService';
 import type { Admission } from '@/types/admission';
 import { cn } from "@/lib/utils";
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
 } from "@/components/ui/command";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
 } from "@/components/ui/popover";
 
 interface LabRequestModalProps {
@@ -63,12 +63,12 @@ export const LabRequestModal: React.FC<LabRequestModalProps> = ({ isOpen, onClos
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         console.log('Form data before conversion:', formData);
-        
+
         // Find selected admission to get subject_id
         const selected = admissions.find(a => a.encounter_id === parseInt(formData.admission));
-        
+
         const requestData = {
             subject_id: selected?.subject_id || 0,
             admission: parseInt(formData.admission),
@@ -81,7 +81,7 @@ export const LabRequestModal: React.FC<LabRequestModalProps> = ({ isOpen, onClos
         console.log('Submitting lab request:', requestData);
         onSubmit(requestData);
         onClose();
-        
+
         // Reset form
         setFormData({
             admission: '',
@@ -164,7 +164,7 @@ export const LabRequestModal: React.FC<LabRequestModalProps> = ({ isOpen, onClos
                                             {selectedAdmission.patient_summary.last_name}, {selectedAdmission.patient_summary.first_name}
                                         </div>
                                         <div className="text-xs text-gray-600 mt-1">
-                                            <span className="font-medium">Patient ID:</span> {selectedAdmission.patient_summary.patient_id} | 
+                                            <span className="font-medium">Patient ID:</span> {selectedAdmission.patient_summary.patient_id} |
                                             <span className="font-medium ml-2">Admission ID:</span> {selectedAdmission.identifier}
                                         </div>
                                     </div>
@@ -203,13 +203,40 @@ export const LabRequestModal: React.FC<LabRequestModalProps> = ({ isOpen, onClos
                                 value={formData.test_type}
                                 onChange={e => setFormData({ ...formData, test_type: e.target.value as LabTestType })}
                             >
-                                <option value="cbc">Complete Blood Count (CBC)</option>
-                                <option value="urinalysis">Urinalysis</option>
-                                <option value="fecalysis">Fecalysis</option>
-                                <option value="xray">X-Ray</option>
-                                <option value="ultrasound">Ultrasound</option>
-                                <option value="ecg">ECG</option>
-                                <option value="blood_chemistry">Blood Chemistry</option>
+                                <optgroup label="Hematology">
+                                    <option value="cbc">Complete Blood Count (CBC)</option>
+                                    <option value="platelet_count">Platelet Count</option>
+                                    <option value="blood_typing">Blood Typing</option>
+                                    <option value="clotting_time">Clotting Time</option>
+                                    <option value="bleeding_time">Bleeding Time</option>
+                                </optgroup>
+                                <optgroup label="Clinical Microscopy">
+                                    <option value="urinalysis">Urinalysis</option>
+                                    <option value="fecalysis">Fecalysis</option>
+                                    <option value="pregnancy_test">Pregnancy Test</option>
+                                </optgroup>
+                                <optgroup label="Blood Chemistry">
+                                    <option value="fbs">Fasting Blood Sugar (FBS)</option>
+                                    <option value="rbs">Random Blood Sugar (RBS)</option>
+                                    <option value="lipid_profile">Lipid Profile</option>
+                                    <option value="creatinine">Creatinine</option>
+                                    <option value="bua">Blood Uric Acid</option>
+                                    <option value="bun">Blood Urea Nitrogen</option>
+                                    <option value="sgpt">SGPT (ALT)</option>
+                                    <option value="sgot">SGOT (AST)</option>
+                                    <option value="electrolytes">Electrolytes</option>
+                                    <option value="blood_chemistry">Blood Chemistry (Package)</option>
+                                </optgroup>
+                                <optgroup label="Serology & Immunology">
+                                    <option value="hbsag">HBsAg</option>
+                                    <option value="syphilis">Syphilis (RPR/VDRL)</option>
+                                    <option value="dengue_duo">Dengue Duo</option>
+                                    <option value="typhoid">Typhoid Test</option>
+                                </optgroup>
+                                <optgroup label="Microbiology">
+                                    <option value="gram_stain">Gram Stain</option>
+                                    <option value="afb_stain">AFB Stain</option>
+                                </optgroup>
                             </select>
                         </div>
                         <div>

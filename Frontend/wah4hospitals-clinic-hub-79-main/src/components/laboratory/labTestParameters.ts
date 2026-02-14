@@ -53,22 +53,6 @@ export const LAB_TEST_PARAMETERS: Record<string, TestParameter[]> = {
     { parameter_name: 'SGPT (ALT)', unit: 'U/L', reference_range: '7-56', normalMin: 7, normalMax: 56 },
     { parameter_name: 'SGOT (AST)', unit: 'U/L', reference_range: '5-40', normalMin: 5, normalMax: 40 },
   ],
-  xray: [
-    { parameter_name: 'Findings', unit: '', reference_range: 'Normal', normalMin: undefined, normalMax: undefined },
-    { parameter_name: 'Impression', unit: '', reference_range: 'Within Normal Limits', normalMin: undefined, normalMax: undefined },
-  ],
-  ultrasound: [
-    { parameter_name: 'Findings', unit: '', reference_range: 'Normal', normalMin: undefined, normalMax: undefined },
-    { parameter_name: 'Impression', unit: '', reference_range: 'Within Normal Limits', normalMin: undefined, normalMax: undefined },
-  ],
-  ecg: [
-    { parameter_name: 'Heart Rate', unit: 'bpm', reference_range: '60-100', normalMin: 60, normalMax: 100 },
-    { parameter_name: 'PR Interval', unit: 'ms', reference_range: '120-200', normalMin: 120, normalMax: 200 },
-    { parameter_name: 'QRS Duration', unit: 'ms', reference_range: '80-120', normalMin: 80, normalMax: 120 },
-    { parameter_name: 'QT Interval', unit: 'ms', reference_range: '350-450', normalMin: 350, normalMax: 450 },
-    { parameter_name: 'Rhythm', unit: '', reference_range: 'Normal Sinus Rhythm', normalMin: undefined, normalMax: undefined },
-    { parameter_name: 'Interpretation', unit: '', reference_range: 'Within Normal Limits', normalMin: undefined, normalMax: undefined },
-  ],
 };
 
 /**
@@ -90,7 +74,7 @@ export function calculateInterpretation(
 
   // Parse the result value to a number
   const numericValue = parseFloat(resultValue);
-  
+
   // If result is not a valid number, cannot calculate
   if (isNaN(numericValue)) {
     return '';
