@@ -40,7 +40,7 @@ export default function LaboratoryDashboard() {
   const { toast } = useToast();
 
   // State Management
-  const [activeTab, setActiveTab] = useState<'pending' | 'in_progress' | 'completed'>('pending');
+  const [activeTab, setActiveTab] = useState<'verified' | 'completed'>('verified');
   const [labRequests, setLabRequests] = useState<LabRequest[]>([]);
   const [stats, setStats] = useState<LabDashboardStats>({ pending: 0, in_progress: 0, completed_today: 0 });
   const [loading, setLoading] = useState(true);
@@ -71,7 +71,7 @@ export default function LaboratoryDashboard() {
 
       // Fetch requests based on active tab
       const filters: LabRequestFilters = {
-        status: activeTab === 'in_progress' ? 'in_progress' : activeTab === 'completed' ? 'completed' : 'pending',
+        status: activeTab,
         // priority: priorityFilter !== 'all' ? priorityFilter : undefined, // Backend filtering for priority to be added
       };
 
@@ -210,7 +210,7 @@ export default function LaboratoryDashboard() {
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <Clock className="text-orange-600" size={16} />
-                    <p className="text-sm text-orange-800 font-medium">Pending</p>
+                    <p className="text-sm text-orange-800 font-medium">Requested</p>
                   </div>
                   <p className="text-3xl font-bold text-orange-900">{stats.pending}</p>
                   <p className="text-xs text-orange-600 mt-1">Awaiting processing</p>
@@ -226,7 +226,7 @@ export default function LaboratoryDashboard() {
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <Activity className="text-blue-600" size={16} />
-                    <p className="text-sm text-blue-800 font-medium">In-Progress</p>
+                    <p className="text-sm text-blue-800 font-medium">Verified</p>
                   </div>
                   <p className="text-3xl font-bold text-blue-900">{stats.in_progress}</p>
                   <p className="text-xs text-blue-600 mt-1">Being analyzed</p>
@@ -274,36 +274,19 @@ export default function LaboratoryDashboard() {
           {/* Tab Navigation */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
+
               <button
-                onClick={() => setActiveTab('pending')}
-                className={`px-6 py-2.5 rounded-lg font-medium transition-all ${activeTab === 'pending'
-                  ? 'bg-orange-500 text-white shadow-md'
-                  : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
-                  }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Clock size={18} />
-                  <span>Pending</span>
-                  {stats.pending > 0 && (
-                    <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-semibold ${activeTab === 'pending' ? 'bg-orange-600 text-white' : 'bg-orange-100 text-orange-700'
-                      }`}>
-                      {stats.pending}
-                    </span>
-                  )}
-                </div>
-              </button>
-              <button
-                onClick={() => setActiveTab('in_progress')}
-                className={`px-6 py-2.5 rounded-lg font-medium transition-all ${activeTab === 'in_progress'
+                onClick={() => setActiveTab('verified')}
+                className={`px-6 py-2.5 rounded-lg font-medium transition-all ${activeTab === 'verified'
                   ? 'bg-blue-500 text-white shadow-md'
                   : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
                   }`}
               >
                 <div className="flex items-center gap-2">
                   <Activity size={18} />
-                  <span>In-Progress</span>
+                  <span>Verified</span>
                   {stats.in_progress > 0 && (
-                    <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-semibold ${activeTab === 'in_progress' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700'
+                    <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-semibold ${activeTab === 'verified' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700'
                       }`}>
                       {stats.in_progress}
                     </span>
@@ -448,19 +431,11 @@ export default function LaboratoryDashboard() {
                           </p>
                         </td>
                         <td className="px-6 py-4">
-                          {/* Pending Tab Actions */}
-                          {activeTab === 'pending' && (
-                            <button
-                              onClick={() => handleReceiveSpecimenClick(request.id)}
-                              className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2 font-medium text-sm"
-                            >
-                              <CheckCircle size={16} />
-                              Receive
-                            </button>
-                          )}
+                          {/* Requested Tab Actions */}
 
-                          {/* In-Progress Tab Actions */}
-                          {activeTab === 'in_progress' && (
+
+                          {/* Verified Tab Actions */}
+                          {activeTab === 'verified' && (
                             <button
                               onClick={() => handleStartEncoding(request)}
                               className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2 font-medium text-sm"
@@ -519,7 +494,7 @@ export default function LaboratoryDashboard() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Specimen Receipt</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to receive this specimen? This will move the request to the In-Progress queue.
+              Are you sure you want to receive this specimen? This will move the request to the Verified queue.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

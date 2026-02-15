@@ -12,8 +12,8 @@ export type LabTestType =
   | 'gram_stain' | 'afb_stain'
   // Legacy/Group placeholders
   | 'lipid_panel';
-export type LabPriority = 'routine' | 'stat';
-export type LabStatus = 'pending' | 'in_progress' | 'completed';
+export type LabPriority = 'routine' | 'urgent' | 'stat';
+export type LabStatus = 'requested' | 'verified' | 'completed';
 export type LabInterpretation = 'normal' | 'high' | 'low';
 
 // Test Parameter

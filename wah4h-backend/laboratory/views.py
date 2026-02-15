@@ -70,7 +70,7 @@ class DiagnosticReportViewSet(viewsets.ModelViewSet):
         'encounter_id': ['exact'],
         'performer_id': ['exact'],
         'requester_id': ['exact'],
-        'status': ['exact'],
+        'status': ['exact', 'in'],
         'code_code': ['exact', 'icontains'],
         'category_code': ['exact'],
         'priority': ['exact'],  # Enable priority filtering
@@ -108,6 +108,29 @@ class DiagnosticReportViewSet(viewsets.ModelViewSet):
         else:
             serializer.save()
 
+    def get_object(self):
+        """
+        Resilient get_object: supports lookup by integer ID (PK) OR string identifier.
+        """
+        queryset = self.filter_queryset(self.get_queryset())
+        lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
+        lookup_value = self.kwargs.get(lookup_url_kwarg)
+
+        try:
+            # If it's a digit, treat as standard PK lookup
+            # Check string content because int("LAB-123") throws, but int("123") works
+            if str(lookup_value).isdigit():
+                return super().get_object()
+            
+            # Otherwise, try lookup by identifier
+            from django.shortcuts import get_object_or_404
+            obj = get_object_or_404(queryset, identifier=lookup_value)
+            self.check_object_permissions(self.request, obj)
+            return obj
+        except Exception:
+            # Fallback to default behavior if anything goes wrong
+            return super().get_object()
+
     @action(detail=True, methods=['post'])
     def finalize(self, request, pk=None):
         """
@@ -133,10 +156,10 @@ class DiagnosticReportViewSet(viewsets.ModelViewSet):
         
         # Efficient aggregation query instead of fetching all objects
         stats = DiagnosticReport.objects.aggregate(
-            pending=Count('diagnostic_report_id', filter=Q(status='registered')),
-            in_progress=Count('diagnostic_report_id', filter=Q(status__in=['preliminary', 'partial'])),
+            pending=Count('diagnostic_report_id', filter=Q(status__in=['requested', 'draft'])),
+            in_progress=Count('diagnostic_report_id', filter=Q(status__in=['verified', 'registered', 'preliminary', 'partial'])),
             completed_today=Count('diagnostic_report_id', filter=Q(
-                status='final',
+                status__in=['completed', 'final', 'amended', 'corrected'],
                 issued_datetime__date=today
             ))
         )
@@ -147,7 +170,7 @@ class DiagnosticReportViewSet(viewsets.ModelViewSet):
     def update_status(self, request, pk=None):
         """
         Update the status of a diagnostic report.
-        Accepts: { "status": "registered|preliminary|partial|final|..." }
+        Accepts: { "status": "requested|verified|completed|..." }
         """
         instance = self.get_object()
         new_status = request.data.get('status')
@@ -159,7 +182,10 @@ class DiagnosticReportViewSet(viewsets.ModelViewSet):
             )
         
         # Validate status value
-        valid_statuses = ['registered', 'partial', 'preliminary', 'final', 'amended', 'corrected', 'cancelled']
+        valid_statuses = [
+            'requested', 'verified', 'completed',
+            'draft', 'registered', 'partial', 'preliminary', 'final', 'amended', 'corrected', 'cancelled'
+        ]
         if new_status not in valid_statuses:
             return Response(
                 {'error': f'Invalid status. Must be one of: {", ".join(valid_statuses)}'},
@@ -168,8 +194,8 @@ class DiagnosticReportViewSet(viewsets.ModelViewSet):
         
         instance.status = new_status
         
-        # Auto-set issued_datetime when transitioning to final
-        if new_status == 'final' and not instance.issued_datetime:
+        # Auto-set issued_datetime when transitioning to completed/final
+        if new_status in ['completed', 'final'] and not instance.issued_datetime:
             from django.utils import timezone
             instance.issued_datetime = timezone.now()
         

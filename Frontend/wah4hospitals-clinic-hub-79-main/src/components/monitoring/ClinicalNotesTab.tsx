@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRole } from '@/contexts/RoleContext';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -24,6 +26,8 @@ export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({
     patientId,
     onAddNote,
 }) => {
+    const { user } = useAuth();
+    const { currentRole } = useRole();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [type, setType] = useState<'SOAP' | 'Progress'>('SOAP');
     const [subjective, setSubjective] = useState('');
@@ -40,7 +44,7 @@ export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({
 
     const handleSave = async () => {
         const newNote: ClinicalNote = {
-            id: '', // Will be set by backend
+            id: Date.now().toString(), // Temporary ID for frontend rendering
             admissionId,
             dateTime: new Date().toISOString(),
             type,
@@ -48,7 +52,7 @@ export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({
             objective,
             assessment,
             plan,
-            providerName: 'Dr. Test User', // TODO: Get from auth context
+            providerName: user ? `${user.firstName} ${user.lastName}` : 'Unknown Provider', 
         };
 
         try {
@@ -66,9 +70,11 @@ export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({
     return (
         <div className="space-y-6">
             <div className="flex justify-end">
-                <Button onClick={() => setIsModalOpen(true)} className="bg-blue-600 hover:bg-blue-700">
-                    <Plus className="w-4 h-4 mr-2" /> Add Clinical Note
-                </Button>
+                {(currentRole === 'doctor' || currentRole === 'nurse') && (
+                    <Button onClick={() => setIsModalOpen(true)} className="bg-blue-600 hover:bg-blue-700">
+                        <Plus className="w-4 h-4 mr-2" /> Add Clinical Note
+                    </Button>
+                )}
             </div>
 
             <div className="space-y-4">

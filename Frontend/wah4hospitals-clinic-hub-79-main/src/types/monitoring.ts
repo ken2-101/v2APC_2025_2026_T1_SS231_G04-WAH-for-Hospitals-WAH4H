@@ -70,7 +70,8 @@ export interface LabRequest {
     testCode: string;                // LOINC code
     priority: 'routine' | 'urgent' | 'stat';
     notes: string;
-    lifecycleStatus: 'ordered' | 'requested' | 'completed';
+    lifecycleStatus: 'requested' | 'verified' | 'completed';
+    status_display?: string; // Backend raw status (e.g. 'draft', 'registered')
     orderedBy: string;
     orderedAt: string;
     requestedBy?: string;

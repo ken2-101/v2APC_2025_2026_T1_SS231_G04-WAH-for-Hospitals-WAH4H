@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Search, Activity, Users, AlertTriangle, Heart, User, ChevronRight, ArrowLeft, Clock } from 'lucide-react';
@@ -24,6 +25,7 @@ import monitoringService from '@/services/monitoringService';
 import laboratoryService from '@/services/laboratoryService';  // For lab requests/results
 
 const Monitoring: React.FC = () => {
+  const { toast } = useToast();
   const [admissions, setAdmissions] = useState<MonitoringAdmission[]>([]);
   const [selectedAdmission, setSelectedAdmission] = useState<MonitoringAdmission | null>(null);
 
@@ -90,8 +92,8 @@ const Monitoring: React.FC = () => {
         const labResponse = await laboratoryService.getLabRequests({
           subject_id: adm.patientId,  // Filter by patient ID
           encounter_id: adm.id,
-          status: 'final'
-        } as any);  // Type assertion: cross-module integration with laboratory filters
+        } as any);
+
 
         // API returns paginated response with results array
         const labResults = labResponse.results || [];
@@ -104,17 +106,24 @@ const Monitoring: React.FC = () => {
           testCode: report.test_type,
           priority: report.priority || 'routine',
           notes: report.clinical_reason || '',
-          lifecycleStatus: 'completed' as const,
-          orderedBy: report.doctor_name || 'Unknown',
+          lifecycleStatus: (['verified', 'registered', 'preliminary', 'partial'].includes(report.status)) ? 'verified' : 
+                          (['completed', 'final', 'amended', 'corrected'].includes(report.status) ? 'completed' : 'requested'),
+          status_display: (() => {
+            const s = report.status;
+            if (['completed', 'final', 'amended', 'corrected'].includes(s)) return 'Completed';
+            if (['verified', 'registered', 'preliminary', 'partial'].includes(s)) return 'Verified';
+            return 'Requested'; // 'requested', 'draft'
+          })(),
+          orderedBy: report.doctor_name || report.orderedBy || 'Unknown',
           orderedAt: report.created_at,
           completedAt: report.updated_at,
-          resultContent: {
+          resultContent: report.status === 'final' ? {
             findings: 'Results available in Laboratory module',
             values: [],
             interpretation: 'See Laboratory page for detailed results',
             reportedBy: 'Lab',
             reportedAt: report.updated_at
-          }
+          } : undefined
         }));
         setLabRequests(mappedLabs);
       } catch (labErr) {
@@ -200,8 +209,8 @@ const Monitoring: React.FC = () => {
       const labResponse = await laboratoryService.getLabRequests({
         subject_id: selectedAdmission.patientId,  // Filter by patient ID
         encounter_id: selectedAdmission.id,
-        status: 'final'
-      } as any);  // Type assertion for cross-module filters
+      } as any);
+
 
       const labResults = labResponse.results || [];
       const mappedLabs: LabRequest[] = labResults.map((report: any) => ({
@@ -211,19 +220,26 @@ const Monitoring: React.FC = () => {
         testCode: report.test_type,
         priority: report.priority || 'routine',
         notes: report.clinical_reason || '',
-        lifecycleStatus: 'completed' as const,
-        orderedBy: report.doctor_name || 'Unknown',
-        orderedAt: report.created_at,
-        completedAt: report.updated_at,
-        resultContent: {
-          findings: 'Results available in Laboratory module',
-          values: [],
-          interpretation: 'See Laboratory page for detailed results',
-          reportedBy: 'Lab',
-          reportedAt: report.updated_at
-        }
-      }));
-      setLabRequests(mappedLabs);
+          lifecycleStatus: (['verified', 'registered', 'preliminary', 'partial'].includes(report.status)) ? 'verified' : 
+                          (['completed', 'final', 'amended', 'corrected'].includes(report.status) ? 'completed' : 'requested'),
+          status_display: (() => {
+            const s = report.status;
+            if (['completed', 'final', 'amended', 'corrected'].includes(s)) return 'Completed';
+            if (['verified', 'registered', 'preliminary', 'partial'].includes(s)) return 'Verified';
+            return 'Requested'; // 'requested', 'draft'
+          })(),
+          orderedBy: report.doctor_name || report.orderedBy || 'Unknown',
+          orderedAt: report.created_at,
+          completedAt: report.updated_at,
+          resultContent: report.status === 'final' ? {
+            findings: 'Results available in Laboratory module',
+            values: [],
+            interpretation: 'See Laboratory page for detailed results',
+            reportedBy: 'Lab',
+            reportedAt: report.updated_at
+          } : undefined
+        }));
+        setLabRequests(mappedLabs);
     } catch (err: any) {
       console.error('Error adding lab request:', err);
       console.error('Error response data:', err.response?.data);
@@ -237,6 +253,54 @@ const Monitoring: React.FC = () => {
     console.log('Lab results should be entered in the Laboratory module');
     alert('Please use the Laboratory page to enter/update lab results');
   };
+
+  const handleVerifyLabRequest = async (requestId: number | string) => {
+      try {
+          await laboratoryService.verifyLabRequest(requestId);
+          toast({
+            title: "Success",
+            description: "Lab request verified successfully",
+            className: "bg-green-600 text-white border-green-700",
+          });
+          
+          // Refresh requests
+          if (selectedAdmission) {
+            handleSelectAdmission(selectedAdmission);
+          }
+      } catch (err: any) {
+          console.error("Failed to verify lab request", err);
+          const errorMessage = err.response?.data?.error || "Failed to verify lab request";
+          toast({
+            title: "Verification Failed",
+            description: errorMessage,
+            variant: "destructive",
+          });
+      }
+  };
+
+  const handleDeleteLabRequest = async (requestId: number | string) => {
+      try {
+          await laboratoryService.deleteLabRequest(requestId);
+          toast({
+            title: "Success",
+            description: "Lab request deleted successfully",
+            className: "bg-green-600 text-white border-green-700",
+          });
+          
+          if (selectedAdmission) {
+            handleSelectAdmission(selectedAdmission);
+          }
+      } catch (err: any) {
+          console.error("Failed to delete lab request", err);
+          toast({
+            title: "Error",
+            description: "Failed to delete lab request",
+            variant: "destructive",
+          });
+      }
+  };
+
+
 
   const defaultDietaryOrder: DietaryOrder = selectedAdmission ? {
     admissionId: selectedAdmission.id.toString(),
@@ -483,6 +547,8 @@ const Monitoring: React.FC = () => {
                     labRequests={labRequests}
                     onAddRequest={handleAddLabRequest}
                     onUpdateResult={handleUpdateLabResult}
+                    onVerifyRequest={handleVerifyLabRequest}
+                    onDeleteRequest={handleDeleteLabRequest}
                     onRefresh={() => {
                       if (selectedAdmission) handleSelectAdmission(selectedAdmission);
                     }}

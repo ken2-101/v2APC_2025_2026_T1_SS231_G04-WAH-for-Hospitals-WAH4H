@@ -22,6 +22,7 @@ import { InventoryItem, MedicationRequest } from '@/types/pharmacy';
 import pharmacyService from '@/services/pharmacyService';
 
 import { useRole } from '@/contexts/RoleContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface MedicationRequestTabProps {
   admissionId: string;
@@ -29,6 +30,7 @@ interface MedicationRequestTabProps {
 }
 
 export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admissionId, patientId }) => {
+  const { user } = useAuth();
   const { currentRole } = useRole();
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [requests, setRequests] = useState<MedicationRequest[]>([]);
@@ -100,8 +102,7 @@ export const MedicationRequestTab: React.FC<MedicationRequestTabProps> = ({ admi
     try {
       const selectedItem = inventory.find(i => i.id === selectedInventoryId);
 
-      // TODO: Get requester_id from current user context/auth
-      const requesterId = 1; // Hardcoded for now
+      const requesterId = user ? Number(user.id) : 1;
 
       const payload = {
         admission: Number(admissionId),

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, FileText, AlertCircle, CheckCircle, Clock, RefreshCw, ExternalLink } from 'lucide-react';
+import { Plus, FileText, AlertCircle, CheckCircle, Clock, RefreshCw, ExternalLink, Trash2 } from 'lucide-react';
 import { LabRequest, LabResult } from '../../types/monitoring';
 import { useRole } from '@/contexts/RoleContext';
 
@@ -15,6 +15,8 @@ interface LaboratoryTabProps {
     labRequests: LabRequest[];
     onAddRequest?: (request: Omit<LabRequest, 'id'>) => void;
     onUpdateResult?: (requestId: string, result: LabResult) => void;
+    onVerifyRequest?: (requestId: number | string) => void;
+    onDeleteRequest?: (requestId: number | string) => void;
     onRefresh?: () => void;
 }
 
@@ -54,6 +56,8 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
     labRequests,
     onAddRequest,
     onUpdateResult,
+    onVerifyRequest,
+    onDeleteRequest,
     onRefresh
 }) => {
     const { currentRole, canModify } = useRole();
@@ -80,6 +84,19 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
     });
 
     // Permissions
+    // Role-based default filter
+    const [statusFilter, setStatusFilter] = useState<'all' | 'requested' | 'verified' | 'completed'>('all');
+
+    React.useEffect(() => {
+        if (currentRole === 'doctor') {
+            setStatusFilter('requested');
+        } else if (currentRole === 'nurse') {
+            setStatusFilter('requested');
+        } else {
+            setStatusFilter('all');
+        }
+    }, [currentRole]);
+
     const canOrderLabs = currentRole === 'doctor';
     const canViewLabs = currentRole === 'doctor' || currentRole === 'nurse' || currentRole === 'lab_technician';
 
@@ -95,7 +112,7 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
             testName: orderForm.testName,
             priority: orderForm.priority,
             notes: orderForm.notes,
-            lifecycleStatus: 'ordered',
+            lifecycleStatus: 'requested', // Default to requested (Active/Registered)
             orderedBy: currentRole,
             orderedAt: new Date().toISOString(),
         };
@@ -104,6 +121,28 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
         setIsOrderModalOpen(false);
         setOrderForm({ testCode: '', testName: '', priority: 'routine', notes: '' });
     };
+
+    const handleVerifyClick = (request: LabRequest) => {
+        if (onVerifyRequest) {
+            onVerifyRequest(request.id);
+        }
+    };
+
+    const handleDeleteClick = (request: LabRequest) => {
+        if (onDeleteRequest && window.confirm('Are you sure you want to delete this lab request?')) {
+            onDeleteRequest(request.id);
+        }
+    };
+
+
+
+    const filteredRequests = labRequests.filter(req => {
+        if (statusFilter === 'all') return true;
+        if (statusFilter === 'requested') return req.lifecycleStatus === 'requested';
+        if (statusFilter === 'verified') return req.lifecycleStatus === 'verified';
+        if (statusFilter === 'completed') return req.lifecycleStatus === 'completed';
+        return true;
+    });
 
     const getStatusBadge = (status: string) => {
         // In monitoring, we only show completed results
@@ -137,8 +176,27 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
     return (
         <div className="space-y-4">
             {/* Header */}
-            <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold text-gray-900">Laboratory Results</h3>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                   <h3 className="text-lg font-semibold text-gray-900">Laboratory Results</h3>
+                   <div className="flex items-center gap-2 mt-2">
+                        <Label className="text-sm font-medium text-gray-700">Filter Status:</Label>
+                        <Select
+                            value={statusFilter}
+                            onValueChange={(value: any) => setStatusFilter(value)}
+                        >
+                            <SelectTrigger className="w-[180px] h-8">
+                                <SelectValue placeholder="Filter Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Requests</SelectItem>
+                                <SelectItem value="requested">Requested (Active)</SelectItem>
+                                <SelectItem value="verified">Verified (Prelim)</SelectItem>
+                                <SelectItem value="completed">Completed</SelectItem>
+                            </SelectContent>
+                        </Select>
+                   </div>
+                </div>
                 <div className="flex items-center gap-2">
                     {onRefresh && (
                         <Button variant="outline" size="icon" onClick={onRefresh} title="Reload Requests">
@@ -168,22 +226,35 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
 
             {/* Lab Requests List */}
             <div className="space-y-3">
-                {labRequests.length === 0 ? (
+                {filteredRequests.length === 0 ? (
                     <Card className="p-8 text-center">
                         <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                        <p className="text-gray-600">No completed laboratory results found</p>
+                        <p className="text-gray-600">No laboratory results found</p>
                         {canOrderLabs && (
                             <p className="text-sm text-gray-500 mt-2">Click "Request Lab Test" to create a new request</p>
                         )}
                     </Card>
                 ) : (
-                    labRequests.map((request) => (
+                    filteredRequests.map((request) => (
                         <Card key={request.id} className="p-4">
                             <div className="flex justify-between items-start">
                                 <div className="flex-1">
                                     <div className="flex items-center gap-2 mb-2">
                                         <h4 className="font-semibold text-gray-900">{request.testName}</h4>
-                                        {getStatusBadge(request.lifecycleStatus)}
+                                        {request.lifecycleStatus === 'requested' ? (
+                                             <Badge className="bg-orange-100 text-orange-800 border-orange-200">
+                                                {request.status_display?.toUpperCase() || 'REQUESTED'}
+                                             </Badge>
+                                        ) : request.lifecycleStatus === 'verified' ? (
+                                             <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                                                {request.status_display?.toUpperCase() || 'VERIFIED'}
+                                             </Badge>
+                                        ) : (
+                                            <Badge className="bg-green-100 text-green-800 border-green-200">
+                                                <CheckCircle className="w-3 h-3 mr-1" />
+                                                {request.status_display?.toUpperCase() || 'COMPLETED'}
+                                            </Badge>
+                                        )}
                                         {getPriorityBadge(request.priority)}
                                     </div>
                                     <div className="text-sm text-gray-600 space-y-1">
@@ -202,16 +273,40 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
                                         )}
                                     </div>
                                 </div>
-                                <div className="ml-4">
-                                    {request.resultContent && (
-                                        <a href="/laboratory" target="_blank" rel="noopener noreferrer">
-                                            <Button size="sm" variant="outline">
-                                                <ExternalLink className="w-4 h-4 mr-1" />
-                                                View in Laboratory
+                                    <div className="ml-4 flex flex-col gap-2">
+                                        {/* Nurse Verification Action */}
+                                        {currentRole === 'nurse' && request.lifecycleStatus === 'requested' && (
+                                            <Button 
+                                                size="sm" 
+                                                className="bg-purple-600 hover:bg-purple-700 text-white"
+                                                onClick={() => handleVerifyClick(request)}
+                                            >
+                                                Verify Request
                                             </Button>
-                                        </a>
-                                    )}
-                                </div>
+                                        )}
+
+                                        {request.resultContent && (
+                                            <a href="/laboratory" target="_blank" rel="noopener noreferrer">
+                                                <Button size="sm" variant="outline">
+                                                    <ExternalLink className="w-4 h-4 mr-1" />
+                                                    View in Laboratory
+                                                </Button>
+                                            </a>
+                                        )}
+
+                                        {/* Delete Action - Only for requested items */}
+                                        {(currentRole === 'doctor' || currentRole === 'nurse') && request.lifecycleStatus === 'requested' && (
+                                            <Button 
+                                                size="sm" 
+                                                variant="ghost" 
+                                                className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                onClick={() => handleDeleteClick(request)}
+                                                title="Delete Request"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                        )}
+                                    </div>
                             </div>
                         </Card>
                     ))

@@ -306,6 +306,18 @@ class DiagnosticReportSerializer(serializers.ModelSerializer):
         # Remove any key that doesn't belong to the model
         model_data = {k: v for k, v in validated_data.items()}
 
+        # 1. Generate identifier if missing
+        if 'identifier' not in model_data:
+            import uuid
+            import time
+            timestamp = int(time.time() * 1000)
+            short_uuid = str(uuid.uuid4())[:8].upper()
+            model_data['identifier'] = f"LAB-{timestamp}-{short_uuid}"
+
+        # 2. Set default status to 'draft' if missing
+        if 'status' not in model_data:
+            model_data['status'] = 'requested'
+
         with transaction.atomic():
             report = DiagnosticReport.objects.create(**model_data)
             # Create result rows preserving order / sequence

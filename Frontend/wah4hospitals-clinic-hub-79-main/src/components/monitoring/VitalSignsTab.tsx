@@ -9,6 +9,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Plus, Printer, AlertTriangle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { VitalSign } from '../../types/monitoring';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRole } from '@/contexts/RoleContext';
 
 interface VitalSignsTabProps {
     vitals: VitalSign[];  // Already formatted VitalSign objects from service
@@ -17,6 +19,8 @@ interface VitalSignsTabProps {
 }
 
 export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital, patientId }) => {
+    const { user } = useAuth();
+    const { currentRole } = useRole();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [viewMode, setViewMode] = useState<'table' | 'graph'>('graph');
 
@@ -35,6 +39,8 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
     const handleSave = () => {
         if (!bpSys || !bpDia || !hr || !rr || !temp || !o2) return;
 
+        const staffName = user ? `${user.firstName} ${user.lastName}` : 'Unknown Staff';
+
         const newVital: Omit<VitalSign, 'id'> = {
             admissionId: patientId,
             dateTime: new Date().toISOString(),
@@ -43,7 +49,7 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
             respiratoryRate: Number(rr),
             temperature: Number(temp),
             oxygenSaturation: Number(o2),
-            staffName: 'Current User'
+            staffName: staffName
         };
 
         onAddVital(newVital);
@@ -99,10 +105,12 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
                         <Printer className="w-4 h-4 mr-2" />
                         Print
                     </Button>
-                    <Button onClick={() => setIsModalOpen(true)} className="bg-green-600 hover:bg-green-700">
-                        <Plus className="w-4 h-4 mr-2" />
-                        Record Vitals
-                    </Button>
+                    {(currentRole === 'nurse' || currentRole === 'doctor') && (
+                        <Button onClick={() => setIsModalOpen(true)} className="bg-green-600 hover:bg-green-700">
+                            <Plus className="w-4 h-4 mr-2" />
+                            Record Vitals
+                        </Button>
+                    )}
                 </div>
             </div>
 

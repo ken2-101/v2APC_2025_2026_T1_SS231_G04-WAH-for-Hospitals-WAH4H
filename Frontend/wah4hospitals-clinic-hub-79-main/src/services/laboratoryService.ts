@@ -28,11 +28,13 @@ export const laboratoryService = {
 
     // Map frontend status to backend status
     if (filters?.status) {
-      let backendStatus = '';
-      if (filters.status === 'pending') backendStatus = 'registered';
-      else if (filters.status === 'in_progress') backendStatus = 'preliminary';
-      else if (filters.status === 'completed') backendStatus = 'final';
-      if (backendStatus) params.append('status', backendStatus);
+      if (filters.status === 'requested') {
+        params.append('status__in', 'requested,draft');
+      } else if (filters.status === 'verified') {
+        params.append('status__in', 'verified,registered,preliminary,partial');
+      } else if (filters.status === 'completed') {
+        params.append('status__in', 'completed,final,amended,corrected');
+      }
     }
 
     if (filters?.search) params.append('search', filters.search);
@@ -80,7 +82,7 @@ export const laboratoryService = {
    * Get a single lab request by ID
    * Backend endpoint: GET /api/laboratory/reports/{id}/
    */
-  getLabRequest: async (id: number): Promise<LabRequest> => {
+  getLabRequest: async (id: number | string): Promise<LabRequest> => {
     const response = await api.get(`${LABORATORY_BASE_URL}/reports/${id}/`);
     const report = response.data;
 
@@ -131,7 +133,7 @@ export const laboratoryService = {
       code_display: getTestTypeDisplay(data.test_type),
       category_code: 'LAB',
       priority: data.priority,  // Now sending priority to backend
-      status: 'registered',
+      status: 'requested', // Default to requested
       conclusion: data.clinical_reason || ''
     };
 
@@ -153,7 +155,7 @@ export const laboratoryService = {
       priority: data.priority,
       priority_display: data.priority === 'stat' ? 'STAT' : 'Routine',
       clinical_reason: report.conclusion,
-      status: 'pending',
+      status: 'requested',
       status_display: report.status,
       created_at: report.created_at,
       updated_at: report.updated_at
@@ -183,7 +185,7 @@ export const laboratoryService = {
    * Delete a lab request
    * Backend endpoint: DELETE /api/laboratory/reports/{id}/
    */
-  deleteLabRequest: async (id: number): Promise<void> => {
+  deleteLabRequest: async (id: number | string): Promise<void> => {
     await api.delete(`${LABORATORY_BASE_URL}/reports/${id}/`);
   },
 
@@ -208,6 +210,16 @@ export const laboratoryService = {
     return laboratoryService.getLabRequest(id);
   },
 
+  /**
+   * Verify a drafted lab request (Nurse Action)
+   * Transitions status from 'draft' to 'registered'
+   */
+  verifyLabRequest: async (id: number | string): Promise<LabRequest> => {
+    await api.patch(`${LABORATORY_BASE_URL}/reports/${id}/update_status/`, {
+      status: 'verified'
+    });
+    return laboratoryService.getLabRequest(id);
+  },
   // ========== Lab Results ==========
 
   /**
@@ -345,24 +357,26 @@ export const laboratoryService = {
   },
 };
 
-// Helper functions
-
 /**
  * Map backend status to frontend status
  */
-function mapBackendStatusToFrontend(backendStatus: string): 'pending' | 'in_progress' | 'completed' {
+function mapBackendStatusToFrontend(backendStatus: string): 'requested' | 'verified' | 'completed' {
   switch (backendStatus) {
+    case 'requested':
+    case 'draft':
+      return 'requested'; 
+    case 'verified':
     case 'registered':
-      return 'pending';
     case 'preliminary':
     case 'partial':
-      return 'in_progress';
+      return 'verified';
+    case 'completed':
     case 'final':
     case 'amended':
     case 'corrected':
       return 'completed';
     default:
-      return 'pending';
+      return 'requested';
   }
 }
 
