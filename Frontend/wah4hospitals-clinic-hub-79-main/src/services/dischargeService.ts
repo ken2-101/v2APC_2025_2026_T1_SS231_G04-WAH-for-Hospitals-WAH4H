@@ -13,11 +13,11 @@ import type {
 const api: AxiosInstance = axios.create({
   baseURL:
     import.meta.env.BACKEND_DISCHARGE_8000
-      ? `${import.meta.env.BACKEND_DISCHARGE_8000}discharge-records/`
+      ? `${import.meta.env.BACKEND_DISCHARGE_8000}discharges/`
       : import.meta.env.LOCAL_8000
-        ? `${import.meta.env.LOCAL_8000}/api/discharge/discharge-records/`
+        ? `${import.meta.env.LOCAL_8000}/api/discharge/discharges/`
         : import.meta.env.BACKEND_DISCHARGE
-          ? `${import.meta.env.BACKEND_DISCHARGE}discharge-records/`
+          ? `${import.meta.env.BACKEND_DISCHARGE}discharges/`
           : undefined,
   headers: {
     "Content-Type": "application/json",
