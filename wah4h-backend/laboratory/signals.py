@@ -4,7 +4,7 @@ from .models import DiagnosticReport, LabTestDefinition
 from billing.models import Claim, ClaimItem
 from django.utils import timezone
 
-@receiver(post_save, sender=DiagnosticReport)
+# @receiver(post_save, sender=DiagnosticReport)
 def create_lab_charge(sender, instance, created, **kwargs):
     """
     Automated Billing Trigger:

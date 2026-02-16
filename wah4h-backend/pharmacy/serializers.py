@@ -25,6 +25,14 @@ class MedicationRequestSerializer(serializers.ModelSerializer):
     def get_patient_name(self, obj):
         if not obj.subject_id:
             return "Unknown"
+            
+        # Check context first (bulk fetch)
+        patients_map = self.context.get('patients_map', {})
+        if obj.subject_id in patients_map:
+            patient = patients_map[obj.subject_id]
+            return f"{patient.first_name} {patient.last_name}".strip()
+            
+        # Fallback to single query if not in context
         patient = Patient.objects.filter(id=obj.subject_id).first()
         if patient:
             return f"{patient.first_name} {patient.last_name}".strip()
@@ -33,6 +41,14 @@ class MedicationRequestSerializer(serializers.ModelSerializer):
     def get_practitioner_name(self, obj):
         if not obj.requester_id:
             return "Unknown"
+            
+        # Check context first (bulk fetch)
+        practitioners_map = self.context.get('practitioners_map', {})
+        if obj.requester_id in practitioners_map:
+            practitioner = practitioners_map[obj.requester_id]
+            return f"{practitioner.first_name} {practitioner.last_name}".strip()
+            
+        # Fallback
         practitioner = Practitioner.objects.filter(practitioner_id=obj.requester_id).first()
         if practitioner:
             return f"{practitioner.first_name} {practitioner.last_name}".strip()

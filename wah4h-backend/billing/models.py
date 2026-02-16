@@ -1,5 +1,7 @@
 from django.db import models
 from core.models import FHIRResourceModel
+from django.core.validators import MinValueValidator
+from decimal import Decimal
 
 
 # ============================================================================
@@ -50,7 +52,7 @@ class Claim(FHIRResourceModel):
     use = models.CharField(max_length=255, null=True, blank=True)
     
     # Fortress Pattern: Cross-app references
-    patient_id = models.BigIntegerField()
+    subject_id = models.BigIntegerField()
     enterer_id = models.BigIntegerField(null=True, blank=True)
     insurer_id = models.BigIntegerField(null=True, blank=True)
     provider_id = models.BigIntegerField(null=True, blank=True)
@@ -89,7 +91,7 @@ class Claim(FHIRResourceModel):
     class Meta:
         db_table = 'billing_claim'
         indexes = [
-            models.Index(fields=['patient_id']),
+            models.Index(fields=['subject_id']),
             models.Index(fields=['status']),
             models.Index(fields=['created']),
         ]
@@ -281,7 +283,7 @@ class ClaimResponse(FHIRResourceModel):
     use = models.CharField(max_length=255, null=True, blank=True)
     
     # Fortress Pattern: Cross-app references
-    patient_id = models.BigIntegerField()
+    subject_id = models.BigIntegerField()
     insurer_id = models.BigIntegerField(null=True, blank=True)
     requestor_id = models.BigIntegerField(null=True, blank=True)
     request_id = models.BigIntegerField(null=True, blank=True)
@@ -311,7 +313,7 @@ class ClaimResponse(FHIRResourceModel):
     class Meta:
         db_table = 'billing_claim_response'
         indexes = [
-            models.Index(fields=['patient_id']),
+            models.Index(fields=['subject_id']),
             models.Index(fields=['status']),
             models.Index(fields=['request_id']),
         ]
@@ -542,21 +544,21 @@ class InvoiceManager(models.Manager):
         from django.db import transaction
         from django.utils import timezone
         
-        # 1. Fetch pending items
-        pending_lab = DiagnosticReport.objects.filter(
-            subject_id=subject_id, 
-            billing_reference__isnull=True
-        ).exclude(status='cancelled')
-        
-        pending_meds = MedicationRequest.objects.filter(
-            subject_id=subject_id,
-            billing_reference__isnull=True
-        ).exclude(status='cancelled')
-        
-        if not pending_lab.exists() and not pending_meds.exists():
-            return None
-            
         with transaction.atomic():
+            # 1. Fetch pending items with lock to prevent race conditions
+            pending_lab = list(DiagnosticReport.objects.select_for_update().filter(
+                subject_id=subject_id, 
+                billing_reference__isnull=True
+            ).exclude(status='cancelled'))
+            
+            pending_meds = list(MedicationRequest.objects.select_for_update().filter(
+                subject_id=subject_id,
+                billing_reference__isnull=True
+            ).exclude(status='cancelled'))
+
+            if not pending_lab and not pending_meds:
+                return None
+
             # Create Invoice Header
             invoice = self.create(
                 identifier=f"{identifier_prefix}{timezone.now().strftime('%Y%m%d%H%M%S')}",
@@ -568,6 +570,8 @@ class InvoiceManager(models.Manager):
             
             # --- Process Laboratory Items ---
             lab_prices = self._get_lab_pricing(pending_lab)
+            new_line_items = []
+            reports_to_update = []
             
             for report in pending_lab:
                 # Lookup Price from Cache
@@ -579,8 +583,8 @@ class InvoiceManager(models.Manager):
                     price = 0
                     details = f"Unknown Test: {report.code_display or report.code_code}"
                 
-                # Create Line Item
-                InvoiceLineItem.objects.create(
+                # Prepare Line Item
+                new_line_items.append(InvoiceLineItem(
                     invoice=invoice,
                     chargeitem_reference_id=report.diagnostic_report_id, # Link back ID
                     chargeitem_code=report.code_code,
@@ -590,14 +594,15 @@ class InvoiceManager(models.Manager):
                     unit_price=price,
                     net_value=price,
                     gross_value=price
-                )
+                ))
                 
-                # Update Source Reference (Back-link)
+                # Prepare Source Reference Update
                 report.billing_reference = str(invoice.identifier)
-                report.save(update_fields=['billing_reference'])
+                reports_to_update.append(report)
 
             # --- Process Pharmacy Items ---
             med_prices = self._get_med_pricing(pending_meds)
+            med_requests_to_update = []
             
             for request in pending_meds:
                 # Lookup Price from Cache
@@ -613,8 +618,8 @@ class InvoiceManager(models.Manager):
                 quantity = request.dispense_quantity or 1
                 total_line = price * quantity
                 
-                # Create Line Item
-                InvoiceLineItem.objects.create(
+                # Prepare Line Item
+                new_line_items.append(InvoiceLineItem(
                     invoice=invoice,
                     chargeitem_reference_id=request.medication_request_id, # Link back ID
                     chargeitem_code=request.medication_code,
@@ -624,15 +629,43 @@ class InvoiceManager(models.Manager):
                     unit_price=price,
                     net_value=total_line,
                     gross_value=total_line
-                )
+                ))
                 
-                # Update Source Reference (Back-link)
+                # Prepare Source Reference Update
                 request.billing_reference = str(invoice.identifier)
-                request.save(update_fields=['billing_reference'])
+                med_requests_to_update.append(request)
+
+            # BULK OPERATIONS
+            if new_line_items:
+                InvoiceLineItem.objects.bulk_create(new_line_items)
+            
+            if reports_to_update:
+                DiagnosticReport.objects.bulk_update(reports_to_update, ['billing_reference'])
+                
+            if med_requests_to_update:
+                MedicationRequest.objects.bulk_update(med_requests_to_update, ['billing_reference'])
             
             # Final Calculation
             invoice.calculate_totals()
             
+        return invoice
+
+    def create_empty_invoice(self, subject_id, identifier_prefix="INV-"):
+        """
+        Creates an empty 'draft' invoice for a patient.
+        Used when billing Professional Fees or other manual items without Lab/Meds.
+        """
+        from django.utils import timezone
+        
+        invoice = self.create(
+            identifier=f"{identifier_prefix}{timezone.now().strftime('%Y%m%d%H%M%S')}",
+            subject_id=subject_id,
+            status='draft',
+            type='clinical',
+            invoice_datetime=timezone.now(),
+            total_net_value=0,
+            total_gross_value=0
+        )
         return invoice
 
 
@@ -714,19 +747,52 @@ class InvoiceLineItem(models.Model):
     description = models.CharField(max_length=255, null=True, blank=True) # Snapshot of item name
     
     # Billing Details
-    quantity = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    unit_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    net_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    gross_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    quantity = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        null=True, 
+        blank=True,
+        validators=[MinValueValidator(Decimal('0.00'))]
+    )
+    unit_price = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        null=True, 
+        blank=True,
+        validators=[MinValueValidator(Decimal('0.00'))]
+    )
+    net_value = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        null=True, 
+        blank=True,
+        validators=[MinValueValidator(Decimal('0.00'))]
+    )
+    gross_value = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        null=True, 
+        blank=True,
+        validators=[MinValueValidator(Decimal('0.00'))]
+    )
 
     def save(self, *args, **kwargs):
         # Auto-calculate totals if not provided
         if self.unit_price is not None and self.quantity is not None:
-            calculated = self.unit_price * self.quantity
-            if self.net_value is None:
-                self.net_value = calculated
-            if self.gross_value is None:
-                self.gross_value = calculated # Default to net until tax logic
+            from decimal import Decimal
+            # Ensure we are working with Decimals
+            try:
+                q_val = Decimal(str(self.quantity))
+                p_val = Decimal(str(self.unit_price))
+                calculated = q_val * p_val
+                
+                if self.net_value is None:
+                    self.net_value = calculated
+                if self.gross_value is None:
+                    self.gross_value = calculated # Default to net until tax logic
+            except Exception:
+                pass # Fallback if conversion fails
+                
         super().save(*args, **kwargs)
     
     class Meta:
@@ -798,6 +864,15 @@ class PaymentReconciliation(FHIRResourceModel):
     payment_amount_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     payment_amount_currency = models.CharField(max_length=3, null=True, blank=True)  # ISO 4217: PHP, USD
     payment_identifier = models.CharField(max_length=100, null=True, blank=True)
+    
+    # Direct Link to Invoice (Fortress Extension)
+    invoice = models.ForeignKey(
+        'Invoice', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='payments'
+    )
     
     form_code = models.CharField(max_length=100, null=True, blank=True)
     

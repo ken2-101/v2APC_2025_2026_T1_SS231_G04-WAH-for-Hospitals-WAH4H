@@ -1,6 +1,8 @@
 from rest_framework import viewsets, status
-from .models import Account, Claim, Invoice, PaymentReconciliation, PaymentNotice
-from django.db.models import Sum
+from .models import Account, Claim, Invoice, PaymentReconciliation, PaymentNotice, InvoiceLineItem
+from django.db.models import Sum, Q, F
+from decimal import Decimal, InvalidOperation
+from django.db import transaction
 from .serializers import (
     AccountSerializer, 
     ClaimSerializer, 
@@ -19,6 +21,9 @@ class ClaimViewSet(viewsets.ModelViewSet):
 
 from rest_framework.decorators import action
 from rest_framework.response import Response
+
+from django.utils import timezone
+import uuid
 
 class InvoiceViewSet(viewsets.ModelViewSet):
     queryset = Invoice.objects.all().prefetch_related(
@@ -46,6 +51,18 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         else:
             return Response({"message": "No pending items to bill"}, status=status.HTTP_200_OK)
 
+    @action(detail=False, methods=['post'])
+    def create_manual(self, request):
+        """
+        Force create an empty invoice for manual billing (e.g. PF Only).
+        """
+        subject_id = request.data.get('subject_id')
+        if not subject_id:
+            return Response({"error": "subject_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+            
+        invoice = Invoice.objects.create_empty_invoice(subject_id)
+        return Response(self.get_serializer(invoice).data, status=status.HTTP_201_CREATED)
+
     @action(detail=False, methods=['get'])
     def patient_summary(self, request):
         subject_id = request.query_params.get('subject_id')
@@ -70,6 +87,109 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             "unbilled_total": unbilled_totals['grand_total'],
             "grand_total": billed_total + unbilled_totals['grand_total']
         })
+
+
+    @action(detail=True, methods=['post'])
+    def add_item(self, request, pk=None):
+        """
+        Manually add a line item (e.g., Professional Fee, Room Charge) to an invoice.
+        """
+        invoice = self.get_object()
+        
+        if invoice.status in ['balanced', 'cancelled']:
+            return Response(
+                {"error": f"Cannot add items to an invoice with status '{invoice.status}'."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        description = request.data.get('description')
+        amount = request.data.get('amount')
+        category = request.data.get('category', 'manual')
+        
+        if not description or amount is None:
+            return Response(
+                {"error": "Description and amount are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        try:
+            amount_val = Decimal(str(amount))
+        except (InvalidOperation, TypeError):
+            return Response(
+                {"error": "Invalid amount format."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        with transaction.atomic():
+            # Get next sequence
+            last_item = invoice.line_items.order_by('sequence').last()
+            next_seq = str(int(last_item.sequence) + 1) if last_item and last_item.sequence.isdigit() else "1"
+            
+            InvoiceLineItem.objects.create(
+                invoice=invoice,
+                sequence=next_seq,
+                description=f"[{category.upper()}] {description}",
+                quantity=1,
+                unit_price=amount_val,
+                net_value=amount_val,
+                gross_value=amount_val
+            )
+            
+            # Recalculate totals
+            invoice.calculate_totals()
+            
+        serializer = self.get_serializer(invoice)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def record_payment(self, request, pk=None):
+        invoice = self.get_object()
+        
+        amount = request.data.get('amount')
+        method = request.data.get('method')
+        reference = request.data.get('reference')
+        
+        if not amount:
+            return Response({"error": "amount is required"}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            amount_val = float(amount)
+        except ValueError:
+             return Response({"error": "Invalid amount format"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Create Payment Record
+        # Note: In a real world scenario, this might need a more complex link (e.g. via PaymentNotice or LineItem)
+        # For now, we creating a PaymentReconciliation record to track the event
+        
+        payment = PaymentReconciliation.objects.create(
+            identifier=f"PAY-{uuid.uuid4()}",
+            status='active',
+            invoice=invoice, # Direct link
+            payment_amount_value=amount_val,
+            payment_amount_currency='PHP',
+            payment_identifier=reference,
+            disposition=f"Payment for Invoice {invoice.identifier} via {method}",
+            created_datetime=timezone.now()
+        )
+        
+        # Calculate balance based on direct invoice link
+        total_paid_agg = PaymentReconciliation.objects.filter(
+            invoice=invoice,
+            status='active'
+        ).aggregate(total=Sum('payment_amount_value'))
+        
+        total_paid = total_paid_agg['total'] or 0
+        
+        if total_paid >= invoice.total_net_value:
+            invoice.status = 'balanced'
+            invoice.save()
+            
+        return Response({
+            "message": "Payment recorded",
+            "total_paid": total_paid,
+            "balance": invoice.total_net_value - total_paid,
+            "status": invoice.status
+        }, status=status.HTTP_200_OK)
 
 class PaymentReconciliationViewSet(viewsets.ModelViewSet):
     queryset = PaymentReconciliation.objects.all()

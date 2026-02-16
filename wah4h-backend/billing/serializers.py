@@ -40,12 +40,24 @@ class InvoiceSerializer(serializers.ModelSerializer):
         with transaction.atomic():
             invoice = Invoice.objects.create(**validated_data)
             
-            for item_data in line_items_data:
+            # Efficiently create line items and collect components
+            
+            for idx, item_data in enumerate(line_items_data):
                 price_components_data = item_data.pop('price_components', [])
-                line_item = InvoiceLineItem.objects.create(invoice=invoice, **item_data)
                 
-                for component_data in price_components_data:
-                    InvoiceLineItemPriceComponent.objects.create(line_item=line_item, **component_data)
+                # Assign invoice ID directly
+                item_data['invoice'] = invoice
+                # Create item (traces save() method for calculation)
+                line_item = InvoiceLineItem.objects.create(**item_data)
+                
+                # Create price components
+                components_to_create = []
+                for comp_data in price_components_data:
+                    comp_data['line_item'] = line_item
+                    components_to_create.append(InvoiceLineItemPriceComponent(**comp_data))
+                
+                if components_to_create:
+                    InvoiceLineItemPriceComponent.objects.bulk_create(components_to_create)
             
             # Auto-calculate totals after creation
             invoice.calculate_totals()
@@ -63,16 +75,31 @@ class InvoiceSerializer(serializers.ModelSerializer):
             
             # Handle Line Items if provided
             if line_items_data is not None:
-                # For simplicity in this iteration, we'll replace existing items
-                # In a more complex scenario, we might want to update/add/delete specific items
+                # Existing items are deleted and replaced (Replacement strategy)
                 instance.line_items.all().delete()
                 
-                for item_data in line_items_data:
+                line_items_to_create = []
+                components_map = {}
+                
+                for idx, item_data in enumerate(line_items_data):
                     price_components_data = item_data.pop('price_components', [])
-                    line_item = InvoiceLineItem.objects.create(invoice=instance, **item_data)
+                    components_map[idx] = price_components_data
                     
-                    for component_data in price_components_data:
-                        InvoiceLineItemPriceComponent.objects.create(line_item=line_item, **component_data)
+                    item_data['invoice'] = instance
+                    line_items_to_create.append(InvoiceLineItem(**item_data))
+                
+                if line_items_to_create:
+                    created_items = InvoiceLineItem.objects.bulk_create(line_items_to_create)
+                    
+                    components_to_create = []
+                    for idx, line_item in enumerate(created_items):
+                        p_components = components_map.get(idx, [])
+                        for comp_data in p_components:
+                            comp_data['line_item'] = line_item
+                            components_to_create.append(InvoiceLineItemPriceComponent(**comp_data))
+                    
+                    if components_to_create:
+                        InvoiceLineItemPriceComponent.objects.bulk_create(components_to_create)
             
             # Recalculate totals
             instance.calculate_totals()

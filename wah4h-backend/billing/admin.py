@@ -19,7 +19,7 @@ class AccountAdmin(admin.ModelAdmin):
 
 @admin.register(Claim)
 class ClaimAdmin(admin.ModelAdmin):
-    list_display = ('identifier', 'status', 'type', 'patient_id', 'created')
+    list_display = ('identifier', 'status', 'type', 'subject_id', 'created')
     search_fields = ('identifier', 'status')
     list_filter = ('status', 'type', 'created')
     readonly_fields = ('claim_id', 'created', 'created_at', 'updated_at')
@@ -27,7 +27,7 @@ class ClaimAdmin(admin.ModelAdmin):
 
 @admin.register(ClaimResponse)
 class ClaimResponseAdmin(admin.ModelAdmin):
-    list_display = ('identifier', 'status', 'patient_id', 'outcome', 'created')
+    list_display = ('identifier', 'status', 'subject_id', 'outcome', 'created')
     search_fields = ('identifier', 'status')
     list_filter = ('status', 'outcome')
     readonly_fields = ('claimResponse_id', 'created', 'created_at', 'updated_at')

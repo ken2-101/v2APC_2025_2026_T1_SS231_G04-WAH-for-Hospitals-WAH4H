@@ -105,7 +105,7 @@ class InvoiceWorkflowTest(APITestCase):
         Test the custom recalculate action in ViewSet
         """
         # Create invoice via ORM (bypass serializer calculation)
-        invoice = Invoice.objects.create(subject_id=999, status='draft')
+        invoice = Invoice.objects.create(identifier="INV-TEST-RECALC", subject_id=999, status='draft')
         InvoiceLineItem.objects.create(
             invoice=invoice, 
             quantity=10, 
@@ -133,9 +133,11 @@ class InvoiceWorkflowTest(APITestCase):
         Inventory.objects.create(item_code="AMOX_API", unit_cost=10.00, item_name="Amox")
         
         DiagnosticReport.objects.create(
+            identifier="REP-API-001",
             subject_id=999, encounter_id=1, code_code="CBC_API", status="final", billing_reference=None
         )
         MedicationRequest.objects.create(
+            identifier="REQ-API-001",
             subject_id=999, encounter_id=1, medication_code="AMOX_API", dispense_quantity=5, status="active", billing_reference=None
         )
         
@@ -144,3 +146,14 @@ class InvoiceWorkflowTest(APITestCase):
         
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(float(response.data['total_net_value']), 550.00) # 500 + 5*10
+
+    def test_create_manual_action(self):
+        """
+        Test creating a manual invoice (PF Only workflow)
+        """
+        url = reverse('invoice-create-manual')
+        response = self.client.post(url, {'subject_id': 888})
+        
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(float(response.data['total_net_value']), 0.00)
+        self.assertEqual(response.data['status'], 'draft')

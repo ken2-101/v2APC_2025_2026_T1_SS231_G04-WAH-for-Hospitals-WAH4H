@@ -35,8 +35,54 @@ class MedicationRequestViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(requests, many=True)
         return Response(serializer.data)
 
+    def list(self, request, *args, **kwargs):
+        """
+        Optimized list view with manual pre-fetching to solve N+1 problem.
+        """
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True, context=self._get_prefetch_context(page))
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True, context=self._get_prefetch_context(queryset))
+        return Response(serializer.data)
+
+    def _get_prefetch_context(self, queryset):
+        """
+        Helper to fetch related entities in bulk.
+        """
+        subject_ids = set()
+        practitioner_ids = set()
+
+        for req in queryset:
+            if req.subject_id:
+                subject_ids.add(req.subject_id)
+            if req.requester_id:
+                practitioner_ids.add(req.requester_id)
+        
+        patients_map = {}
+        if subject_ids:
+            from patients.models import Patient
+            patients = Patient.objects.filter(id__in=subject_ids)
+            patients_map = {p.id: p for p in patients}
+
+        practitioners_map = {}
+        if practitioner_ids:
+            from accounts.models import Practitioner
+            practitioners = Practitioner.objects.filter(practitioner_id__in=practitioner_ids)
+            practitioners_map = {p.practitioner_id: p for p in practitioners}
+
+        return {
+            'patients_map': patients_map,
+            'practitioners_map': practitioners_map
+        }
+
     @action(detail=True, methods=['post', 'patch'], url_path='update-status')
     def update_status(self, request, pk=None):
+        from django.db import transaction
+        
         medication_request = self.get_object()
         status = request.data.get('status')
         note = request.data.get('note')
@@ -44,38 +90,42 @@ class MedicationRequestViewSet(viewsets.ModelViewSet):
         if not status:
             return Response({"error": "status is required"}, status=400)
             
-        # Inventory Deduction Logic
-        if status == 'completed' and medication_request.status != 'completed':
-            try:
-                dispense_qty = float(request.data.get('quantity') or medication_request.dispense_quantity or 0)
-                
-                # Find associated inventory item
-                inventory_item = Inventory.objects.filter(item_code=medication_request.medication_code).first()
-                if not inventory_item and medication_request.medication_display:
-                    inventory_item = Inventory.objects.filter(item_name__iexact=medication_request.medication_display).first()
-                
-                if inventory_item:
-                    if inventory_item.current_stock < dispense_qty:
-                        return Response({"error": f"Insufficient stock. Available: {inventory_item.current_stock}"}, status=400)
+        try:
+            with transaction.atomic():
+                # Inventory Deduction Logic
+                if status == 'completed' and medication_request.status != 'completed':
+                    dispense_qty = float(request.data.get('quantity') or medication_request.dispense_quantity or 0)
                     
-                    inventory_item.current_stock -= int(dispense_qty)
-                    inventory_item.save()
+                    # Find associated inventory item
+                    inventory_item = Inventory.objects.filter(item_code=medication_request.medication_code).first()
+                    if not inventory_item and medication_request.medication_display:
+                        inventory_item = Inventory.objects.filter(item_name__iexact=medication_request.medication_display).first()
                     
-                    # Update dispense quantity in request record if provided
-                    if request.data.get('quantity'):
-                        medication_request.dispense_quantity = dispense_qty
-                else:
-                    print(f"Warning: No inventory item found for {medication_request.medication_display}")
-            except Exception as e:
-                print(f"Error updating inventory: {e}")
-                return Response({"error": "Failed to update inventory"}, status=500)
-
-        medication_request.status = status
-        if note:
-           medication_request.note = note
-           
-        medication_request.save()
-        return Response(self.get_serializer(medication_request).data)
+                    if inventory_item:
+                        if inventory_item.current_stock < dispense_qty:
+                            return Response({"error": f"Insufficient stock. Available: {inventory_item.current_stock}"}, status=400)
+                        
+                        # Use update fields to ensure minimal footprint, though simpler -= is fine inside atomic
+                        inventory_item.current_stock -= int(dispense_qty)
+                        inventory_item.save()
+                        
+                        # Update dispense quantity in request record if provided
+                        if request.data.get('quantity'):
+                            medication_request.dispense_quantity = dispense_qty
+                    else:
+                        print(f"Warning: No inventory item found for {medication_request.medication_display}")
+    
+                medication_request.status = status
+                if note:
+                   medication_request.note = note
+                   
+                medication_request.save()
+                
+            return Response(self.get_serializer(medication_request).data)
+            
+        except Exception as e:
+            print(f"Error updating medication request: {e}")
+            return Response({"error": str(e)}, status=500)
 
 class MedicationAdministrationViewSet(viewsets.ModelViewSet):
     queryset = MedicationAdministration.objects.all()
