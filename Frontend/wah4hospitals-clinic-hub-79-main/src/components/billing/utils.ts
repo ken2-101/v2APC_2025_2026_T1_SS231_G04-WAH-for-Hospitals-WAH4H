@@ -5,6 +5,12 @@ import { BillingRecord as APIBillingRecord } from '@/services/billingService';
 // --- API Fetchers ---
 
 export const fetchPharmacyCharges = async (admissionId: number): Promise<MedicineItem[]> => {
+    // NOTE: This is for the old manual billing system.
+    // The new Invoice system automatically fetches pharmacy data through InvoiceManager.
+    // Returning empty array gracefully - 404s are expected.
+    return [];
+
+    /* Old implementation - disabled
     try {
         const API_BASE =
             import.meta.env.BACKEND_PHARMACY_8000 ||
@@ -21,12 +27,19 @@ export const fetchPharmacyCharges = async (admissionId: number): Promise<Medicin
 
         return pharmacyItems;
     } catch (err) {
-        console.error('Error fetching pharmacy charges:', err);
         return [];
     }
+    */
 };
 
+
 export const fetchLaboratoryCharges = async (admissionId: number): Promise<DiagnosticItem[]> => {
+    // NOTE: This is for the old manual billing system.
+    // The new Invoice system automatically fetches laboratory data through InvoiceManager.
+    // Returning empty array gracefully - 404s are expected.
+    return [];
+
+    /* Old implementation - disabled
     try {
         const API_BASE =
             import.meta.env.BACKEND_LABORATORY_8000 ||
@@ -47,9 +60,9 @@ export const fetchLaboratoryCharges = async (admissionId: number): Promise<Diagn
 
         return labItems;
     } catch (err) {
-        console.error('Error fetching laboratory charges:', err);
         return [];
     }
+    */
 };
 
 // --- Data Converters ---

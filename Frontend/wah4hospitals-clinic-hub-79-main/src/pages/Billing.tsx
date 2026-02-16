@@ -1,25 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle } from '@/components/ui/card'; // Basic Card used in dashboard container
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Users } from 'lucide-react';
+import { Users, Receipt, AlertCircle, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import billingService from '@/services/billingService';
 import { admissionService } from '@/services/admissionService';
 
 // Components
 import PatientBillPrint from '@/components/billing/PatientBillPrint';
-import { BillingDashboard } from '@/components/billing/BillingDashboard';
+import { PatientBillingSummary } from '@/components/billing/PatientBillingSummary';
 import { PaymentModal } from '@/components/billing/PaymentModal';
 import { PatientSelector } from '@/components/billing/PatientSelector';
 import { BillingForm } from '@/components/billing/BillingForm';
 import { convertAPIToLocal } from '@/components/billing/utils';
+
 // Types
-import { Patient, BillingRecord } from '@/components/billing/types';
+import type { Patient, BillingRecord } from '@/components/billing/types';
 
 const Billing = () => {
   const { toast } = useToast();
-  
+
   // Patient & View State
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [currentView, setCurrentView] = useState<'list' | 'billing' | 'print'>('list');
@@ -29,7 +30,6 @@ const Billing = () => {
 
   // API Data
   const [billingRecords, setBillingRecords] = useState<BillingRecord[]>([]);
-  const [dashboardData, setDashboardData] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,35 +37,36 @@ const Billing = () => {
   const [admittedPatients, setAdmittedPatients] = useState<any[]>([]);
   const [showPatientSelector, setShowPatientSelector] = useState(false);
 
-  // Fetch billing records, dashboard data, and admitted patients on mount
+  // Fetch billing records and admitted patients on mount
   useEffect(() => {
     fetchBillingData();
     fetchAdmittedPatients();
   }, []);
 
+  // Auto-open patient selector if no patient is selected and patients are loaded
+  useEffect(() => {
+    if (!selectedPatient && admittedPatients.length > 0 && !showPatientSelector && !isLoading) {
+      setShowPatientSelector(true);
+    }
+  }, [admittedPatients, selectedPatient, showPatientSelector, isLoading]);
+
   const fetchBillingData = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const [records, dashboard] = await Promise.all([
-        billingService.getAll(),
-        billingService.getDashboard()
-      ]);
+      const records = await billingService.getAll();
       setBillingRecords(records.map(convertAPIToLocal));
-      setDashboardData(dashboard);
     } catch (err) {
       console.error('Error fetching billing data:', err);
-      setError('Failed to load billing data');
+      setBillingRecords([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Fetch admitted patients from Admissions module
   const fetchAdmittedPatients = async () => {
     try {
       const admissions = await admissionService.getAll();
-      // Filter to only active admissions (not discharged)
       const activeAdmissions = admissions.filter((adm: any) =>
         ['active', 'in-progress', 'admitted', 'finished'].includes(adm.status?.toLowerCase())
       );
@@ -77,194 +78,188 @@ const Billing = () => {
 
   const handlePatientSelect = (patient: Patient) => {
     setSelectedPatient(patient);
-    setCurrentView('billing');
-  };
-
-  const handleQuickPay = (p: Patient) => {
-    handlePatientSelect(p);
-    setIsPaymentModalOpen(true);
+    setShowPatientSelector(false);
   };
 
   const handleSaveSuccess = async () => {
     await fetchBillingData();
     setCurrentView('list');
+    toast({
+      title: "Success",
+      description: "Billing record saved successfully.",
+    });
   };
-
-  // --- Render Sections ---
 
   const existingBilling = selectedPatient ? billingRecords.find(b => b.patientId === selectedPatient.id) : null;
 
+  // Print View
   if (currentView === 'print' && existingBilling) {
-    return <PatientBillPrint billingRecord={existingBilling} onClose={() => setCurrentView('billing')} />;
+    return <PatientBillPrint billingRecord={existingBilling} onClose={() => setCurrentView('list')} />;
   }
 
-  // Calculate dashboard view data
-  const dashboardPatients = dashboardData.map(d => ({
-    id: d.id,
-    patientName: d.patientName,
-    encounterId: d.encounterId,
-    runningBalance: Number(d.runningBalance),
-    paymentStatus: d.paymentStatus,
-    lastORDate: d.lastORDate,
-    room: d.room
-  }));
+  // Billing Form View
+  if (currentView === 'billing' && selectedPatient) {
+    return (
+      <BillingForm
+        patient={selectedPatient}
+        billingRecords={billingRecords}
+        onSaveSuccess={handleSaveSuccess}
+        onCancel={() => setCurrentView('list')}
+        onPrint={() => setCurrentView('print')}
+      />
+    );
+  }
 
+  // Main List View
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* Glass Card Header */}
+      <div className="glass-card p-6 rounded-xl">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-xl flex items-center justify-center shadow-lg" style={{ background: 'linear-gradient(135deg, #45017c 0%, #0a9bff 100%)' }}>
+              <Receipt className="w-7 h-7 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Billing</h1>
+              <p className="text-gray-600 mt-0.5">Patient billing management</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            {/* Stats in header */}
+            {!selectedPatient && (
+              <div className="flex gap-3 text-sm text-gray-600">
+                <div>
+                  <span className="font-semibold text-purple-600">{admittedPatients.length}</span> Patient{admittedPatients.length !== 1 ? 's' : ''}
+                </div>
+                <div className="text-gray-300">•</div>
+                <div>
+                  <span className="font-semibold text-blue-600">{billingRecords.length}</span> Record{billingRecords.length !== 1 ? 's' : ''}
+                </div>
+              </div>
+            )}
+
+            {selectedPatient && (
+              <Button
+                variant="outline"
+                onClick={() => setSelectedPatient(null)}
+                className="gap-2 border-gray-300 hover:bg-gray-100"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
       {error && (
         <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-      {isLoading && currentView === 'list' && (
-        <Alert>
-          <AlertDescription>Loading billing data...</AlertDescription>
-        </Alert>
-      )}
 
-      {currentView === 'list' && (
-          <>
-            <PatientSelector 
-                show={showPatientSelector}
-                onShow={() => setShowPatientSelector(true)}
-                admittedPatients={admittedPatients} 
-                billingRecords={billingRecords}
-                onSelect={handlePatientSelect}
-                onCancel={() => setShowPatientSelector(false)}
-            />
+      {/* Patient Selected - Show Summary and Actions */}
+      {selectedPatient && (
+        <div className="space-y-6">
+          {/* Patient Card - Front and Center */}
+          <Card className="border-purple-100 shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-gray-500 mb-1">Patient</div>
+                  <h2 className="text-xl font-bold text-gray-900">{selectedPatient.patientName}</h2>
+                  <div className="flex gap-3 mt-2 text-sm text-gray-600">
+                    <span>ID: {selectedPatient.id}</span>
+                    <span>•</span>
+                    <span>Room: {selectedPatient.room}</span>
+                  </div>
+                </div>
+                <Button
+                  onClick={() => setCurrentView('billing')}
+                  className="text-white shadow-md hover:opacity-90"
+                  style={{ background: 'linear-gradient(135deg, #45017c 0%, #0a9bff 100%)' }}
+                >
+                  <Receipt className="mr-2 h-4 w-4" />
+                  Manage Billing
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
-            {!showPatientSelector && (
-              <BillingDashboard 
-                patients={dashboardPatients} 
-                onSelectPatient={(id) => {
-                   const record = billingRecords.find(r => r.id === id);
-                   if (record) {
-                      const p: Patient = {
-                          id: record.patientId,
-                          patientName: record.patientName,
-                          room: record.roomWard,
-                          admissionDate: record.admissionDate,
-                          dischargeDate: record.dischargeDate,
-                          condition: '',
-                          physician: '',
-                          department: '',
-                          age: 0, 
-                          status: 'ready'
-                      };
-                      handlePatientSelect(p);
-                   }
-                }}
-                onQuickPay={(bp) => {
-                   const record = billingRecords.find(r => r.id === bp.id);
-                   if (record) {
-                      const p: Patient = {
-                          id: record.patientId,
-                          patientName: record.patientName,
-                          room: record.roomWard,
-                          admissionDate: record.admissionDate,
-                          dischargeDate: record.dischargeDate,
-                          condition: '',
-                          physician: '',
-                          department: '',
-                          age: 0, 
-                          status: 'ready'
-                      };
-                      handleQuickPay(p);
-                   }
-                }}
-                onDeletePatient={async (id) => {
-                    await billingService.delete(id);
-                    await fetchBillingData();
-                }}
-              />
-            )}
-          </>
-      )}
-
-      {currentView === 'billing' && selectedPatient && (
-          <BillingForm 
-            patient={selectedPatient}
-            billingRecords={billingRecords}
-            onSaveSuccess={handleSaveSuccess}
-            onCancel={() => setCurrentView('list')}
-            onPrint={() => setCurrentView('print')}
+          {/* Billing Summary */}
+          <PatientBillingSummary
+            subjectId={selectedPatient.id}
+            onInvoiceGenerated={fetchBillingData}
           />
+        </div>
       )}
 
-      {/* Payment Modal remains here as it's overlay */}
+      {/* Patient Selector Modal */}
+      {showPatientSelector && (
+        <PatientSelector
+          show={showPatientSelector}
+          onShow={() => setShowPatientSelector(true)}
+          admittedPatients={admittedPatients}
+          billingRecords={billingRecords}
+          onSelect={handlePatientSelect}
+          onCancel={() => setShowPatientSelector(false)}
+        />
+      )}
+
+      {/* Payment Modal */}
       {selectedPatient && existingBilling && (
-          <PaymentModal
-            isOpen={isPaymentModalOpen}
-            onClose={() => setIsPaymentModalOpen(false)}
-            patientName={selectedPatient.patientName}
-            totalBalance={(() => {
-                const b = existingBilling;
-                const totalRoom = b.numberOfDays * b.ratePerDay;
-                const totalProf = b.attendingPhysicianFee + b.specialistFee + b.surgeonFee + b.otherProfessionalFees;
-                const totalMeds = b.medicines.reduce((acc, m) => acc + (m.quantity * m.unitPrice), 0);
-                const totalDiags = b.diagnostics.reduce((acc, d) => acc + d.cost, 0);
-                const totalDiet = b.mealsPerDay * b.dietDuration * b.costPerMeal;
-                const subtotal = totalRoom + totalProf + totalMeds + totalDiags + totalDiet + 
-                    b.suppliesCharge + b.procedureCharge + b.nursingCharge + b.miscellaneousCharge;
-                return Math.max(0, subtotal - b.discount - b.philhealthCoverage);
-            })()}
-            onPaymentSuccess={async (paymentData) => {
-                try {
-                    if (existingBilling && existingBilling.id) {
-                         setIsLoading(true);
-                         // Transform data for API
-                         const apiPaymentData = {
-                             amount: paymentData.amount,
-                             payment_method: paymentData.method,
-                             payment_date: paymentData.date,
-                             or_number: paymentData.orNumber,
-                             cashier: paymentData.cashier,
-                             // specific backend fields if needed
-                             paymentIdentifier: paymentData.orNumber
-                         };
+        <PaymentModal
+          isOpen={isPaymentModalOpen}
+          onClose={() => setIsPaymentModalOpen(false)}
+          patientName={selectedPatient.patientName}
+          totalBalance={(() => {
+            const b = existingBilling;
+            const totalRoom = b.numberOfDays * b.ratePerDay;
+            const totalProf = b.attendingPhysicianFee + b.specialistFee + b.surgeonFee + b.otherProfessionalFees;
+            const totalMeds = b.medicines.reduce((acc, m) => acc + (m.quantity * m.unitPrice), 0);
+            const totalDiags = b.diagnostics.reduce((acc, d) => acc + d.cost, 0);
+            const totalDiet = b.mealsPerDay * b.dietDuration * b.costPerMeal;
+            const subtotal = totalRoom + totalProf + totalMeds + totalDiags + totalDiet +
+              b.suppliesCharge + b.procedureCharge + b.nursingCharge + b.miscellaneousCharge;
+            return Math.max(0, subtotal - b.discount - b.philhealthCoverage);
+          })()}
+          onPaymentSuccess={async (paymentData) => {
+            try {
+              if (existingBilling && existingBilling.id) {
+                setIsLoading(true);
+                const apiPaymentData = {
+                  amount: paymentData.amount,
+                  payment_method: paymentData.method,
+                  payment_date: paymentData.date,
+                  or_number: paymentData.orNumber,
+                  cashier: paymentData.cashier,
+                  paymentIdentifier: paymentData.orNumber
+                };
 
-                         // We use 'any' casting here because the service type definition might be slightly off 
-                         // relative to what we actually want to send (e.g. or_number vs orNumber in Omit)
-                         await billingService.addPayment(existingBilling.id, apiPaymentData as any);
-                         
-                         toast({
-                             title: "Payment Recorded",
-                             description: "Payment has been successfully processed and saved.",
-                         });
-                         
-                         await fetchBillingData();
-                    }
-                } catch (err) {
-                    console.error("Error saving payment:", err);
-                    toast({
-                        variant: "destructive",
-                        title: "Payment Error",
-                        description: "Failed to save payment record to the system.",
-                    });
-                } finally {
-                    setIsLoading(false);
-                    // Do NOT close immediately if we want them to see the receipt in the modal?
-                    // The modal handles receipt view internally.
-                    // If modal calls onPaymentSuccess, it might be after "Process" click.
-                    // PaymentModal implementation: calls onPaymentSuccess -> shows receipt.
-                    // So we should NOT close the modal here if we want them to see the receipt.
-                    // But the modal has a "Close" button which calls onClose.
-                    // So we should just save data here.
-                    // However, we need to know if we should close or not.
-                    // Checking PaymentModal.tsx: it sets showReceipt(true) then calls onPaymentSuccess.
-                    // It stays open. Good.
-                    
-                    // Actually, if we refresh data, the parent re-renders. 
-                    // Does that unmount the modal?
-                    // Modal open state is controlled by isPaymentModalOpen in Billing.tsx.
-                    // Re-render is fine as long as isPaymentModalOpen stays true.
-                }
-            }}
-            // Note: We don't close the modal here automatically to allow receipt printing.
-            // The modal's internal "Close" button will trigger onClose={...} which sets isOpen to false.
-            // But wait, the previous code had setIsPaymentModalOpen(false) in onPaymentSuccess. 
-            // I will remove that to let the user review the receipt.
-          />
+                await billingService.addPayment(existingBilling.id, apiPaymentData as any);
+
+                toast({
+                  title: "Payment Recorded",
+                  description: "Payment has been successfully processed.",
+                });
+
+                await fetchBillingData();
+              }
+            } catch (err) {
+              console.error("Error saving payment:", err);
+              toast({
+                variant: "destructive",
+                title: "Payment Error",
+                description: "Failed to save payment record.",
+              });
+            } finally {
+              setIsLoading(false);
+            }
+          }}
+        />
       )}
     </div>
   );

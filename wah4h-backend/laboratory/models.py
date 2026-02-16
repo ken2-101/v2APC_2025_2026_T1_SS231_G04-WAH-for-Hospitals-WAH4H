@@ -40,7 +40,7 @@ class DiagnosticReport(FHIRResourceModel):
     encounter_id = models.BigIntegerField(db_index=True)
     
     # Billing Traceability
-    billing_reference = models.CharField(max_length=100, null=True, blank=True, help_text="Reference to the Claim/Invoice generated")
+    billing_reference = models.CharField(max_length=100, null=True, blank=True, db_index=True, help_text="Reference to the Claim/Invoice generated")
     
     # Trinity Approach: Requester vs Performer
     requester_id = models.BigIntegerField(

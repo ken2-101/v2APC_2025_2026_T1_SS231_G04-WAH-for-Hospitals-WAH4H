@@ -46,6 +46,9 @@ class MedicationRequest(FHIRResourceModel):
     medication_display = models.CharField(max_length=100, null=True, blank=True)
     medication_system = models.CharField(max_length=100, null=True, blank=True)
     
+    # Billing Traceability
+    billing_reference = models.CharField(max_length=100, null=True, blank=True, db_index=True, help_text="Reference to the Claim/Invoice generated")
+    
     # Request Details
     intent = models.CharField(max_length=255, null=True, blank=True)
     category = models.CharField(max_length=255, null=True, blank=True)

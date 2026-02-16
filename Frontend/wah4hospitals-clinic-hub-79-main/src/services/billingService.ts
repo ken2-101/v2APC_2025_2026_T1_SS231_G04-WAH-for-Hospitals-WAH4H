@@ -103,8 +103,9 @@ export const billingService = {
   // Get all billing records
   getAll: async (): Promise<BillingRecord[]> => {
     try {
-      const { data } = await api.get<BillingRecord[]>('/api/billing/billing-records/');
-      return data;
+      // For now, return empty array since we're using the Invoice system
+      // The old billing-records endpoint doesn't exist
+      return [];
     } catch (error) {
       return handleError(error);
     }
@@ -113,12 +114,9 @@ export const billingService = {
   // Get dashboard data
   getDashboard: async (status?: string): Promise<BillingDashboardItem[]> => {
     try {
-      const params = status ? { status } : {};
-      const { data } = await api.get<BillingDashboardItem[]>(
-        '/api/billing/billing-records/dashboard/',
-        { params }
-      );
-      return data;
+      // Return empty array - we don't have a dashboard endpoint for the old system
+      // The new system uses patient_summary per patient
+      return [];
     } catch (error) {
       return handleError(error);
     }
@@ -241,6 +239,18 @@ export const billingService = {
     } catch (error) {
       return handleError(error);
     }
+  },
+
+  // --- NEW STEP 3 METHODS ---
+
+  getPatientSummary: async (subjectId: number) => {
+    const response = await api.get(`/api/billing/invoices/patient_summary/?subject_id=${subjectId}`);
+    return response.data;
+  },
+
+  generateInvoice: async (subjectId: number) => {
+    const response = await api.post('/api/billing/invoices/generate/', { subject_id: subjectId });
+    return response.data;
   },
 };
 

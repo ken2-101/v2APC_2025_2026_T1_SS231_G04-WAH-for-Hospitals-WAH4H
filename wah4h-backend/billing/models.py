@@ -459,6 +459,183 @@ class ClaimResponseError(models.Model):
         ]
 
 
+class InvoiceManager(models.Manager):
+    def _get_lab_pricing(self, lab_items):
+        """
+        Helper to batch fetch Lab Pricing.
+        Returns a dictionary: { code: LabTestDefinition }
+        """
+        from laboratory.models import LabTestDefinition
+        codes = [item.code_code for item in lab_items if item.code_code]
+        return {
+            t.code: t 
+            for t in LabTestDefinition.objects.filter(code__in=codes)
+        }
+
+    def _get_med_pricing(self, med_items):
+        """
+        Helper to batch fetch Pharmacy Pricing.
+        Returns a dictionary: { item_code: Inventory }
+        """
+        from pharmacy.models import Inventory
+        codes = [item.medication_code for item in med_items if item.medication_code]
+        return {
+            i.item_code: i 
+            for i in Inventory.objects.filter(item_code__in=codes)
+        }
+
+    def get_pending_totals(self, subject_id):
+        """
+        Calculates the total potential cost of unbilled items WITHOUT creating an invoice.
+        Returns: { 'lab_total': decimal, 'pharmacy_total': decimal, 'grand_total': decimal }
+        """
+        from laboratory.models import DiagnosticReport
+        from pharmacy.models import MedicationRequest
+        
+        # 1. Fetch pending items
+        pending_lab = DiagnosticReport.objects.filter(
+            subject_id=subject_id, 
+            billing_reference__isnull=True
+        ).exclude(status='cancelled')
+        
+        pending_meds = MedicationRequest.objects.filter(
+            subject_id=subject_id,
+            billing_reference__isnull=True
+        ).exclude(status='cancelled')
+        
+        lab_total = 0
+        pharmacy_total = 0
+        
+        # 2. Calculate Lab Totals
+        if pending_lab.exists():
+            lab_prices = self._get_lab_pricing(pending_lab)
+            for report in pending_lab:
+                test_def = lab_prices.get(report.code_code)
+                price = test_def.base_price if test_def else 0
+                lab_total += price
+
+        # 3. Calculate Pharmacy Totals
+        if pending_meds.exists():
+            med_prices = self._get_med_pricing(pending_meds)
+            for request in pending_meds:
+                inventory_item = med_prices.get(request.medication_code)
+                price = inventory_item.unit_cost if inventory_item else 0
+                quantity = request.dispense_quantity or 1
+                pharmacy_total += (price * quantity)
+                
+        return {
+            'lab_total': lab_total,
+            'pharmacy_total': pharmacy_total,
+            'grand_total': lab_total + pharmacy_total
+        }
+
+    def generate_from_pending_orders(self, subject_id, identifier_prefix="INV-"):
+        """
+        Generates an invoice for a patient by aggregating unbilled:
+        1. DiagnosticReports (Laboratory)
+        2. MedicationRequests (Pharmacy)
+        
+        Returns the created Invoice or None if no items found.
+        """
+        from laboratory.models import DiagnosticReport
+        from pharmacy.models import MedicationRequest
+        from django.db import transaction
+        from django.utils import timezone
+        
+        # 1. Fetch pending items
+        pending_lab = DiagnosticReport.objects.filter(
+            subject_id=subject_id, 
+            billing_reference__isnull=True
+        ).exclude(status='cancelled')
+        
+        pending_meds = MedicationRequest.objects.filter(
+            subject_id=subject_id,
+            billing_reference__isnull=True
+        ).exclude(status='cancelled')
+        
+        if not pending_lab.exists() and not pending_meds.exists():
+            return None
+            
+        with transaction.atomic():
+            # Create Invoice Header
+            invoice = self.create(
+                identifier=f"{identifier_prefix}{timezone.now().strftime('%Y%m%d%H%M%S')}",
+                subject_id=subject_id,
+                status='draft',
+                type='clinical',
+                invoice_datetime=timezone.now()
+            )
+            
+            # --- Process Laboratory Items ---
+            lab_prices = self._get_lab_pricing(pending_lab)
+            
+            for report in pending_lab:
+                # Lookup Price from Cache
+                test_def = lab_prices.get(report.code_code)
+                if test_def:
+                    price = test_def.base_price
+                    details = test_def.name
+                else:
+                    price = 0
+                    details = f"Unknown Test: {report.code_display or report.code_code}"
+                
+                # Create Line Item
+                InvoiceLineItem.objects.create(
+                    invoice=invoice,
+                    chargeitem_reference_id=report.diagnostic_report_id, # Link back ID
+                    chargeitem_code=report.code_code,
+                    description=details, # Store snapshot
+                    sequence='LAB',
+                    quantity=1,
+                    unit_price=price,
+                    net_value=price,
+                    gross_value=price
+                )
+                
+                # Update Source Reference (Back-link)
+                report.billing_reference = str(invoice.identifier)
+                report.save(update_fields=['billing_reference'])
+
+            # --- Process Pharmacy Items ---
+            med_prices = self._get_med_pricing(pending_meds)
+            
+            for request in pending_meds:
+                # Lookup Price from Cache
+                inventory_item = med_prices.get(request.medication_code)
+                if inventory_item:
+                    price = inventory_item.unit_cost or 0
+                    details = inventory_item.item_name
+                else:
+                    price = 0
+                    details = f"Unknown Med: {request.medication_display or request.medication_code}"
+                
+                # Calculate based on dispense quantity
+                quantity = request.dispense_quantity or 1
+                total_line = price * quantity
+                
+                # Create Line Item
+                InvoiceLineItem.objects.create(
+                    invoice=invoice,
+                    chargeitem_reference_id=request.medication_request_id, # Link back ID
+                    chargeitem_code=request.medication_code,
+                    description=details, # Store snapshot
+                    sequence='PHARMACY',
+                    quantity=quantity,
+                    unit_price=price,
+                    net_value=total_line,
+                    gross_value=total_line
+                )
+                
+                # Update Source Reference (Back-link)
+                request.billing_reference = str(invoice.identifier)
+                request.save(update_fields=['billing_reference'])
+            
+            # Final Calculation
+            invoice.calculate_totals()
+            
+        return invoice
+
+
 class Invoice(FHIRResourceModel):
     """
     FHIR Invoice Resource - HEADER LEVEL (Normalized)
@@ -468,6 +645,8 @@ class Invoice(FHIRResourceModel):
     Related Line Items: InvoiceLineItem
     """
     invoice_id = models.AutoField(primary_key=True)
+    
+    objects = InvoiceManager()
     cancelled_reason = models.CharField(max_length=255, null=True, blank=True)
     type = models.CharField(max_length=100, null=True, blank=True)
     
@@ -498,6 +677,31 @@ class Invoice(FHIRResourceModel):
             models.Index(fields=['invoice_datetime']),
         ]
 
+    def calculate_totals(self):
+        """
+        Calculates and updates the total net and gross values based on line items.
+        """
+        from django.db.models import Sum, F
+        
+        # Calculate total from line items (quantity * unitPrice)
+        # We use aggregate to force calculation in DB
+        # Note: We assume unitPrice is the definitive price per item
+        total = self.line_items.aggregate(
+            total_value=Sum(F('quantity') * F('unit_price'))
+        )['total_value'] or 0
+        
+        self.total_net_value = total
+        self.total_gross_value = total # For now, gross = net until tax logic is added
+        
+        # Ensure currency is consistent
+        if not self.total_net_currency:
+            self.total_net_currency = 'PHP'
+        if not self.total_gross_currency:
+            self.total_gross_currency = 'PHP'
+            
+        self.save(update_fields=['total_net_value', 'total_gross_value', 'total_net_currency', 'total_gross_currency'])
+        return total
+
 
 class InvoiceLineItem(models.Model):
     """
@@ -507,6 +711,23 @@ class InvoiceLineItem(models.Model):
     sequence = models.CharField(max_length=255, null=True, blank=True)
     chargeitem_reference_id = models.BigIntegerField(null=True, blank=True)
     chargeitem_code = models.CharField(max_length=100, null=True, blank=True)
+    description = models.CharField(max_length=255, null=True, blank=True) # Snapshot of item name
+    
+    # Billing Details
+    quantity = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    net_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    gross_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        # Auto-calculate totals if not provided
+        if self.unit_price is not None and self.quantity is not None:
+            calculated = self.unit_price * self.quantity
+            if self.net_value is None:
+                self.net_value = calculated
+            if self.gross_value is None:
+                self.gross_value = calculated # Default to net until tax logic
+        super().save(*args, **kwargs)
     
     class Meta:
         db_table = 'billing_invoice_line_item'

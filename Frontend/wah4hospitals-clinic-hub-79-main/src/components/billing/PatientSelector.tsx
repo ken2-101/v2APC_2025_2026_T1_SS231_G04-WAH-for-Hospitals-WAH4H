@@ -14,11 +14,11 @@ interface PatientSelectorProps {
     onShow: () => void;
 }
 
-export const PatientSelector: React.FC<PatientSelectorProps> = ({ 
-    show, 
-    admittedPatients, 
-    billingRecords, 
-    onSelect, 
+export const PatientSelector: React.FC<PatientSelectorProps> = ({
+    show,
+    admittedPatients,
+    billingRecords,
+    onSelect,
     onCancel,
     onShow
 }) => {
@@ -43,16 +43,8 @@ export const PatientSelector: React.FC<PatientSelectorProps> = ({
 
     return (
         <Card>
-            <CardHeader>
-                <div className="flex justify-between items-center">
-                    <CardTitle>Select Patient for Billing</CardTitle>
-                    <Button
-                        variant="outline"
-                        onClick={onCancel}
-                    >
-                        Cancel
-                    </Button>
-                </div>
+            <CardHeader className="border-b">
+                <CardTitle className="text-xl">Select Patient for Billing</CardTitle>
             </CardHeader>
             <CardContent>
                 <div className="space-y-2 max-h-96 overflow-y-auto">
@@ -98,7 +90,7 @@ export const PatientSelector: React.FC<PatientSelectorProps> = ({
                                 } else if (admission.patientId && !isNaN(parseInt(admission.patientId))) {
                                     patientId = parseInt(admission.patientId);
                                 } else if (admission.patient_summary?.id) {
-                                     patientId = admission.patient_summary.id;
+                                    patientId = admission.patient_summary.id;
                                 }
 
                                 return {
@@ -115,6 +107,7 @@ export const PatientSelector: React.FC<PatientSelectorProps> = ({
                                 };
                             };
 
+
                             return (
                                 <div
                                     key={admission.id || admission.encounter_id || index}
@@ -123,8 +116,10 @@ export const PatientSelector: React.FC<PatientSelectorProps> = ({
                                         : 'hover:bg-blue-50 hover:border-blue-300 cursor-pointer'
                                         }`}
                                     onClick={() => {
-                                        const p = constructPatient();
-                                        onSelect(p);
+                                        if (!alreadyBilled) {
+                                            const p = constructPatient();
+                                            onSelect(p);
+                                        }
                                     }}
                                 >
                                     <div>
@@ -148,20 +143,6 @@ export const PatientSelector: React.FC<PatientSelectorProps> = ({
                                             <span className="font-medium">Room:</span> {admission.location_summary?.name || admission.location_status || admission.room || admission.ward || 'N/A'}
                                         </p>
                                     </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        disabled={alreadyBilled}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            if (!alreadyBilled) {
-                                                const p = constructPatient();
-                                                onSelect(p);
-                                            }
-                                        }}
-                                    >
-                                        {alreadyBilled ? 'View Bill' : 'Select'}
-                                    </Button>
                                 </div>
                             );
                         })
