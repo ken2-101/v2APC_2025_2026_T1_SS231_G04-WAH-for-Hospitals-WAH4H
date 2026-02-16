@@ -100,12 +100,89 @@ class DiagnosticReportResultSerializer(serializers.Serializer):
         return instance
 
 
+class DiagnosticReportListSerializer(serializers.ModelSerializer):
+    """
+    Lite serializer for list views. 
+    Only fetches fields required for the dashboard table to optimize performance.
+    """
+    subject_display = serializers.SerializerMethodField()
+    subject_patient_id = serializers.SerializerMethodField()
+    lifecycleStatus = serializers.SerializerMethodField()
+    priority = serializers.SerializerMethodField()
+    orderedBy = serializers.SerializerMethodField()
+    orderedAt = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DiagnosticReport
+        fields = [
+            'diagnostic_report_id',
+            'identifier',
+            'status',
+            'lifecycleStatus',
+            'priority',
+            'code_code',
+            'code_display',
+            'subject_id',
+            'subject_display',
+            'subject_patient_id',
+            'orderedBy',
+            'orderedAt',
+            'conclusion',
+            'created_at',
+            'updated_at'
+        ]
+
+    # Re-use optimized optimization logic from main serializer by defining same methods
+    # We duplicate them here to keep the "Lite" serializer independent and explicit
+    
+    def get_subject_display(self, obj):
+        # Try context first (N+1 optimization)
+        patients_map = self.context.get('patients_map', {})
+        if obj.subject_id in patients_map:
+            patient = patients_map[obj.subject_id]
+            return f"{patient.first_name or ''} {patient.last_name or ''}".strip() or "Unknown Patient"
+        return "Unknown Patient" # simplified fallback for list view
+
+    def get_subject_patient_id(self, obj):
+        patients_map = self.context.get('patients_map', {})
+        if obj.subject_id in patients_map:
+            patient = patients_map[obj.subject_id]
+            return patient.patient_id or f"P-{patient.id}"
+        return f"P-{obj.subject_id}"
+
+    def get_lifecycleStatus(self, obj):
+        status_map = {
+            'registered': 'pending', 'partial': 'in-progress', 'preliminary': 'in-progress',
+            'final': 'completed', 'amended': 'completed', 'corrected': 'completed',
+            'cancelled': 'pending'
+        }
+        return status_map.get(obj.status, 'pending')
+
+    def get_priority(self, obj):
+        return obj.priority if obj.priority else 'routine'
+
+    def get_orderedBy(self, obj):
+        if not obj.requester_id: return None
+        practitioners_map = self.context.get('practitioners_map', {})
+        users_map = self.context.get('users_map', {})
+        
+        if obj.requester_id in practitioners_map:
+            p = practitioners_map[obj.requester_id]
+            return f"Dr. {p.first_name} {p.last_name}".strip()
+        if obj.requester_id in users_map:
+            u = users_map[obj.requester_id]
+            return f"{u.first_name} {u.last_name}".strip() or u.username
+        return None
+
+    def get_orderedAt(self, obj):
+        if obj.effective_datetime: return obj.effective_datetime.isoformat()
+        return obj.created_at.isoformat() if hasattr(obj, 'created_at') else None
 class DiagnosticReportSerializer(serializers.ModelSerializer):
     """
     Enhanced serializer that fetches Patient data and formats DiagnosticReport
     to match frontend expectations.
     """
-    results = DiagnosticReportResultSerializer(many=True, required=False)
+    results = serializers.SerializerMethodField()
     
     # Additional fields for frontend (read-only, computed from linked models)
     subject_display = serializers.SerializerMethodField()
@@ -128,22 +205,33 @@ class DiagnosticReportSerializer(serializers.ModelSerializer):
         model = DiagnosticReport
         fields = '__all__'
 
-    def to_representation(self, instance):
+    def get_results(self, obj):
         """
-        Override to merge legacy 'results' (DiagnosticReportResult) with new 'result_data' (JSONField).
-        Prioritize 'result_data' if it exists as it contains the structured form data.
+        Prioritize 'result_data' (JSON) if it exists.
+        Fallback to 'results' relation (Legacy DB Table) only if strictly necessary.
+        This lazy loading prevents N+1 queries for users with modern JSON data.
         """
-        representation = super().to_representation(instance)
-        
-        # If result_data exists, use it directly as the 'results' field in the API response
-        # This matches what the frontend expects (list of parameters or object with meta)
-        if instance.result_data:
-            representation['results'] = instance.result_data.get('results', instance.result_data)
-        
-        return representation
+        if obj.result_data:
+            # Return the JSON content directly
+            # Handle potential nesting if 'results' key was used inside JSON
+            val = obj.result_data
+            if isinstance(val, dict) and 'results' in val:
+                return val['results']
+            return val
+            
+        # Legacy Fallback: Expensive DB Lookup
+        # Only runs if result_data is empty
+        return DiagnosticReportResultSerializer(instance=obj.results.all(), many=True).data
 
     def get_subject_display(self, obj):
-        """Fetch patient name from Patient model."""
+        """Fetch patient name from Patient model (Optimized)."""
+        # Try context first
+        patients_map = self.context.get('patients_map', {})
+        if obj.subject_id in patients_map:
+            patient = patients_map[obj.subject_id]
+            return f"{patient.first_name or ''} {patient.last_name or ''}".strip() or "Unknown Patient"
+
+        # Fallback to DB
         from patients.models import Patient
         try:
             patient = Patient.objects.get(id=obj.subject_id)
@@ -152,7 +240,14 @@ class DiagnosticReportSerializer(serializers.ModelSerializer):
             return "Unknown Patient"
 
     def get_subject_patient_id(self, obj):
-        """Fetch patient identifier from Patient model."""
+        """Fetch patient identifier from Patient model (Optimized)."""
+        # Try context first
+        patients_map = self.context.get('patients_map', {})
+        if obj.subject_id in patients_map:
+            patient = patients_map[obj.subject_id]
+            return patient.patient_id or f"P-{patient.id}"
+
+        # Fallback to DB
         from patients.models import Patient
         try:
             patient = Patient.objects.get(id=obj.subject_id)
@@ -186,11 +281,24 @@ class DiagnosticReportSerializer(serializers.ModelSerializer):
 
     def get_orderedBy(self, obj):
         """
-        Get ordering physician name from requester_id.
-        requester_id represents the doctor/nurse who ordered the test.
+        Get ordering physician name from requester_id (Optimized).
         """
         if not obj.requester_id:
             return None
+            
+        # Try context first
+        practitioners_map = self.context.get('practitioners_map', {})
+        users_map = self.context.get('users_map', {})
+        
+        if obj.requester_id in practitioners_map:
+            p = practitioners_map[obj.requester_id]
+            return f"Dr. {p.first_name} {p.last_name}".strip()
+        
+        if obj.requester_id in users_map:
+            u = users_map[obj.requester_id]
+            return f"{u.first_name} {u.last_name}".strip() or u.username
+
+        # Fallback to DB
         try:
             from accounts.models import Practitioner
             from django.contrib.auth.models import User
@@ -228,9 +336,23 @@ class DiagnosticReportSerializer(serializers.ModelSerializer):
         return None
 
     def get_processedBy(self, obj):
-        """Get lab technician name from performer_id."""
+        """Get lab technician name from performer_id (Optimized)."""
         if not obj.performer_id or obj.status not in ['final', 'amended', 'corrected']:
             return None
+            
+        # Try context first
+        practitioners_map = self.context.get('practitioners_map', {})
+        users_map = self.context.get('users_map', {})
+        
+        if obj.performer_id in practitioners_map:
+            p = practitioners_map[obj.performer_id]
+            return f"{p.first_name} {p.last_name}".strip()
+            
+        if obj.performer_id in users_map:
+            u = users_map[obj.performer_id]
+            return f"{u.first_name} {u.last_name}".strip() or u.username
+
+        # Fallback to DB
         try:
             from accounts.models import Practitioner
             from django.contrib.auth.models import User
@@ -249,12 +371,43 @@ class DiagnosticReportSerializer(serializers.ModelSerializer):
             return obj.issued_datetime.isoformat()
         return None
 
+
+
     def get_releasedBy(self, obj):
-        """Placeholder for who released the results."""
-        return None
+        """Get releaser name from results_interpreter_id."""
+        if not obj.results_interpreter_id: return None
+        
+        # Try context first
+        practitioners_map = self.context.get('practitioners_map', {})
+        users_map = self.context.get('users_map', {})
+        
+        if obj.results_interpreter_id in practitioners_map:
+            p = practitioners_map[obj.results_interpreter_id]
+            return f"{p.first_name} {p.last_name}".strip()
+            
+        if obj.results_interpreter_id in users_map:
+            u = users_map[obj.results_interpreter_id]
+            return f"{u.first_name} {u.last_name}".strip() or u.username
+
+        # Fallback to DB
+        try:
+            from accounts.models import Practitioner
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            
+            try:
+                practitioner = Practitioner.objects.get(practitioner_id=obj.results_interpreter_id)
+                return f"{practitioner.first_name} {practitioner.last_name}".strip()
+            except Practitioner.DoesNotExist:
+                user = User.objects.get(pk=obj.results_interpreter_id)
+                return f"{user.first_name} {user.last_name}".strip() or user.username
+        except Exception:
+            return None
 
     def get_releasedAt(self, obj):
-        """Placeholder for release time."""
+        """Use issued_datetime as release time."""
+        if obj.issued_datetime:
+            return obj.issued_datetime.isoformat()
         return None
 
     def get_clinicalReason(self, obj):
@@ -267,8 +420,9 @@ class DiagnosticReportSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         # Basic required-field checks
-        if not data.get('subject_id'):
-            raise serializers.ValidationError({'subject_id': 'This field is required.'})
+        # REMOVED: Manual check for subject_id breaks PATCH requests (partial updates). 
+        # DRF ModelSerializer handles required fields automatically for Creates.
+
 
         # Period consistency
         start = data.get('effective_period_start')
@@ -300,7 +454,7 @@ class DiagnosticReportSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
-        # Pull nested results from initial_data (we validate them in validate())
+        # Pull nested results from initial_data
         results_input = self.initial_data.get('results', [])
 
         # Remove any key that doesn't belong to the model
@@ -318,15 +472,19 @@ class DiagnosticReportSerializer(serializers.ModelSerializer):
         if 'status' not in model_data:
             model_data['status'] = 'requested'
 
+        # 3. OPTIMIZATION: Store results directly in result_data (JSON)
+        # This is the "Most Optimal" way requested by user for flexible schema (CBC, Urinalysis, etc.)
+        if results_input:
+            model_data['result_data'] = results_input
+
         with transaction.atomic():
             report = DiagnosticReport.objects.create(**model_data)
-            # Create result rows preserving order / sequence
-            for r in results_input:
-                DiagnosticReportResult.objects.create(
-                    diagnostic_report=report,
-                    observation_id=r['observation_id'],
-                    item_sequence=r['item_sequence']
-                )
+            
+            # Legacy Sync: We keep this minimal or remove it. 
+            # User requested "most optimal performance". Writing to a secondary table 
+            # doubles the write time and is unnecessary if we use JSON.
+            # We will SKIP writing to DiagnosticReportResult table.
+            
             return report
 
     def update(self, instance, validated_data):
@@ -336,41 +494,20 @@ class DiagnosticReportSerializer(serializers.ModelSerializer):
             # Update simple fields
             for attr, value in validated_data.items():
                 setattr(instance, attr, value)
-            instance.save()
-
+            
             # If results were provided, save them to the JSONField
             if results_input is not None:
                 # Save the raw payload to result_data
                 instance.result_data = results_input
-                instance.save()
-                
-                # Also try to map to DiagnosticReportResult for backward compatibility if possible
-                # But primarily rely on result_data for read operations
-                try:
-                    instance.results.all().delete()
-                    # Only map if results_input is a list (legacy format)
-                    if isinstance(results_input, list):
-                        for r in results_input:
-                            # Skip if not structured correctly for legacy model
-                            if 'observation_id' not in r or 'item_sequence' not in r:
-                                continue
-                            DiagnosticReportResult.objects.create(
-                                diagnostic_report=instance,
-                                observation_id=r['observation_id'],
-                                item_sequence=r['item_sequence']
-                            )
-                except Exception:
-                    # Ignore errors in legacy mapping, main data is in result_data
-                    pass
+            
+            instance.save()
+            
+            # OPTIMIZATION: Skip syncing to DiagnosticReportResult table.
+            # relying purely on result_data JSONField.
 
             return instance
 
-    def finalize(self, instance):
-        # Example state transition: mark the report as issued if not already
-        if not instance.issued_datetime:
-            instance.issued_datetime = timezone.now()
-            instance.save()
-        return instance
+
 
 class LabTestDefinitionSerializer(serializers.ModelSerializer):
     """

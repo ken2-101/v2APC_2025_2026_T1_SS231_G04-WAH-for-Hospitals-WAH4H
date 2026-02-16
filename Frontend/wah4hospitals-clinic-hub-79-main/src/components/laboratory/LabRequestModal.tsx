@@ -205,37 +205,16 @@ export const LabRequestModal: React.FC<LabRequestModalProps> = ({ isOpen, onClos
                             >
                                 <optgroup label="Hematology">
                                     <option value="cbc">Complete Blood Count (CBC)</option>
-                                    <option value="platelet_count">Platelet Count</option>
                                     <option value="blood_typing">Blood Typing</option>
-                                    <option value="clotting_time">Clotting Time</option>
-                                    <option value="bleeding_time">Bleeding Time</option>
                                 </optgroup>
                                 <optgroup label="Clinical Microscopy">
                                     <option value="urinalysis">Urinalysis</option>
                                     <option value="fecalysis">Fecalysis</option>
-                                    <option value="pregnancy_test">Pregnancy Test</option>
                                 </optgroup>
                                 <optgroup label="Blood Chemistry">
                                     <option value="fbs">Fasting Blood Sugar (FBS)</option>
                                     <option value="rbs">Random Blood Sugar (RBS)</option>
-                                    <option value="lipid_profile">Lipid Profile</option>
-                                    <option value="creatinine">Creatinine</option>
-                                    <option value="bua">Blood Uric Acid</option>
-                                    <option value="bun">Blood Urea Nitrogen</option>
-                                    <option value="sgpt">SGPT (ALT)</option>
-                                    <option value="sgot">SGOT (AST)</option>
-                                    <option value="electrolytes">Electrolytes</option>
-                                    <option value="blood_chemistry">Blood Chemistry (Package)</option>
-                                </optgroup>
-                                <optgroup label="Serology & Immunology">
-                                    <option value="hbsag">HBsAg</option>
-                                    <option value="syphilis">Syphilis (RPR/VDRL)</option>
-                                    <option value="dengue_duo">Dengue Duo</option>
-                                    <option value="typhoid">Typhoid Test</option>
-                                </optgroup>
-                                <optgroup label="Microbiology">
-                                    <option value="gram_stain">Gram Stain</option>
-                                    <option value="afb_stain">AFB Stain</option>
+                                    <option value="glucose_panel">Blood Glucose Panel</option>
                                 </optgroup>
                             </select>
                         </div>

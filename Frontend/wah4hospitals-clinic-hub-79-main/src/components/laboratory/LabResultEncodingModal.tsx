@@ -70,11 +70,14 @@ export const LabResultEncodingModal: React.FC<LabResultEncodingModalProps> = ({ 
                     }
                     // If not a number (e.g. "Reactive"), apiInterp remains '' which is correct.
 
+                    // Hide reference range if both low and high are 0 (e.g. Qualitative tests)
+                    const refRange = (param.refLow === 0 && param.refHigh === 0) ? '' : `${param.refLow}-${param.refHigh}`;
+
                     results.push({
                         parameter_name: param.label,
                         result_value: value,
                         unit: param.unit,
-                        reference_range: `${param.refLow}-${param.refHigh}`,
+                        reference_range: refRange,
                         interpretation: apiInterp
                     });
                 }
@@ -168,35 +171,14 @@ export const LabResultEncodingModal: React.FC<LabResultEncodingModalProps> = ({ 
                                 const testTypeToPanels: Record<string, string[]> = {
                                     // Hematology
                                     'cbc': ['cbc'],
-                                    'platelet_count': ['platelet_count'],
                                     'blood_typing': ['blood_typing'],
-                                    'clotting_time': ['coagulation'],
-                                    'bleeding_time': ['coagulation'],
                                     // Microscopy
                                     'urinalysis': ['urinalysis'],
                                     'fecalysis': ['fecalysis'],
-                                    'pregnancy_test': ['pregnancy_test'],
                                     // Chemistry
                                     'fbs': ['glucose_panel'],
                                     'rbs': ['glucose_panel'],
-                                    'lipid_profile': ['lipid_profile'],
-                                    'creatinine': ['kidney_func'],
-                                    'bua': ['kidney_func'],
-                                    'bun': ['kidney_func'],
-                                    'sgpt': ['liver_func'],
-                                    'sgot': ['liver_func'],
-                                    'electrolytes': ['electrolytes'],
-                                    'blood_chemistry': ['glucose_panel', 'lipid_profile', 'kidney_func', 'liver_func', 'electrolytes'],
-                                    // Serology
-                                    'hbsag': ['serology'],
-                                    'syphilis': ['serology'],
-                                    'typhoid': ['serology'],
-                                    'dengue_duo': ['dengue'],
-                                    // Microbiology
-                                    'gram_stain': ['microbiology'],
-                                    'afb_stain': ['microbiology'],
-                                    // Legacy
-                                    'lipid_panel': ['lipid_profile'],
+                                    'glucose_panel': ['glucose_panel'],
                                 };
 
                                 const testTypeKey = request.test_type.toLowerCase();

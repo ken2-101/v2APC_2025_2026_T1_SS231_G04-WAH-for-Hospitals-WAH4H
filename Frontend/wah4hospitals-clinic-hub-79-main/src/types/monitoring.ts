@@ -63,33 +63,44 @@ export interface HistoryEvent {
    These types are kept for monitoring UI compatibility only.
    For actual lab operations, import from laboratory types.
    */
+import { LabTestType, LabPriority, LabStatus } from './laboratory';
+
 export interface LabRequest {
     id: string;
     admissionId: string;
     testName: string;
-    testCode: string;                // LOINC code
-    priority: 'routine' | 'urgent' | 'stat';
+    testCode: LabTestType;                // LOINC code / Internal Code
+    priority: LabPriority;
     notes: string;
-    lifecycleStatus: 'requested' | 'verified' | 'completed';
+    lifecycleStatus: LabStatus;
     status_display?: string; // Backend raw status (e.g. 'draft', 'registered')
     orderedBy: string;
     orderedAt: string;
     requestedBy?: string;
     requestedAt?: string;
     completedAt?: string;
-    resultContent?: {
-        findings: string;
-        values: { parameter: string; value: string; reference: string; flag?: string }[];
-        interpretation: string;
-        reportedBy: string;
-        reportedAt: string;
-    };
+    // Backend returns 'results' which is an array of result objects
+    results?: {
+        parameter: string;
+        value: string;
+        unit: string;
+        referenceRange: string;
+        flag?: string;
+        interpretation?: string;
+    }[];
 }
 
 export interface LabResult {
-    findings: string;
-    values: { parameter: string; value: string; reference: string; flag?: string }[];
-    interpretation: string;
+    findings?: string;
+    results: {
+        parameter: string;
+        value: string;
+        unit: string;
+        referenceRange: string;
+        flag?: string;
+        interpretation?: string;
+    }[];
+    interpretation?: string;
     reportedBy: string;
     reportedAt: string;
 }

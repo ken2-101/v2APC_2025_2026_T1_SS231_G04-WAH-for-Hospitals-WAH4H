@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  FlaskConical, Clock, AlertCircle,
-  Search, Eye, Send, CheckCircle, FileText,
+  FlaskConical, Clock, AlertCircle, Search, Eye, Send, CheckCircle, FileText,
   Microscope, ClipboardCheck, Activity
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -11,7 +10,6 @@ import {
   LabRequestFilters,
   LabDashboardStats
 } from '../types/laboratory';
-import { labPanelsArray } from '../config/labParameters';
 import { LabResultEncodingModal } from '../components/laboratory/LabResultEncodingModal';
 import { LabResultViewModal } from '../components/laboratory/LabResultViewModal';
 import { useToast } from "@/hooks/use-toast";
@@ -26,23 +24,15 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-// ==================== TYPE DEFINITIONS (Form State) ====================
-
-// Result encoding form state
-// ResultFormState removed as it is now handled by LabResultEncodingModal
-
-
-// ==================== MAIN COMPONENT ====================
-
 export default function LaboratoryDashboard() {
-  // Auth Context
+  // Auth & Toast
   const { user } = useAuth();
   const { toast } = useToast();
 
   // State Management
-  const [activeTab, setActiveTab] = useState<'verified' | 'completed'>('verified');
+  const [activeTab, setActiveTab] = useState<'pending' | 'in-progress' | 'completed' | 'released'>('pending');
   const [labRequests, setLabRequests] = useState<LabRequest[]>([]);
-  const [stats, setStats] = useState<LabDashboardStats>({ pending: 0, in_progress: 0, completed_today: 0 });
+  const [stats, setStats] = useState<LabDashboardStats>({ pending: 0, in_progress: 0, to_release: 0, released_today: 0 });
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<'all' | 'routine' | 'urgent' | 'stat'>('all');
@@ -55,44 +45,75 @@ export default function LaboratoryDashboard() {
   // Confirmation State
   const [specimenToReceive, setSpecimenToReceive] = useState<number | null>(null);
 
-
-
   // Load Data
   useEffect(() => {
-    fetchData();
-  }, [activeTab, priorityFilter]);
+    fetchData(); // Initial fetch
 
-  const fetchData = async () => {
-    setLoading(true);
+    // Real-time: Soft Polling every 30 seconds
+    const intervalId = setInterval(() => {
+      // Only poll if not viewing a modal to avoid disruption
+      if (!showEncodeModal && !showViewModal) {
+        fetchData(true); // true = isPolling (silent update)
+      }
+    }, 30000);
+
+    return () => clearInterval(intervalId);
+  }, [activeTab, priorityFilter]);
+  // Removed searchTerm from dependency to avoid debouncing conflict, 
+  // search is handled by its own effect effectively or should be.
+  // Actually, for this structure, we can keep it simple.
+
+  const fetchData = async (isPolling = false) => {
+    if (!isPolling) setLoading(true); // Only show spinner on manual/initial load
     try {
       // Fetch stats
       const statsData = await laboratoryService.getDashboardStats();
       setStats(statsData);
 
-      // Fetch requests based on active tab
+      // Map activeTab to backend status filters
+      let statusFilter: 'verified' | 'completed' | 'requested' | 'registered' | 'partial' | undefined;
+
+      if (activeTab === 'pending') {
+        statusFilter = 'requested'; // Covers requested, draft, registered
+      } else if (activeTab === 'in-progress') {
+        statusFilter = 'partial'; // Maps to partial, preliminary, in-progress in service
+      } else if (activeTab === 'completed' || activeTab === 'released') {
+        statusFilter = 'completed';
+      }
+
+      // Fetch requests based on tab
       const filters: LabRequestFilters = {
-        status: activeTab,
-        // priority: priorityFilter !== 'all' ? priorityFilter : undefined, // Backend filtering for priority to be added
+        status: statusFilter, // Use mapped status
+        search: searchTerm,
+        priority: priorityFilter !== 'all' ? priorityFilter : undefined,
       };
 
-      const response = await laboratoryService.getLabRequests(filters);
-      setLabRequests(response.results);
+      const requests = await laboratoryService.getLabRequests(filters);
+
+      // Client-side filtering REMOVED - Logic moved to laboratoryService.ts for optimization
+      // Trust the API response to return the correct records based on the status filter
+      const filteredResults = requests.results;
+
+      setLabRequests(filteredResults);
     } catch (error) {
-      console.error('Error fetching lab data:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to load laboratory data",
-      });
+      console.error("Error fetching lab data:", error);
+      if (!isPolling) {
+        toast({
+          title: "Error",
+          description: "Failed to load laboratory data.",
+          variant: "destructive",
+        });
+      }
     } finally {
-      setLoading(false);
+      if (!isPolling) setLoading(false);
     }
   };
 
+
   // ==================== HANDLERS ====================
 
-  const handleReceiveSpecimenClick = (requestId: number) => {
-    setSpecimenToReceive(requestId);
+  const handleReceiveSpecimenClick = (request: LabRequest) => {
+    setSpecimenToReceive(request.id);
   };
 
   const confirmReceiveSpecimen = async () => {
@@ -104,7 +125,8 @@ export default function LaboratoryDashboard() {
         title: "Specimen Received",
         description: "Specimen received and moved to In-Progress queue",
       });
-      fetchData(); // Refresh list
+      fetchData();
+      setActiveTab('in-progress');
     } catch (error) {
       console.error('Error receiving specimen:', error);
       toast({
@@ -122,18 +144,16 @@ export default function LaboratoryDashboard() {
     setShowEncodeModal(true);
   };
 
-
-
   const handleModalSubmit = async (requestId: number, data: import('../types/laboratory').LabResultFormData) => {
     try {
       await laboratoryService.createLabResult(data);
       toast({
         title: "Results Saved",
-        description: "Test is now in Completed queue.",
+        description: "Test results saved. Verification required before release.",
       });
       setShowEncodeModal(false);
       setSelectedRequest(null);
-      setActiveTab('completed'); // Switch to completed tab
+      setActiveTab('completed'); // Move to completed tab
       fetchData();
     } catch (error) {
       console.error('Error saving results:', error);
@@ -147,15 +167,11 @@ export default function LaboratoryDashboard() {
 
   const handleViewResults = async (request: LabRequest) => {
     try {
-      // Fetch the full result details including parameters/interpretation
       const resultData = await laboratoryService.getLabResult(request.id);
-
-      // Merge with the request object
       const fullRequest = {
         ...request,
         result: resultData
       };
-
       setSelectedRequest(fullRequest);
       setShowViewModal(true);
     } catch (error) {
@@ -168,35 +184,32 @@ export default function LaboratoryDashboard() {
     }
   };
 
-  const handleReleaseToMonitoring = (requestId: number) => {
-    // This functionality might need a specific backend endpoint
-    // For now, it's already 'final', so effective released.
-    toast({
-      title: "Results Released",
-      description: "Results released to Monitoring Module! Doctors and nurses can now view the results.",
-    });
+  const handleReleaseToMonitoring = async (requestId: number) => {
+    try {
+      await laboratoryService.releaseLabResult(requestId);
+      toast({
+        title: "Results Released",
+        description: "Results released to Monitoring Module! Doctors and nurses can now view the results.",
+      });
+      fetchData();
+      // Optionally switch to released tab or stay on completed to release more
+    } catch (error) {
+      console.error('Error releasing results:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to release results.",
+      });
+    }
   };
-
-  // ==================== COMPUTED VALUES ====================
-
-  const filteredRequests = labRequests.filter(req => {
-    if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase();
-    return (
-      req.patient_name.toLowerCase().includes(term) ||
-      req.patient_id.toLowerCase().includes(term) ||
-      req.request_id.toLowerCase().includes(term) ||
-      req.test_type_display.toLowerCase().includes(term)
-    );
-  });
 
   // ==================== RENDER ====================
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden p-2">
-        <div className="h-full flex flex-col">
+      <div className="flex-1 overflow-hidden p-6">
+        <div className="max-w-full mx-auto h-full flex flex-col">
           {/* Page Title */}
           <div className="mb-6">
             <h2 className="text-2xl font-bold text-gray-900">Laboratory Information System</h2>
@@ -210,7 +223,7 @@ export default function LaboratoryDashboard() {
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <Clock className="text-orange-600" size={16} />
-                    <p className="text-sm text-orange-800 font-medium">Requested</p>
+                    <p className="text-sm text-orange-800 font-medium">Pending</p>
                   </div>
                   <p className="text-3xl font-bold text-orange-900">{stats.pending}</p>
                   <p className="text-xs text-orange-600 mt-1">Awaiting processing</p>
@@ -226,7 +239,7 @@ export default function LaboratoryDashboard() {
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <Activity className="text-blue-600" size={16} />
-                    <p className="text-sm text-blue-800 font-medium">Verified</p>
+                    <p className="text-sm text-blue-800 font-medium">In-Progress</p>
                   </div>
                   <p className="text-3xl font-bold text-blue-900">{stats.in_progress}</p>
                   <p className="text-xs text-blue-600 mt-1">Being analyzed</p>
@@ -244,7 +257,7 @@ export default function LaboratoryDashboard() {
                     <ClipboardCheck className="text-purple-600" size={16} />
                     <p className="text-sm text-purple-800 font-medium">Completed</p>
                   </div>
-                  <p className="text-3xl font-bold text-purple-900">{stats.completed_today}</p>
+                  <p className="text-3xl font-bold text-purple-900">{stats.to_release}</p>
                   <p className="text-xs text-purple-600 mt-1">Ready to release</p>
                 </div>
                 <div className="w-12 h-12 bg-purple-200 rounded-lg flex items-center justify-center">
@@ -253,19 +266,18 @@ export default function LaboratoryDashboard() {
               </div>
             </div>
 
-            {/* Released card kept for UI consistency, using completed count or separate stat if available */}
             <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200 p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <Send className="text-green-600" size={16} />
+                    <CheckCircle className="text-green-600" size={16} />
                     <p className="text-sm text-green-800 font-medium">Released Today</p>
                   </div>
-                  <p className="text-3xl font-bold text-green-900">{stats.completed_today}</p>
+                  <p className="text-3xl font-bold text-green-900">{stats.released_today}</p>
                   <p className="text-xs text-green-600 mt-1">Sent to monitoring</p>
                 </div>
                 <div className="w-12 h-12 bg-green-200 rounded-lg flex items-center justify-center">
-                  <CheckCircle className="text-green-700" size={24} />
+                  <Send className="text-green-700" size={24} />
                 </div>
               </div>
             </div>
@@ -274,19 +286,36 @@ export default function LaboratoryDashboard() {
           {/* Tab Navigation */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-
               <button
-                onClick={() => setActiveTab('verified')}
-                className={`px-6 py-2.5 rounded-lg font-medium transition-all ${activeTab === 'verified'
+                onClick={() => setActiveTab('pending')}
+                className={`px-6 py-2.5 rounded-lg font-medium transition-all ${activeTab === 'pending'
+                  ? 'bg-orange-500 text-white shadow-md'
+                  : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+                  }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Clock size={18} />
+                  <span>Pending</span>
+                  {stats.pending > 0 && (
+                    <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-semibold ${activeTab === 'pending' ? 'bg-orange-600 text-white' : 'bg-orange-100 text-orange-700'
+                      }`}>
+                      {stats.pending}
+                    </span>
+                  )}
+                </div>
+              </button>
+              <button
+                onClick={() => setActiveTab('in-progress')}
+                className={`px-6 py-2.5 rounded-lg font-medium transition-all ${activeTab === 'in-progress'
                   ? 'bg-blue-500 text-white shadow-md'
                   : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
                   }`}
               >
                 <div className="flex items-center gap-2">
                   <Activity size={18} />
-                  <span>Verified</span>
+                  <span>In-Progress</span>
                   {stats.in_progress > 0 && (
-                    <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-semibold ${activeTab === 'verified' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700'
+                    <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-semibold ${activeTab === 'in-progress' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700'
                       }`}>
                       {stats.in_progress}
                     </span>
@@ -303,12 +332,24 @@ export default function LaboratoryDashboard() {
                 <div className="flex items-center gap-2">
                   <ClipboardCheck size={18} />
                   <span>Completed</span>
-                  {stats.completed_today > 0 && (
+                  {stats.to_release > 0 && (
                     <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-semibold ${activeTab === 'completed' ? 'bg-purple-600 text-white' : 'bg-purple-100 text-purple-700'
                       }`}>
-                      {stats.completed_today}
+                      {stats.to_release}
                     </span>
                   )}
+                </div>
+              </button>
+              <button
+                onClick={() => setActiveTab('released')}
+                className={`px-6 py-2.5 rounded-lg font-medium transition-all ${activeTab === 'released'
+                  ? 'bg-green-500 text-white shadow-md'
+                  : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+                  }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Send size={18} />
+                  <span>Released</span>
                 </div>
               </button>
             </div>
@@ -351,11 +392,16 @@ export default function LaboratoryDashboard() {
                 <div className="flex justify-center items-center h-full">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
                 </div>
-              ) : filteredRequests.length === 0 ? (
+              ) : labRequests.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-gray-500">
                   <FlaskConical size={64} className="mb-4 opacity-50" />
                   <p className="text-lg font-medium">No requests found</p>
-                  <p className="text-sm mt-1">No requests match your current filters.</p>
+                  <p className="text-sm mt-1">
+                    {activeTab === 'pending' && 'There are no pending laboratory requests.'}
+                    {activeTab === 'in-progress' && 'No tests are currently being processed.'}
+                    {activeTab === 'completed' && 'No completed tests awaiting release.'}
+                    {activeTab === 'released' && 'No released results available.'}
+                  </p>
                 </div>
               ) : (
                 <table className="w-full">
@@ -385,7 +431,7 @@ export default function LaboratoryDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {filteredRequests.map((request) => (
+                    {labRequests.map((request) => (
                       <tr
                         key={request.id}
                         className={`hover:bg-gray-50 ${request.priority === 'stat' ? 'border-l-4 border-red-500 bg-red-50' : ''
@@ -394,8 +440,11 @@ export default function LaboratoryDashboard() {
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-purple-600">{request.request_id}</span>
-                            <span className="px-2 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-700">
-                              {request.test_type}
+                            <span className={`px-2 py-0.5 rounded text-xs font-semibold ${request.test_type === 'cbc' ? 'bg-blue-100 text-blue-700' :
+                              request.test_type === 'urinalysis' ? 'bg-yellow-100 text-yellow-700' :
+                                'bg-gray-100 text-gray-700'
+                              }`}>
+                              {request.test_type.toUpperCase()}
                             </span>
                           </div>
                         </td>
@@ -431,22 +480,27 @@ export default function LaboratoryDashboard() {
                           </p>
                         </td>
                         <td className="px-6 py-4">
-                          {/* Requested Tab Actions */}
+                          {activeTab === 'pending' && (
+                            <button
+                              onClick={() => handleReceiveSpecimenClick(request)}
+                              className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2 font-medium text-sm shadow-sm"
+                            >
+                              <FlaskConical size={16} />
+                              Receive
+                            </button>
+                          )}
 
-
-                          {/* Verified Tab Actions */}
-                          {activeTab === 'verified' && (
+                          {activeTab === 'in-progress' && (
                             <button
                               onClick={() => handleStartEncoding(request)}
-                              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2 font-medium text-sm"
+                              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2 font-medium text-sm shadow-sm"
                             >
                               <FileText size={16} />
                               Encode
                             </button>
                           )}
 
-                          {/* Completed Tab Actions */}
-                          {activeTab === 'completed' && (
+                          {(activeTab === 'completed' || activeTab === 'released') && (
                             <div className="flex items-center gap-2">
                               <button
                                 onClick={() => handleViewResults(request)}
@@ -455,13 +509,15 @@ export default function LaboratoryDashboard() {
                                 <Eye size={16} />
                                 View
                               </button>
-                              <button
-                                onClick={() => handleReleaseToMonitoring(request.id)}
-                                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2 font-medium text-sm shadow-md"
-                              >
-                                <Send size={16} />
-                                Release
-                              </button>
+                              {activeTab === 'completed' && (
+                                <button
+                                  onClick={() => handleReleaseToMonitoring(request.id)}
+                                  className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2 font-medium text-sm shadow-md"
+                                >
+                                  <Send size={16} />
+                                  Release
+                                </button>
+                              )}
                             </div>
                           )}
                         </td>
@@ -482,6 +538,8 @@ export default function LaboratoryDashboard() {
         request={selectedRequest}
         onSubmit={handleModalSubmit}
       />
+
+      {/* View Results Modal */}
       <LabResultViewModal
         isOpen={showViewModal}
         onClose={() => setShowViewModal(false)}
@@ -494,7 +552,7 @@ export default function LaboratoryDashboard() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Specimen Receipt</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to receive this specimen? This will move the request to the Verified queue.
+              Are you sure you want to receive this specimen? This will move the request to the In-Progress queue.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -505,6 +563,6 @@ export default function LaboratoryDashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div >
+    </div>
   );
 }

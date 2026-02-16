@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, FileText, AlertCircle, CheckCircle, Clock, RefreshCw, ExternalLink, Trash2 } from 'lucide-react';
 import { LabRequest, LabResult } from '../../types/monitoring';
+import { LabTestType, LabPriority } from '../../types/laboratory';
 import { useRole } from '@/contexts/RoleContext';
 
 interface LaboratoryTabProps {
@@ -20,36 +21,16 @@ interface LaboratoryTabProps {
     onRefresh?: () => void;
 }
 
-const COMMON_LAB_TESTS = [
+const COMMON_LAB_TESTS: { code: LabTestType; name: string }[] = [
     // Hematology
     { code: 'cbc', name: 'Complete Blood Count (CBC)' },
-    { code: 'platelet_count', name: 'Platelet Count' },
     { code: 'blood_typing', name: 'Blood Typing' },
-    { code: 'clotting_time', name: 'Clotting Time' },
-    { code: 'bleeding_time', name: 'Bleeding Time' },
     // Microscopy
     { code: 'urinalysis', name: 'Urinalysis' },
     { code: 'fecalysis', name: 'Fecalysis' },
-    { code: 'pregnancy_test', name: 'Pregnancy Test' },
     // Chemistry
     { code: 'fbs', name: 'Fasting Blood Sugar (FBS)' },
     { code: 'rbs', name: 'Random Blood Sugar (RBS)' },
-    { code: 'lipid_profile', name: 'Lipid Profile' },
-    { code: 'creatinine', name: 'Creatinine' },
-    { code: 'bua', name: 'Blood Uric Acid' },
-    { code: 'bun', name: 'Blood Urea Nitrogen' },
-    { code: 'sgpt', name: 'SGPT (ALT)' },
-    { code: 'sgot', name: 'SGOT (AST)' },
-    { code: 'electrolytes', name: 'Electrolytes' },
-    { code: 'blood_chemistry', name: 'Blood Chemistry (Package)' },
-    // Serology
-    { code: 'hbsag', name: 'HBsAg' },
-    { code: 'syphilis', name: 'Syphilis (RPR/VDRL)' },
-    { code: 'dengue_duo', name: 'Dengue Duo' },
-    { code: 'typhoid', name: 'Typhoid Test' },
-    // Microbiology
-    { code: 'gram_stain', name: 'Gram Stain' },
-    { code: 'afb_stain', name: 'AFB Stain' },
 ];
 
 export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
@@ -68,16 +49,16 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
 
     // Order Lab Test Form State
     const [orderForm, setOrderForm] = useState({
-        testCode: '',
+        testCode: '' as LabTestType | '',
         testName: '',
-        priority: 'routine' as 'routine' | 'urgent' | 'stat',
+        priority: 'routine' as LabPriority,
         notes: '',
     });
 
     // Lab Result Form State
     const [resultForm, setResultForm] = useState<LabResult>({
         findings: '',
-        values: [],
+        results: [],
         interpretation: '',
         reportedBy: '',
         reportedAt: new Date().toISOString(),
@@ -108,7 +89,7 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
 
         const newRequest: Omit<LabRequest, 'id'> = {
             admissionId: '', // Will be set by parent
-            testCode: orderForm.testCode,
+            testCode: orderForm.testCode as LabTestType,
             testName: orderForm.testName,
             priority: orderForm.priority,
             notes: orderForm.notes,
@@ -119,7 +100,7 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
 
         onAddRequest?.(newRequest);
         setIsOrderModalOpen(false);
-        setOrderForm({ testCode: '', testName: '', priority: 'routine', notes: '' });
+        setOrderForm({ testCode: '' as LabTestType | '', testName: '', priority: 'routine', notes: '' });
     };
 
     const handleVerifyClick = (request: LabRequest) => {
@@ -178,8 +159,8 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                   <h3 className="text-lg font-semibold text-gray-900">Laboratory Results</h3>
-                   <div className="flex items-center gap-2 mt-2">
+                    <h3 className="text-lg font-semibold text-gray-900">Laboratory Results</h3>
+                    <div className="flex items-center gap-2 mt-2">
                         <Label className="text-sm font-medium text-gray-700">Filter Status:</Label>
                         <Select
                             value={statusFilter}
@@ -195,7 +176,7 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
                                 <SelectItem value="completed">Completed</SelectItem>
                             </SelectContent>
                         </Select>
-                   </div>
+                    </div>
                 </div>
                 <div className="flex items-center gap-2">
                     {onRefresh && (
@@ -242,13 +223,13 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
                                     <div className="flex items-center gap-2 mb-2">
                                         <h4 className="font-semibold text-gray-900">{request.testName}</h4>
                                         {request.lifecycleStatus === 'requested' ? (
-                                             <Badge className="bg-orange-100 text-orange-800 border-orange-200">
+                                            <Badge className="bg-orange-100 text-orange-800 border-orange-200">
                                                 {request.status_display?.toUpperCase() || 'REQUESTED'}
-                                             </Badge>
+                                            </Badge>
                                         ) : request.lifecycleStatus === 'verified' ? (
-                                             <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                                            <Badge className="bg-blue-100 text-blue-800 border-blue-200">
                                                 {request.status_display?.toUpperCase() || 'VERIFIED'}
-                                             </Badge>
+                                            </Badge>
                                         ) : (
                                             <Badge className="bg-green-100 text-green-800 border-green-200">
                                                 <CheckCircle className="w-3 h-3 mr-1" />
@@ -265,48 +246,52 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
                                             <p><span className="font-medium">Completed at:</span> {new Date(request.completedAt).toLocaleString()}</p>
                                         )}
                                         {request.notes && <p><span className="font-medium">Notes:</span> {request.notes}</p>}
-                                        {request.resultContent && (
+                                        {request.results && request.results.length > 0 && (
                                             <div className="mt-3 p-3 bg-green-50 rounded border border-green-200">
                                                 <p className="font-medium text-green-900 mb-1">✓ Results Available</p>
-                                                <p className="text-sm text-green-800">{request.resultContent.interpretation}</p>
+                                                <p className="text-sm text-green-800">
+                                                    {request.results[0]?.interpretation
+                                                        ? `Interpretation: ${request.results[0].interpretation}`
+                                                        : 'View details to see full results'}
+                                                </p>
                                             </div>
                                         )}
                                     </div>
                                 </div>
-                                    <div className="ml-4 flex flex-col gap-2">
-                                        {/* Nurse Verification Action */}
-                                        {currentRole === 'nurse' && request.lifecycleStatus === 'requested' && (
-                                            <Button 
-                                                size="sm" 
-                                                className="bg-purple-600 hover:bg-purple-700 text-white"
-                                                onClick={() => handleVerifyClick(request)}
-                                            >
-                                                Verify Request
-                                            </Button>
-                                        )}
+                                <div className="ml-4 flex flex-col gap-2">
+                                    {/* Nurse Verification Action */}
+                                    {currentRole === 'nurse' && request.lifecycleStatus === 'requested' && (
+                                        <Button
+                                            size="sm"
+                                            className="bg-purple-600 hover:bg-purple-700 text-white"
+                                            onClick={() => handleVerifyClick(request)}
+                                        >
+                                            Verify Request
+                                        </Button>
+                                    )}
 
-                                        {request.resultContent && (
-                                            <a href="/laboratory" target="_blank" rel="noopener noreferrer">
-                                                <Button size="sm" variant="outline">
-                                                    <ExternalLink className="w-4 h-4 mr-1" />
-                                                    View in Laboratory
-                                                </Button>
-                                            </a>
-                                        )}
-
-                                        {/* Delete Action - Only for requested items */}
-                                        {(currentRole === 'doctor' || currentRole === 'nurse') && request.lifecycleStatus === 'requested' && (
-                                            <Button 
-                                                size="sm" 
-                                                variant="ghost" 
-                                                className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                                                onClick={() => handleDeleteClick(request)}
-                                                title="Delete Request"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
+                                    {request.results && request.results.length > 0 && (
+                                        <a href="/laboratory" target="_blank" rel="noopener noreferrer">
+                                            <Button size="sm" variant="outline">
+                                                <ExternalLink className="w-4 h-4 mr-1" />
+                                                View in Laboratory
                                             </Button>
-                                        )}
-                                    </div>
+                                        </a>
+                                    )}
+
+                                    {/* Delete Action - Only for requested items */}
+                                    {(currentRole === 'doctor' || currentRole === 'nurse') && request.lifecycleStatus === 'requested' && (
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                            onClick={() => handleDeleteClick(request)}
+                                            title="Delete Request"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
                         </Card>
                     ))
@@ -325,8 +310,10 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
                             <Select
                                 value={orderForm.testCode}
                                 onValueChange={(value) => {
-                                    const test = COMMON_LAB_TESTS.find(t => t.code === value);
-                                    setOrderForm({ ...orderForm, testCode: value, testName: test?.name || '' });
+                                    // Cast value to LabTestType - we know it's valid because it comes from COMMON_LAB_TESTS
+                                    const code = value as LabTestType;
+                                    const test = COMMON_LAB_TESTS.find(t => t.code === code);
+                                    setOrderForm({ ...orderForm, testCode: code, testName: test?.name || '' });
                                 }}
                             >
                                 <SelectTrigger>
@@ -345,8 +332,8 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
                             <Label htmlFor="priority">Priority</Label>
                             <Select
                                 value={orderForm.priority}
-                                onValueChange={(value: 'routine' | 'urgent' | 'stat') =>
-                                    setOrderForm({ ...orderForm, priority: value })
+                                onValueChange={(value) =>
+                                    setOrderForm({ ...orderForm, priority: value as LabPriority })
                                 }
                             >
                                 <SelectTrigger>

@@ -13,6 +13,14 @@ class LabTestDefinition(FHIRResourceModel):
     category = models.CharField(max_length=100)
     base_price = models.DecimalField(max_digits=10, decimal_places=2)
     turnaround_time = models.CharField(max_length=100, null=True, blank=True)
+    
+    # Optimization: Dynamic Reference Ranges
+    unit = models.CharField(max_length=50, blank=True, null=True, help_text="Measurement unit (e.g. mg/dL)")
+    normal_range = models.JSONField(
+        default=dict, 
+        blank=True, 
+        help_text="JSON structure for ranges, e.g. {'male': '13.5-17.5', 'female': '12.0-15.5'}"
+    )
 
     class Meta:
         db_table = 'laboratory_test_definition'
@@ -30,6 +38,9 @@ class DiagnosticReport(FHIRResourceModel):
     diagnostic_report_id = models.AutoField(primary_key=True)
     subject_id = models.BigIntegerField(db_index=True)
     encounter_id = models.BigIntegerField(db_index=True)
+    
+    # Billing Traceability
+    billing_reference = models.CharField(max_length=100, null=True, blank=True, help_text="Reference to the Claim/Invoice generated")
     
     # Trinity Approach: Requester vs Performer
     requester_id = models.BigIntegerField(
@@ -74,7 +85,7 @@ class DiagnosticReport(FHIRResourceModel):
     effective_period_start = models.DateField(null=True, blank=True)
     effective_period_end = models.DateField(null=True, blank=True)
     issued_datetime = models.DateTimeField(null=True, blank=True)
-    issued_datetime = models.DateTimeField(null=True, blank=True)
+
     
     # Flexible field to store the full result payload (parameters + metadata)
     # This allows storing the exact form data from the frontend without complex observation mapping

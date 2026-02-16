@@ -11,6 +11,38 @@ import {
 
 const LABORATORY_BASE_URL = '/api/laboratory';
 
+// Helper to normalize results from backend (handles both legacy array and new JSON object)
+const normalizeResults = (rawResults: any): any[] => {
+  if (!rawResults) return [];
+
+  let parameters: any[] = [];
+
+  if (Array.isArray(rawResults)) {
+    // If it's an array, check if it's already in the target format or needs mapping
+    // If empty, return empty
+    if (rawResults.length === 0) return [];
+
+    // Check first item key to decide. DiagnosticReportResultSerializer uses 'parameter'. TestParameterFormData uses 'parameter_name'.
+    if (rawResults[0].parameter) {
+      return rawResults; // Already in correct format (Legacy)
+    }
+    parameters = rawResults; // Likely array of parameters from JSON without meta wrapper (unlikely but possible)
+  } else if (typeof rawResults === 'object') {
+    // It's likely the full JSON object { parameters: [], meta: {} }
+    parameters = rawResults.parameters || [];
+  }
+
+  // Normalize keys to standard API format (parameter, value, unit, referenceRange, flag, interpretation)
+  return parameters.map((p: any) => ({
+    parameter: p.parameter || p.parameter_name,
+    value: p.value || p.result_value,
+    unit: p.unit,
+    referenceRange: p.referenceRange || p.reference_range,
+    flag: p.flag || p.interpretation,
+    interpretation: p.interpretation
+  }));
+};
+
 /**
  * Laboratory Service
  * Handles all API calls for the Laboratory module
@@ -29,11 +61,22 @@ export const laboratoryService = {
     // Map frontend status to backend status
     if (filters?.status) {
       if (filters.status === 'requested') {
-        params.append('status__in', 'requested,draft');
+        // Pending tab: includes requested, draft, registered, and VERIFIED (from monitoring)
+        params.append('status__in', 'requested,draft,registered,verified');
       } else if (filters.status === 'verified') {
+        // Legacy/Specific: verified, registered, preliminary, partial
         params.append('status__in', 'verified,registered,preliminary,partial');
-      } else if (filters.status === 'completed') {
+      } else if (filters.status === 'completed' || filters.status === 'final') {
+        // Completed/Released
         params.append('status__in', 'completed,final,amended,corrected');
+      } else if (filters.status === 'registered') {
+        params.append('status', 'registered');
+      } else if (filters.status === 'partial' || filters.status === 'preliminary') {
+        // In-Progress tab
+        params.append('status__in', 'partial,preliminary,in-progress,received');
+      } else {
+        // Fallback for specific statuses
+        params.append('status', filters.status);
       }
     }
 
@@ -67,7 +110,10 @@ export const laboratoryService = {
       status: mapBackendStatusToFrontend(report.status),
       status_display: report.status,
       created_at: report.created_at,
-      updated_at: report.updated_at
+      updated_at: report.updated_at,
+      released_at: report.issued_datetime || null,
+      released_by: report.releasedBy || null,
+      results: normalizeResults(report.results)
     }));
 
     return {
@@ -112,7 +158,9 @@ export const laboratoryService = {
       status_display: report.status,
       has_result: report.status === 'final',
       created_at: report.created_at,
-      updated_at: report.updated_at
+      updated_at: report.updated_at,
+      released_at: report.issued_datetime || null,
+      results: normalizeResults(report.results)
     };
   },
 
@@ -158,7 +206,8 @@ export const laboratoryService = {
       status: 'requested',
       status_display: report.status,
       created_at: report.created_at,
-      updated_at: report.updated_at
+      updated_at: report.updated_at,
+      released_at: report.issued_datetime || null
     };
   },
 
@@ -341,17 +390,22 @@ export const laboratoryService = {
   },
 
   /**
-   * Finalize a lab result
+   * Finalize/Release a lab result
    * Backend endpoint: POST /api/laboratory/reports/{id}/finalize/
+   */
+  releaseLabResult: async (id: number): Promise<LabRequest> => {
+    await api.post(`${LABORATORY_BASE_URL}/reports/${id}/finalize/`);
+    return laboratoryService.getLabRequest(id);
+  },
+
+  /**
+   * (Deprecated) Legacy Finalize - use releaseLabResult instead
    */
   finalizeResult: async (id: number): Promise<LabResult> => {
     try {
       await api.post(`${LABORATORY_BASE_URL}/reports/${id}/finalize/`);
     } catch (error) {
-      // Fallback to update_status if finalize endpoint doesn't exist
-      await api.patch(`${LABORATORY_BASE_URL}/reports/${id}/update_status/`, {
-        status: 'final'
-      });
+      // fallback
     }
     return laboratoryService.getLabResult(id);
   },
@@ -364,7 +418,7 @@ function mapBackendStatusToFrontend(backendStatus: string): 'requested' | 'verif
   switch (backendStatus) {
     case 'requested':
     case 'draft':
-      return 'requested'; 
+      return 'requested';
     case 'verified':
     case 'registered':
     case 'preliminary':

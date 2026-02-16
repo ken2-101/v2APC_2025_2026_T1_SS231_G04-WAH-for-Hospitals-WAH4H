@@ -43,15 +43,6 @@ const cbcPanel: LabPanelConfig = {
     ]
 };
 
-const plateletPanel: LabPanelConfig = {
-    id: 'platelet_count',
-    title: 'Platelet Count',
-    color: 'purple',
-    parameters: [
-        { name: 'platelets', label: 'Platelet Count', unit: 'x10^9/L', refLow: 150, refHigh: 400, step: '1', placeholder: '250', formKey: 'platelets' }
-    ]
-};
-
 const bloodTypingPanel: LabPanelConfig = {
     id: 'blood_typing',
     title: 'Blood Typing',
@@ -59,16 +50,6 @@ const bloodTypingPanel: LabPanelConfig = {
     parameters: [
         { name: 'blood_type', label: 'Blood Group (ABO)', unit: '', refLow: 0, refHigh: 0, step: '', placeholder: 'A, B, AB, O', formKey: 'blood_type' },
         { name: 'rh_factor', label: 'Rh Factor', unit: '', refLow: 0, refHigh: 0, step: '', placeholder: 'Positive (+)', formKey: 'rh_factor' }
-    ]
-};
-
-const coagPanel: LabPanelConfig = {
-    id: 'coagulation',
-    title: 'Coagulation Studies',
-    color: 'red',
-    parameters: [
-        { name: 'clotting_time', label: 'Clotting Time', unit: 'min', refLow: 4, refHigh: 10, step: '0.1', placeholder: '5-8', formKey: 'clotting_time' },
-        { name: 'bleeding_time', label: 'Bleeding Time', unit: 'min', refLow: 2, refHigh: 7, step: '0.1', placeholder: '3-5', formKey: 'bleeding_time' }
     ]
 };
 
@@ -113,15 +94,6 @@ const fecalysisPanel: LabPanelConfig = {
     ]
 };
 
-const pregnancyPanel: LabPanelConfig = {
-    id: 'pregnancy_test',
-    title: 'Pregnancy Test (Urine)',
-    color: 'pink',
-    parameters: [
-        { name: 'pt_result', label: 'Result', unit: '', refLow: 0, refHigh: 0, step: '', placeholder: 'Negative/Positive', formKey: 'pt_result' }
-    ]
-};
-
 // ==========================================
 // BLOOD CHEMISTRY
 // ==========================================
@@ -136,140 +108,24 @@ const glucosePanel: LabPanelConfig = {
     ]
 };
 
-// Lipid Panel (Updated)
-const lipidPanel: LabPanelConfig = {
-    id: 'lipid_profile',
-    title: 'Lipid Profile',
-    color: 'amber',
-    parameters: [
-        { name: 'total_cholesterol', label: 'Total Cholesterol', unit: 'mg/dL', refLow: 0, refHigh: 200, step: '1', placeholder: '180', formKey: 'total_cholesterol' },
-        { name: 'triglycerides', label: 'Triglycerides', unit: 'mg/dL', refLow: 0, refHigh: 150, step: '1', placeholder: '110', formKey: 'triglycerides' },
-        { name: 'hdl', label: 'HDL Cholesterol', unit: 'mg/dL', refLow: 40, refHigh: 999, step: '1', placeholder: '50', formKey: 'hdl' },
-        { name: 'ldl', label: 'LDL Cholesterol', unit: 'mg/dL', refLow: 0, refHigh: 100, step: '1', placeholder: '90', formKey: 'ldl' },
-    ]
-};
-
-const kidneyPanel: LabPanelConfig = {
-    id: 'kidney_func',
-    title: 'Kidney Function',
-    color: 'green',
-    parameters: [
-        { name: 'creatinine', label: 'Creatinine', unit: 'mg/dL', refLow: 0.6, refHigh: 1.2, step: '0.01', placeholder: '0.9', formKey: 'creatinine' },
-        { name: 'bun', label: 'BUN', unit: 'mg/dL', refLow: 7, refHigh: 20, step: '0.1', placeholder: '14', formKey: 'bun' },
-        { name: 'bua', label: 'Blood Uric Acid', unit: 'mg/dL', refLow: 3.5, refHigh: 7.2, step: '0.1', placeholder: '5.5', formKey: 'bua' }
-    ]
-};
-
-const liverPanel: LabPanelConfig = {
-    id: 'liver_func',
-    title: 'Liver Function',
-    color: 'green',
-    parameters: [
-        { name: 'sgpt', label: 'SGPT / ALT', unit: 'U/L', refLow: 0, refHigh: 41, step: '1', placeholder: '25', formKey: 'sgpt' },
-        { name: 'sgot', label: 'SGOT / AST', unit: 'U/L', refLow: 0, refHigh: 40, step: '1', placeholder: '22', formKey: 'sgot' }
-    ]
-};
-
-const electrolytesPanel: LabPanelConfig = {
-    id: 'electrolytes',
-    title: 'Electrolytes',
-    color: 'green',
-    parameters: [
-        { name: 'sodium', label: 'Sodium (Na)', unit: 'mmol/L', refLow: 135, refHigh: 145, step: '1', placeholder: '140', formKey: 'sodium' },
-        { name: 'potassium', label: 'Potassium (K)', unit: 'mmol/L', refLow: 3.5, refHigh: 5.0, step: '0.1', placeholder: '4.0', formKey: 'potassium' },
-        { name: 'chloride', label: 'Chloride (Cl)', unit: 'mmol/L', refLow: 98, refHigh: 107, step: '1', placeholder: '102', formKey: 'chloride' }
-    ]
-};
-
-// ==========================================
-// SEROLOGY & IMMUNOLOGY
-// ==========================================
-
-const serologyPanel: LabPanelConfig = {
-    id: 'serology',
-    title: 'Serology / Immunology',
-    color: 'orange',
-    parameters: [
-        { name: 'hbsag', label: 'HBsAg', unit: '', refLow: 0, refHigh: 0, step: '', placeholder: 'Non-reactive', formKey: 'hbsag' },
-        { name: 'syphilis', label: 'Syphilis (RPR/VDRL)', unit: '', refLow: 0, refHigh: 0, step: '', placeholder: 'Non-reactive', formKey: 'syphilis' },
-        { name: 'typhoid', label: 'Typhoid Test', unit: '', refLow: 0, refHigh: 0, step: '', placeholder: 'Negative', formKey: 'typhoid' }
-    ]
-};
-
-const denguePanel: LabPanelConfig = {
-    id: 'dengue',
-    title: 'Dengue Duo Test',
-    color: 'orange',
-    parameters: [
-        { name: 'ns1', label: 'NS1 Antigen', unit: '', refLow: 0, refHigh: 0, step: '', placeholder: 'Negative', formKey: 'ns1' },
-        { name: 'igg', label: 'IgG', unit: '', refLow: 0, refHigh: 0, step: '', placeholder: 'Negative', formKey: 'igg' },
-        { name: 'igm', label: 'IgM', unit: '', refLow: 0, refHigh: 0, step: '', placeholder: 'Negative', formKey: 'igm' }
-    ]
-};
-
-// ==========================================
-// MICROBIOLOGY
-// ==========================================
-
-const microbioPanel: LabPanelConfig = {
-    id: 'microbiology',
-    title: 'Microbiology',
-    color: 'indigo',
-    parameters: [
-        { name: 'gram_stain', label: 'Gram Stain', unit: '', refLow: 0, refHigh: 0, step: '', placeholder: 'No organisms seen', formKey: 'gram_stain' },
-        { name: 'afb_stain', label: 'AFB Stain', unit: '', refLow: 0, refHigh: 0, step: '', placeholder: 'Negative', formKey: 'afb_stain' }
-    ]
-};
-
-// Legacy CMP Panel (Kept for compatibility if needed, or remove)
-const cmpPanel: LabPanelConfig = {
-    id: 'cmp',
-    title: 'Comprehensive Metabolic Panel',
-    color: 'green',
-    parameters: [
-        // Copied essentials from kidney/liver/electploytes if needed, or just rely on modular panels
-        { name: 'glucose_cmp', label: 'Glucose', unit: 'mg/dL', refLow: 70, refHigh: 100, step: '1', placeholder: '90', formKey: 'glucose_cmp' }
-    ]
-};
-
 // Export all panels
 export const labPanels = {
     // Hematology
     cbc: cbcPanel,
-    platelet_count: plateletPanel,
     blood_typing: bloodTypingPanel,
-    coagulation: coagPanel,
     // Microscopy
     urinalysis: urinalysisPanel,
     fecalysis: fecalysisPanel,
-    pregnancy_test: pregnancyPanel,
     // Chemistry
     glucose: glucosePanel,
-    lipid: lipidPanel,
-    kidney: kidneyPanel,
-    liver: liverPanel,
-    electrolytes: electrolytesPanel,
-    // Serology
-    serology: serologyPanel,
-    dengue: denguePanel,
-    // Micro
-    microbiology: microbioPanel,
-    // Legacy
-    cmp: cmpPanel
 };
 
 // Export as array for iteration
 export const labPanelsArray = [
     // Hematology
-    cbcPanel, plateletPanel, bloodTypingPanel, coagPanel,
+    cbcPanel, bloodTypingPanel,
     // Microscopy
-    urinalysisPanel, fecalysisPanel, pregnancyPanel,
+    urinalysisPanel, fecalysisPanel,
     // Chemistry
-    glucosePanel, lipidPanel, kidneyPanel, liverPanel, electrolytesPanel,
-    // Serology
-    serologyPanel, denguePanel,
-    // Micro
-    microbioPanel,
-    // Legacy
-    cmpPanel
+    glucosePanel
 ];

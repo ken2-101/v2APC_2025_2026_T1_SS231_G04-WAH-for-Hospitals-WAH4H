@@ -103,11 +103,11 @@ const Monitoring: React.FC = () => {
           id: report.request_id,
           admissionId: report.admission_id,
           testName: report.test_type_display || report.test_type,
-          testCode: report.test_type,
-          priority: report.priority || 'routine',
+          testCode: report.test_type as any, // Cast to LabTestType
+          priority: (report.priority || 'routine') as any,
           notes: report.clinical_reason || '',
-          lifecycleStatus: (['verified', 'registered', 'preliminary', 'partial'].includes(report.status)) ? 'verified' : 
-                          (['completed', 'final', 'amended', 'corrected'].includes(report.status) ? 'completed' : 'requested'),
+          lifecycleStatus: (['verified', 'registered', 'preliminary', 'partial'].includes(report.status)) ? 'verified' :
+            (['completed', 'final', 'amended', 'corrected'].includes(report.status) ? 'completed' : 'requested'),
           status_display: (() => {
             const s = report.status;
             if (['completed', 'final', 'amended', 'corrected'].includes(s)) return 'Completed';
@@ -117,13 +117,15 @@ const Monitoring: React.FC = () => {
           orderedBy: report.doctor_name || report.orderedBy || 'Unknown',
           orderedAt: report.created_at,
           completedAt: report.updated_at,
-          resultContent: report.status === 'final' ? {
-            findings: 'Results available in Laboratory module',
-            values: [],
-            interpretation: 'See Laboratory page for detailed results',
-            reportedBy: 'Lab',
-            reportedAt: report.updated_at
-          } : undefined
+
+          results: report.results ? report.results.map((r: any) => ({
+            parameter: r.parameter,
+            value: r.value,
+            unit: r.unit,
+            referenceRange: r.referenceRange,
+            flag: r.flag,
+            interpretation: r.interpretation
+          })) : []
         }));
         setLabRequests(mappedLabs);
       } catch (labErr) {
@@ -217,29 +219,30 @@ const Monitoring: React.FC = () => {
         id: report.request_id,
         admissionId: report.admission_id,
         testName: report.test_type_display || report.test_type,
-        testCode: report.test_type,
-        priority: report.priority || 'routine',
+        testCode: report.test_type as any, // Cast to LabTestType
+        priority: (report.priority || 'routine') as any,
         notes: report.clinical_reason || '',
-          lifecycleStatus: (['verified', 'registered', 'preliminary', 'partial'].includes(report.status)) ? 'verified' : 
-                          (['completed', 'final', 'amended', 'corrected'].includes(report.status) ? 'completed' : 'requested'),
-          status_display: (() => {
-            const s = report.status;
-            if (['completed', 'final', 'amended', 'corrected'].includes(s)) return 'Completed';
-            if (['verified', 'registered', 'preliminary', 'partial'].includes(s)) return 'Verified';
-            return 'Requested'; // 'requested', 'draft'
-          })(),
-          orderedBy: report.doctor_name || report.orderedBy || 'Unknown',
-          orderedAt: report.created_at,
-          completedAt: report.updated_at,
-          resultContent: report.status === 'final' ? {
-            findings: 'Results available in Laboratory module',
-            values: [],
-            interpretation: 'See Laboratory page for detailed results',
-            reportedBy: 'Lab',
-            reportedAt: report.updated_at
-          } : undefined
-        }));
-        setLabRequests(mappedLabs);
+        lifecycleStatus: (['verified', 'registered', 'preliminary', 'partial'].includes(report.status)) ? 'verified' :
+          (['completed', 'final', 'amended', 'corrected'].includes(report.status) ? 'completed' : 'requested'),
+        status_display: (() => {
+          const s = report.status;
+          if (['completed', 'final', 'amended', 'corrected'].includes(s)) return 'Completed';
+          if (['verified', 'registered', 'preliminary', 'partial'].includes(s)) return 'Verified';
+          return 'Requested'; // 'requested', 'draft'
+        })(),
+        orderedBy: report.doctor_name || report.orderedBy || 'Unknown',
+        orderedAt: report.created_at,
+        completedAt: report.updated_at,
+        results: report.results ? report.results.map((r: any) => ({
+          parameter: r.parameter,
+          value: r.value,
+          unit: r.unit,
+          referenceRange: r.referenceRange,
+          flag: r.flag,
+          interpretation: r.interpretation
+        })) : []
+      }));
+      setLabRequests(mappedLabs);
     } catch (err: any) {
       console.error('Error adding lab request:', err);
       console.error('Error response data:', err.response?.data);
@@ -255,49 +258,49 @@ const Monitoring: React.FC = () => {
   };
 
   const handleVerifyLabRequest = async (requestId: number | string) => {
-      try {
-          await laboratoryService.verifyLabRequest(requestId);
-          toast({
-            title: "Success",
-            description: "Lab request verified successfully",
-            className: "bg-green-600 text-white border-green-700",
-          });
-          
-          // Refresh requests
-          if (selectedAdmission) {
-            handleSelectAdmission(selectedAdmission);
-          }
-      } catch (err: any) {
-          console.error("Failed to verify lab request", err);
-          const errorMessage = err.response?.data?.error || "Failed to verify lab request";
-          toast({
-            title: "Verification Failed",
-            description: errorMessage,
-            variant: "destructive",
-          });
+    try {
+      await laboratoryService.verifyLabRequest(requestId);
+      toast({
+        title: "Success",
+        description: "Lab request verified successfully",
+        className: "bg-green-600 text-white border-green-700",
+      });
+
+      // Refresh requests
+      if (selectedAdmission) {
+        handleSelectAdmission(selectedAdmission);
       }
+    } catch (err: any) {
+      console.error("Failed to verify lab request", err);
+      const errorMessage = err.response?.data?.error || "Failed to verify lab request";
+      toast({
+        title: "Verification Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
   };
 
   const handleDeleteLabRequest = async (requestId: number | string) => {
-      try {
-          await laboratoryService.deleteLabRequest(requestId);
-          toast({
-            title: "Success",
-            description: "Lab request deleted successfully",
-            className: "bg-green-600 text-white border-green-700",
-          });
-          
-          if (selectedAdmission) {
-            handleSelectAdmission(selectedAdmission);
-          }
-      } catch (err: any) {
-          console.error("Failed to delete lab request", err);
-          toast({
-            title: "Error",
-            description: "Failed to delete lab request",
-            variant: "destructive",
-          });
+    try {
+      await laboratoryService.deleteLabRequest(requestId);
+      toast({
+        title: "Success",
+        description: "Lab request deleted successfully",
+        className: "bg-green-600 text-white border-green-700",
+      });
+
+      if (selectedAdmission) {
+        handleSelectAdmission(selectedAdmission);
       }
+    } catch (err: any) {
+      console.error("Failed to delete lab request", err);
+      toast({
+        title: "Error",
+        description: "Failed to delete lab request",
+        variant: "destructive",
+      });
+    }
   };
 
 

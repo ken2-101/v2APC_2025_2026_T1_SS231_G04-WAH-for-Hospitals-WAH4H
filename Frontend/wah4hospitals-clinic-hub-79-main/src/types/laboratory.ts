@@ -1,30 +1,26 @@
 // Lab Request Types
 export type LabTestType =
   // Hematology
-  | 'cbc' | 'platelet_count' | 'blood_typing' | 'clotting_time' | 'bleeding_time'
+  | 'cbc' | 'blood_typing'
   // Clinical Microscopy
-  | 'urinalysis' | 'fecalysis' | 'pregnancy_test'
+  | 'urinalysis' | 'fecalysis'
   // Blood Chemistry
-  | 'fbs' | 'rbs' | 'lipid_profile' | 'creatinine' | 'bua' | 'bun' | 'sgpt' | 'sgot' | 'electrolytes' | 'blood_chemistry'
-  // Serology & Immunology
-  | 'hbsag' | 'syphilis' | 'dengue_duo' | 'typhoid'
-  // Microbiology
-  | 'gram_stain' | 'afb_stain'
-  // Legacy/Group placeholders
-  | 'lipid_panel';
+  | 'fbs' | 'rbs' | 'glucose_panel';
 export type LabPriority = 'routine' | 'urgent' | 'stat';
-export type LabStatus = 'requested' | 'verified' | 'completed';
+export type LabStatus =
+  | 'requested' | 'verified' | 'completed'
+  | 'registered' | 'preliminary' | 'partial' | 'final' | 'amended' | 'corrected' | 'cancelled';
 export type LabInterpretation = 'normal' | 'high' | 'low';
 
 // Test Parameter
 export interface TestParameter {
-  id: number;
+  id?: number;
   parameter_name: string;
   result_value: string;
   unit: string;
   reference_range: string;
   interpretation: LabInterpretation | '';
-  created_at: string;
+  created_at?: string;
 }
 
 export interface TestParameterFormData {
@@ -62,6 +58,16 @@ export interface LabResultFormData {
   parameters?: TestParameterFormData[];
 }
 
+// Serialized Result (from DiagnosticReportResultSerializer)
+export interface SerializedResult {
+  parameter: string;
+  value: string;
+  unit: string;
+  referenceRange: string;
+  flag?: string;
+  interpretation?: string;
+}
+
 // Lab Request
 export interface LabRequest {
   id: number;
@@ -95,9 +101,12 @@ export interface LabRequest {
   status: LabStatus;
   status_display: string;
   has_result?: boolean;
-  result?: LabResult;
+  result?: LabResult; // Valid for legacy/internal structure
+  results?: SerializedResult[]; // Valid for API response structure
   created_at: string;
   updated_at: string;
+  released_at?: string | null;
+  released_by?: string | null;
 }
 
 export interface LabRequestFormData {
@@ -110,10 +119,12 @@ export interface LabRequestFormData {
 }
 
 // Dashboard Stats
+// Dashboard Stats
 export interface LabDashboardStats {
   pending: number;
   in_progress: number;
-  completed_today: number;
+  to_release: number; // Completed but not released
+  released_today: number; // Released today
 }
 
 // API Response Types

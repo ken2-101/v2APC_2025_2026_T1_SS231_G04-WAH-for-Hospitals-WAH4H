@@ -5,8 +5,7 @@ Enhanced viewsets with filtering, pagination, and search capabilities.
 Follows the pattern established in the monitoring module.
 """
 
-#from django_weasyprint import WeasyTemplateResponseMixin
-#from django.views.generic import DetailView
+
 from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -64,6 +63,16 @@ class DiagnosticReportViewSet(viewsets.ModelViewSet):
         filters.SearchFilter
     ]
     
+    def get_serializer_class(self):
+        """
+        Use lightweight serializer for list views to optimize performance.
+        """
+        if self.action == 'list':
+            # Import locally to avoid circular dependency if any, though here it is in same file
+            from .serializers import DiagnosticReportListSerializer
+            return DiagnosticReportListSerializer
+        return DiagnosticReportSerializer
+    
     # Filter on Integer FK fields directly (e.g., subject_id, NOT subject)
     filterset_fields = {
         'subject_id': ['exact'],
@@ -97,9 +106,7 @@ class DiagnosticReportViewSet(viewsets.ModelViewSet):
         Custom create behavior to auto-assign requester if not provided.
         """
         user = self.request.user
-        # Check if requester_id is present in the validated data or initial data
-        # Note: serializer.validated_data might not have it if it wasn't in list of fields or was read_only
-        # But here we want to inject it if missing.
+        # Check if requester_id is present in the validated data
         requester_id = serializer.validated_data.get('requester_id')
         
         if not requester_id and user.is_authenticated:
@@ -107,6 +114,65 @@ class DiagnosticReportViewSet(viewsets.ModelViewSet):
             serializer.save(requester_id=user.id)
         else:
             serializer.save()
+
+    def list(self, request, *args, **kwargs):
+        """
+        Optimized list view with manual pre-fetching to solve N+1 problem.
+        """
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True, context=self._get_prefetch_context(page))
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True, context=self._get_prefetch_context(queryset))
+        return Response(serializer.data)
+
+    def _get_prefetch_context(self, queryset):
+        """
+        Helper to fetch related entities in bulk and return context maps.
+        """
+        # 1. Extract IDs
+        subject_ids = set()
+        practitioner_ids = set() # For both requester and performer
+
+        for report in queryset:
+            if report.subject_id:
+                subject_ids.add(report.subject_id)
+            if report.requester_id:
+                practitioner_ids.add(report.requester_id)
+            if report.performer_id:
+                practitioner_ids.add(report.performer_id)
+        
+        # 2. Bulk Fetch
+        patients_map = {}
+        if subject_ids:
+            from patients.models import Patient
+            patients = Patient.objects.filter(id__in=subject_ids)
+            patients_map = {p.id: p for p in patients}
+
+        practitioners_map = {}
+        users_map = {}
+        if practitioner_ids:
+            from accounts.models import Practitioner
+            from django.contrib.auth.models import User
+            
+            # Try fetching as Practitioners first
+            practitioners = Practitioner.objects.filter(practitioner_id__in=practitioner_ids)
+            practitioners_map = {p.practitioner_id: p for p in practitioners}
+            
+            # Find IDs that weren't found in Practitioner table (fallback to User)
+            missing_ids = practitioner_ids - set(practitioners_map.keys())
+            if missing_ids:
+                users = User.objects.filter(id__in=missing_ids)
+                users_map = {u.id: u for u in users}
+
+        return {
+            'patients_map': patients_map,
+            'practitioners_map': practitioners_map,
+            'users_map': users_map
+        }
 
     def get_object(self):
         """
@@ -134,13 +200,29 @@ class DiagnosticReportViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def finalize(self, request, pk=None):
         """
-        Finalize a diagnostic report (transition to final status).
-        This delegates to the serializer's finalize method.
+        Finalize/Release a diagnostic report.
+        Strict FHIR Workflow:
+        1. Status -> 'final'
+        2. issued_datetime -> Now() (Release Time)
+        3. results_interpreter -> Current User (Verifier/Releaser)
         """
         instance = self.get_object()
-        serializer = self.get_serializer(instance)
-        # delegate finalization to serializer (keeps view thin)
-        serializer.finalize(instance)
+        from django.utils import timezone
+        
+        # 1. Update Status
+        instance.status = 'final'
+        
+        # 2. Set Released Date (Issued) if not already set
+        if not instance.issued_datetime:
+            instance.issued_datetime = timezone.now()
+            
+        # 3. Set Verifier/Releaser (Results Interpreter)
+        # In this system, User ID = Practitioner ID (OneToOne PK)
+        if request.user.is_authenticated:
+            instance.results_interpreter_id = request.user.id
+            
+        instance.save()
+        
         return Response(self.get_serializer(instance).data)
 
     @action(detail=False, methods=['get'])
@@ -158,73 +240,74 @@ class DiagnosticReportViewSet(viewsets.ModelViewSet):
         stats = DiagnosticReport.objects.aggregate(
             pending=Count('diagnostic_report_id', filter=Q(status__in=['requested', 'draft'])),
             in_progress=Count('diagnostic_report_id', filter=Q(status__in=['verified', 'registered', 'preliminary', 'partial'])),
-            completed_today=Count('diagnostic_report_id', filter=Q(
+            # To Release: Completed but NOT yet issued (released)
+            to_release=Count('diagnostic_report_id', filter=Q(
                 status__in=['completed', 'final', 'amended', 'corrected'],
+                issued_datetime__isnull=True
+            )),
+            # Released Today: Issued today
+            released_today=Count('diagnostic_report_id', filter=Q(
+                status__in=['completed', 'final', 'amended', 'corrected'],
+                issued_datetime__isnull=False,
                 issued_datetime__date=today
             ))
         )
         
         return Response(stats)
 
+    @action(detail=True, methods=['get'], url_path='pdf')
+    def generate_pdf(self, request, pk=None):
+        """
+        Generate PDF report for a diagnostic report.
+        """
+        from .pdf_generator import LabResultPDFView
+        from django.http import HttpResponse
+        
+        instance = self.get_object()
+        
+        # Only allow PDF for final/completed reports or for testing
+        # if instance.status not in ['final', 'completed', 'amended', 'corrected']:
+        #     return Response(
+        #         {"error": "Report is not ready for printing."}, 
+        #         status=status.HTTP_400_BAD_REQUEST
+        #     )
+            
+        pdf_buffer = LabResultPDFView.generate_pdf(instance)
+        
+        response = HttpResponse(pdf_buffer, content_type='application/pdf')
+        filename = f"LabResult_{instance.diagnostic_report_id}.pdf"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        return response
+
     @action(detail=True, methods=['patch'])
     def update_status(self, request, pk=None):
         """
         Update the status of a diagnostic report.
-        Accepts: { "status": "requested|verified|completed|..." }
+        Accepts: { "status": "...", "results": ..., "conclusion": ... }
+        Uses serializer to ensure proper data handling (including JSON results).
         """
         instance = self.get_object()
-        new_status = request.data.get('status')
         
-        if not new_status:
-            return Response(
-                {'error': 'status field is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # We use the serializer to validate and save the update
+        # This ensures that 'results' -> 'result_data' mapping in the serializer is executed
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
         
-        # Validate status value
-        valid_statuses = [
-            'requested', 'verified', 'completed',
-            'draft', 'registered', 'partial', 'preliminary', 'final', 'amended', 'corrected', 'cancelled'
-        ]
-        if new_status not in valid_statuses:
-            return Response(
-                {'error': f'Invalid status. Must be one of: {", ".join(valid_statuses)}'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        if serializer.is_valid():
+            # Auto-set issued_datetime when transitioning to completed/final
+            new_status = request.data.get('status')
+            # AUTO-RELEASE LOGIC REMOVED
+            # We do NOT want to auto-set issued_datetime here.
+            # The 'finalize' action is responsible for setting issued_datetime (Release Date).
+            # This allows a 2-step process: Encode (Final) -> Review -> Release (Finalize).
+            serializer.save()
+                
+            return Response(serializer.data)
         
-        instance.status = new_status
-        
-        # Auto-set issued_datetime when transitioning to completed/final
-        if new_status in ['completed', 'final'] and not instance.issued_datetime:
-            from django.utils import timezone
-            instance.issued_datetime = timezone.now()
-        
-        instance.save()
-        
-        serializer = self.get_serializer(instance)
-        return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-#class LabResultPDFView(WeasyTemplateResponseMixin, DetailView):
-#    """
-#    Generate a PDF for a specific diagnostic report.
-#    """
-#    model = DiagnosticReport
-#    template_name = 'laboratory/lab_result_pdf.html'
-#    
-#    def get_context_data(self, **kwargs):
-#        context = super().get_context_data(**kwargs)
-#        # Ensure we have the latest data
-#        instance = self.object
-#        
-#        # Serialize the data to get resolved fields (subject name, formatted results)
-#        from .serializers import DiagnosticReportSerializer
-#        serializer = DiagnosticReportSerializer(instance)
-#        
-#        # Add serialized data to context
-#        context['report'] = serializer.data
-#        
-#        return context
+
 
 
 class LabTestDefinitionViewSet(viewsets.ModelViewSet):
