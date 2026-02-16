@@ -1,45 +1,53 @@
 // src/types/discharge.ts
 
+// Discharge requirements - only track requirements from OTHER modules
+// Discharge form fields are handled in the form itself
 export interface DischargeRequirements {
-  finalDiagnosis: boolean;
-  physicianSignature: boolean;
-  medicationReconciliation: boolean;
-  dischargeSummary: boolean;
-  billingClearance: boolean;
-  nursingNotes: boolean;
-  followUpScheduled: boolean;
+  billing_cleared: boolean;           // From billing module
+  medication_reconciliation: boolean; // From pharmacy module
+  nursing_notes: boolean;             // From nursing/monitoring module
 }
 
 export interface DischargeRecord {
-  id: number;
-  patient: number;
-  admission?: number;
+  discharge_id: number;
+  encounter_id: number;
+  patient_id: number;
+  physician_id?: number;
   patientName: string;
   room: string;
   admissionDate: string;
   condition: string;
   status: 'pending' | 'ready' | 'discharged';
+  workflow_status: 'pending' | 'ready' | 'discharged';
   physician: string;
   department: string;
   age: number;
   estimatedDischarge?: string;
   requirements: DischargeRequirements;
   dischargeDate?: string;
+  discharge_datetime?: string;
   finalDiagnosis?: string;
+  summary_of_stay?: string;
+  discharge_instructions?: string;
   dischargeSummary?: string;
   followUpRequired?: boolean;
   followUpPlan?: string;
+  follow_up_plan?: string;
   created_at: string;
   updated_at: string;
 }
 
 export interface PendingPatient {
-  id: number;
+  discharge_id?: number;
+  id?: number;
+  encounter_id: number;
+  patient_id: number;
   patientName: string;
   room: string;
   admissionDate: string;
   condition: string;
   status: 'pending' | 'ready' | 'discharged';
+  workflow_status: 'pending' | 'ready' | 'discharged';
   physician: string;
   department: string;
   age: number;
@@ -48,7 +56,8 @@ export interface PendingPatient {
 }
 
 export interface DischargedPatient {
-  id: number;
+  discharge_id: number;
+  id: number;  // Made required for component compatibility
   patientName: string;
   room: string;
   admissionDate: string;
@@ -64,18 +73,19 @@ export interface DischargedPatient {
 }
 
 export interface DischargeForm {
-  patientId: number;
+  patientId?: number;
   finalDiagnosis: string;
   hospitalStaySummary: string;
   dischargeMedications: string;
   dischargeInstructions: string;
   followUpPlan?: string;
-  billingStatus: string;
+  billingStatus?: string;
   pendingItems?: string;
 }
 
 export interface NewDischargeRecord {
-  patient: number;
+  patient_id: number;
+  encounter_id: number;
   admission?: number;
   patientName: string;
   room: string;
@@ -87,3 +97,4 @@ export interface NewDischargeRecord {
   age: number;
   estimatedDischarge?: string;
 }
+

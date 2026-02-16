@@ -12,13 +12,11 @@ import type {
 // Create an Axios instance
 const api: AxiosInstance = axios.create({
   baseURL:
-    import.meta.env.BACKEND_DISCHARGE_8000
-      ? `${import.meta.env.BACKEND_DISCHARGE_8000}discharge-records/`
-      : import.meta.env.LOCAL_8000
-        ? `${import.meta.env.LOCAL_8000}/api/discharge/discharge-records/`
-        : import.meta.env.BACKEND_DISCHARGE
-          ? `${import.meta.env.BACKEND_DISCHARGE}discharge-records/`
-          : undefined,
+    import.meta.env.VITE_BACKEND_URL
+      ? `${import.meta.env.VITE_BACKEND_URL}/api/discharge/`
+      : import.meta.env.VITE_LOCAL_8000
+        ? `${import.meta.env.VITE_LOCAL_8000}/api/discharge/`
+        : 'http://localhost:8000/api/discharge/',
   headers: {
     "Content-Type": "application/json",
   },
@@ -55,8 +53,28 @@ export const dischargeService = {
   // Get pending discharges (pending or ready status)
   getPending: async (): Promise<PendingPatient[]> => {
     try {
-      const { data } = await api.get<PendingPatient[]>("pending/");
-      return data;
+      const { data } = await api.get<PendingPatient[]>("discharges/pending/");
+      // Map backend field names to frontend expected names
+      return data.map(discharge => ({
+        ...discharge,
+        id: discharge.discharge_id || discharge.id || 0,
+        status: discharge.workflow_status || discharge.status || 'pending'
+      }));
+    } catch (error) {
+      handleError(error);
+      return [];
+    }
+  },
+
+  // Get ready for discharge patients
+  getReady: async (): Promise<PendingPatient[]> => {
+    try {
+      const { data } = await api.get<PendingPatient[]>("discharges/ready/");
+      return data.map(discharge => ({
+        ...discharge,
+        id: discharge.discharge_id || discharge.id || 0,
+        status: 'ready' as const
+      }));
     } catch (error) {
       handleError(error);
       return [];
@@ -66,8 +84,11 @@ export const dischargeService = {
   // Get discharged patients
   getDischarged: async (): Promise<DischargedPatient[]> => {
     try {
-      const { data } = await api.get<DischargedPatient[]>("discharged/");
-      return data;
+      const { data } = await api.get<DischargedPatient[]>("discharges/discharged/");
+      return data.map(patient => ({
+        ...patient,
+        id: patient.discharge_id || patient.id || 0
+      }));
     } catch (error) {
       handleError(error);
       return [];
@@ -131,11 +152,22 @@ export const dischargeService = {
   updateRequirements: async (
     id: number,
     requirements: Partial<DischargeRequirements>
-  ): Promise<DischargeRecord> => {
+  ): Promise<any> => {
     try {
-      const { data } = await api.patch<DischargeRecord>(`${id}/update_requirements/`, {
+      const { data } = await api.patch<any>(`discharges/${id}/update_requirements/`, {
         requirements,
       });
+      return data;
+    } catch (error) {
+      handleError(error);
+      throw error;
+    }
+  },
+
+  // Complete discharge process
+  completeDischarge: async (id: number, form: Partial<DischargeForm>): Promise<any> => {
+    try {
+      const { data } = await api.post<any>(`discharges/${id}/complete/`, form);
       return data;
     } catch (error) {
       handleError(error);
@@ -173,7 +205,7 @@ export const dischargeService = {
   // Create discharge records from billing records
   createFromBilling: async (billingIds: number[]): Promise<any> => {
     try {
-      const { data } = await api.post("from_billing/", { billing_ids: billingIds });
+      const { data } = await api.post("discharges/create_from_billing/", { billing_ids: billingIds });
       return data;
     } catch (error) {
       handleError(error);

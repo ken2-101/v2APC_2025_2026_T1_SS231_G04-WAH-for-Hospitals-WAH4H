@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -25,61 +25,20 @@ import { DischargeStatusBadge } from '@/components/discharge/DischargeStatusBadg
 import { PendingItemsSection } from '@/components/discharge/PendingItemsSection';
 import { DischargedPatientsReport } from '@/components/discharge/DischargedPatientsReport';
 import { dischargeService } from '@/services/dischargeService';
-
-interface DischargeRequirements {
-  finalDiagnosis: boolean;
-  physicianSignature: boolean;
-  medicationReconciliation: boolean;
-  dischargeSummary: boolean;
-  billingClearance: boolean;
-  nursingNotes: boolean;
-  followUpScheduled: boolean;
-}
-
-interface PendingPatient {
-  id: number;
-  patientName: string;
-  room: string;
-  admissionDate: string;
-  condition: string;
-  status: 'pending' | 'ready' | 'discharged';
-  physician: string;
-  department: string;
-  age: number;
-  estimatedDischarge: string;
-  requirements: DischargeRequirements;
-}
-
-interface DischargedPatient {
-  id: number;
-  patientName: string;
-  room: string;
-  admissionDate: string;
-  dischargeDate: string;
-  condition: string;
-  physician: string;
-  department: string;
-  age: number;
-  finalDiagnosis: string;
-  dischargeSummary: string;
-  followUpRequired: boolean;
-  followUpPlan?: string;
-}
+import type { PendingPatient, DischargedPatient, DischargeRequirements } from '@/types/discharge';
 
 const Discharge = () => {
   const [pendingDischarges, setPendingDischarges] = useState<PendingPatient[]>([]);
-
   const [dischargedPatients, setDischargedPatients] = useState<DischargedPatient[]>([]);
-
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isDischargeModalOpen, setIsDischargeModalOpen] = useState(false);
+  const [selectedPatient, setSelectedPatient] = useState<PendingPatient | null>(null);
   const [activeFilters, setActiveFilters] = useState({
     status: [] as string[],
     department: [] as string[],
     condition: [] as string[]
   });
-
-  const [isDischargeModalOpen, setIsDischargeModalOpen] = useState(false);
-  const [selectedPatient, setSelectedPatient] = useState<PendingPatient | null>(null);
   const [dischargeForm, setDischargeForm] = useState({
     patientId: '',
     finalDiagnosis: '',
@@ -95,6 +54,57 @@ const Discharge = () => {
   const [billingPatients, setBillingPatients] = useState<any[]>([]);
   const [selectedBillingIds, setSelectedBillingIds] = useState<number[]>([]);
   const [isLoadingBilling, setIsLoadingBilling] = useState(false);
+
+  const handleRequirementChange = async (requirement: keyof DischargeRequirements, checked: boolean) => {
+    if (!selectedPatient) return;
+
+    try {
+      await dischargeService.updateRequirements(selectedPatient.id, {
+        [requirement]: checked
+      });
+
+      // Update local state
+      const updatedPending = pendingDischarges.map(p => {
+        if (p.id === selectedPatient.id) {
+          const newRequirements = { ...p.requirements, [requirement]: checked } as DischargeRequirements;
+          return { ...p, requirements: newRequirements };
+        }
+        return p;
+      });
+      setPendingDischarges(updatedPending);
+      
+      if (selectedPatient) {
+        setSelectedPatient({
+          ...selectedPatient,
+          requirements: { ...selectedPatient.requirements, [requirement]: checked } as DischargeRequirements
+        });
+      }
+    } catch (error) {
+      console.error('Error updating requirement:', error);
+      alert('Failed to update requirement status');
+    }
+  };
+
+  // Load pending discharges and discharged patients on mount
+  useEffect(() => {
+    loadDischargeData();
+  }, []);
+
+  const loadDischargeData = async () => {
+    try {
+      setIsLoading(true);
+      const [pendingData, dischargedData] = await Promise.all([
+        dischargeService.getPending(),
+        dischargeService.getDischarged()
+      ]);
+      setPendingDischarges(pendingData);
+      setDischargedPatients(dischargedData);
+    } catch (error) {
+      console.error('Error loading discharge data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handlePrintDischarge = () => {
     console.log('Printing discharge report...');
@@ -173,8 +183,7 @@ const Discharge = () => {
       }
 
       // Reload pending discharges
-      const pendingData = await dischargeService.getPending();
-      setPendingDischarges(pendingData);
+      await loadDischargeData();
 
       setIsAddRecordModalOpen(false);
       setBillingPatients([]);
@@ -187,60 +196,57 @@ const Discharge = () => {
     }
   };
 
-  const handleSubmitDischarge = () => {
-    if (!selectedPatient) return;
+  const handleSubmitDischarge = async () => {
+    if (!selectedPatient || !selectedPatient.id) return;
 
     if (!dischargeForm.finalDiagnosis || !dischargeForm.hospitalStaySummary) {
       alert('Please fill in all required fields');
       return;
     }
 
-    // Check if all required items are completed
-    const allRequiredCompleted = selectedPatient.requirements &&
-      selectedPatient.requirements.finalDiagnosis &&
-      selectedPatient.requirements.physicianSignature &&
-      selectedPatient.requirements.medicationReconciliation &&
-      selectedPatient.requirements.dischargeSummary &&
-      selectedPatient.requirements.billingClearance;
+    // Check if all required items from other modules are completed
+    // Requirements: billing_cleared, medication_reconciliation, nursing_notes
+    const requirements = (selectedPatient.requirements || {}) as DischargeRequirements;
+    const allRequiredCompleted = 
+      requirements.billing_cleared && 
+      requirements.medication_reconciliation &&
+      requirements.nursing_notes;
 
     if (!allRequiredCompleted) {
-      alert('All required discharge items must be completed before final discharge');
+      alert('All required items from external modules must be completed before final discharge');
       return;
     }
 
-    // Move patient to discharged list
-    const dischargedPatient: DischargedPatient = {
-      id: Date.now(),
-      patientName: selectedPatient.patientName,
-      room: selectedPatient.room,
-      admissionDate: selectedPatient.admissionDate,
-      dischargeDate: new Date().toISOString().split('T')[0],
-      condition: selectedPatient.condition,
-      physician: selectedPatient.physician,
-      department: selectedPatient.department,
-      age: selectedPatient.age,
-      finalDiagnosis: dischargeForm.finalDiagnosis,
-      dischargeSummary: dischargeForm.hospitalStaySummary,
-      followUpRequired: !!dischargeForm.followUpPlan,
-      followUpPlan: dischargeForm.followUpPlan
-    };
+    try {
+      // Complete discharge via API
+      await dischargeService.completeDischarge(selectedPatient.id, {
+        finalDiagnosis: dischargeForm.finalDiagnosis,
+        hospitalStaySummary: dischargeForm.hospitalStaySummary,
+        dischargeInstructions: dischargeForm.dischargeInstructions,
+        followUpPlan: dischargeForm.followUpPlan
+      });
 
-    setDischargedPatients(prev => [...prev, dischargedPatient]);
-    setPendingDischarges(prev => prev.filter(p => p.id !== selectedPatient.id));
-
-    alert(`Discharge completed successfully for ${selectedPatient.patientName}`);
-    setIsDischargeModalOpen(false);
-    setSelectedPatient(null);
-    setDischargeForm({
-      patientId: '',
-      finalDiagnosis: '',
-      hospitalStaySummary: '',
-      dischargeMedications: '',
-      dischargeInstructions: '',
-      followUpPlan: '',
-      billingStatus: '',
-      pendingItems: ''
-    });
+      alert(`Discharge completed successfully for ${selectedPatient.patientName}`);
+      
+      // Reload discharge data
+      await loadDischargeData();
+      
+      setIsDischargeModalOpen(false);
+      setSelectedPatient(null);
+      setDischargeForm({
+        patientId: '',
+        finalDiagnosis: '',
+        hospitalStaySummary: '',
+        dischargeMedications: '',
+        dischargeInstructions: '',
+        followUpPlan: '',
+        billingStatus: '',
+        pendingItems: ''
+      });
+    } catch (error: any) {
+      console.error('Error completing discharge:', error);
+      alert(error?.response?.data?.error || 'Failed to complete discharge. Please try again.');
+    }
   };
 
   const canPrint = () => {
@@ -307,22 +313,22 @@ const Discharge = () => {
 
       <Tabs defaultValue="active" className="space-y-6">
         <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 h-auto">
-          <TabsTrigger value="active" className="flex items-center gap-2">
+          <TabsTrigger value="active" className="flex items-center justify-center gap-2 py-3 sm:py-2">
             <AlertTriangle className="w-4 h-4" />
-            Active Discharges
+            <span className="truncate">Active Discharges</span>
           </TabsTrigger>
-          <TabsTrigger value="discharged" className="flex items-center gap-2">
+          <TabsTrigger value="discharged" className="flex items-center justify-center gap-2 py-3 sm:py-2">
             <CheckCircle className="w-4 h-4" />
-            Discharged Patients ({dischargedPatients.length})
+            <span className="truncate">Discharged ({dischargedPatients.length})</span>
           </TabsTrigger>
-          <TabsTrigger value="analytics" className="flex items-center gap-2">
+          <TabsTrigger value="analytics" className="flex items-center justify-center gap-2 py-3 sm:py-2">
             <Users className="w-4 h-4" />
-            Analytics
+            <span className="truncate">Analytics</span>
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="active" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center">
@@ -386,13 +392,13 @@ const Discharge = () => {
             <div className="lg:col-span-2">
               <Card>
                 <CardHeader>
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     <CardTitle>Active Discharge Queue</CardTitle>
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full lg:w-auto">
                       <div className="relative w-full sm:w-80">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                         <Input
-                          placeholder="Search patients, room, condition..."
+                          placeholder="Search patients..."
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
                           className="pl-10 w-full"
@@ -442,11 +448,11 @@ const Discharge = () => {
                   <div className="space-y-4">
                     {filteredDischarges.map((patient) => (
                       <div key={patient.id} className="border rounded-lg p-4 space-y-3">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                           <h3 className="font-semibold text-lg">{patient.patientName}</h3>
                           <DischargeStatusBadge status={patient.status} />
                         </div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground">
                           <div>
                             <span className="font-medium text-foreground">Room:</span> {patient.room}
                           </div>
@@ -460,11 +466,11 @@ const Discharge = () => {
                             <span className="font-medium text-foreground">Physician:</span> {patient.physician}
                           </div>
                         </div>
-                        <div className="flex justify-end">
+                        <div className="flex justify-end pt-2">
                           <Button
                             size="sm"
                             onClick={() => handleProcessDischarge(patient)}
-                            className="bg-primary hover:bg-primary/90"
+                            className="bg-primary hover:bg-primary/90 w-full sm:w-auto"
                           >
                             {patient.status === 'ready' ? 'Complete Discharge' : 'Review & Update'}
                           </Button>
@@ -485,38 +491,12 @@ const Discharge = () => {
               {selectedPatient && (
                 <PendingItemsSection
                   requirements={selectedPatient.requirements}
+                  onRequirementChange={handleRequirementChange}
                   className="mb-6"
                 />
               )}
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Quick Actions</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start"
-                    onClick={() => {
-                      const readyPatients = pendingDischarges.filter(p => p.status === 'ready');
-                      if (readyPatients.length > 0) {
-                        handleProcessDischarge(readyPatients[0]);
-                      }
-                    }}
-                    disabled={pendingDischarges.filter(p => p.status === 'ready').length === 0}
-                  >
-                    <CheckCircle className="w-4 h-4 mr-2" />
-                    Process Next Ready Patient
-                  </Button>
-
-                  <Alert>
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertDescription className="text-sm">
-                      Printing is only available for fully discharged patients in the "Discharged Patients" tab.
-                    </AlertDescription>
-                  </Alert>
-                </CardContent>
-              </Card>
+              {/* Quick Actions removed as requested */}
             </div>
           </div>
         </TabsContent>
@@ -526,7 +506,7 @@ const Discharge = () => {
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
               <CardContent className="p-6">
                 <div className="text-center">
@@ -579,6 +559,7 @@ const Discharge = () => {
             {selectedPatient && (
               <PendingItemsSection
                 requirements={selectedPatient.requirements}
+                onRequirementChange={handleRequirementChange}
                 className="mb-6"
               />
             )}

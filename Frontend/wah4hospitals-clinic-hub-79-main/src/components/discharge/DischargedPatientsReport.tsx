@@ -6,22 +6,7 @@ import { PrintButton } from '@/components/ui/PrintButton';
 import { DischargeStatusBadge } from './DischargeStatusBadge';
 import { Search, Calendar, FileText, User } from 'lucide-react';
 import { format } from 'date-fns';
-
-interface DischargedPatient {
-  id: number;
-  patientName: string;
-  room: string;
-  admissionDate: string;
-  dischargeDate: string;
-  condition: string;
-  physician: string;
-  department: string;
-  age: number;
-  finalDiagnosis: string;
-  dischargeSummary: string;
-  followUpRequired: boolean;
-  followUpPlan?: string;
-}
+import type { DischargedPatient } from '@/types/discharge';
 
 interface DischargedPatientsReportProps {
   dischargedPatients: DischargedPatient[];
@@ -31,29 +16,66 @@ export const DischargedPatientsReport: React.FC<DischargedPatientsReportProps> =
   dischargedPatients
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedPatient, setSelectedPatient] = useState<DischargedPatient | null>(null);
-
-  const handlePrintReport = () => {
-    console.log('Printing discharged patients report...');
-  };
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [filterYear, setFilterYear] = useState('');
+  const [filterMonth, setFilterMonth] = useState('');
+  const [followUpFilter, setFollowUpFilter] = useState('all'); // all, yes, no
 
   const handlePrintPatientPacket = (patient: DischargedPatient) => {
     console.log(`Printing discharge packet for ${patient.patientName}...`);
   };
 
-  const filteredPatients = dischargedPatients.filter(patient =>
-    patient.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.room.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.condition.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.physician.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.department.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredPatients = dischargedPatients.filter(patient => {
+    // Text search
+    const matchesSearch = 
+      patient.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      patient.room.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      patient.condition.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      patient.physician.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      patient.department.toLowerCase().includes(searchTerm.toLowerCase());
+
+    // Date filtering
+    let matchesDate = true;
+    const dischargeDate = new Date(patient.dischargeDate);
+    
+    if (startDate) {
+      matchesDate = matchesDate && dischargeDate >= new Date(startDate);
+    }
+    if (endDate) {
+      matchesDate = matchesDate && dischargeDate <= new Date(endDate);
+    }
+    if (filterYear) {
+      matchesDate = matchesDate && dischargeDate.getFullYear().toString() === filterYear;
+    }
+    if (filterMonth) {
+      // Month is 0-indexed in JS Date, but input might be 1-12 or 0-11. 
+      // Let's assume input is 1-12 string.
+      matchesDate = matchesDate && (dischargeDate.getMonth() + 1).toString() === filterMonth;
+    }
+
+    // Follow-up filtering
+    let matchesFollowUp = true;
+    if (followUpFilter === 'yes') matchesFollowUp = patient.followUpRequired;
+    if (followUpFilter === 'no') matchesFollowUp = !patient.followUpRequired;
+
+    return matchesSearch && matchesDate && matchesFollowUp;
+  });
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setStartDate('');
+    setEndDate('');
+    setFilterYear('');
+    setFilterMonth('');
+    setFollowUpFilter('all');
+  };
 
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <CardTitle className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-green-600" />
@@ -63,13 +85,15 @@ export const DischargedPatientsReport: React.FC<DischargedPatientsReportProps> =
                 Patients who have been fully discharged - Print access available
               </p>
             </div>
-            <div className="text-sm text-muted-foreground">
-              Individual patient print options available below
-            </div>
+            
+            <Button variant="outline" size="sm" onClick={clearFilters} className="text-muted-foreground">
+              Clear Filters
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="mb-6">
+          <div className="space-y-4 mb-6">
+            {/* Search Bar */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
               <Input
@@ -79,58 +103,87 @@ export const DischargedPatientsReport: React.FC<DischargedPatientsReportProps> =
                 className="pl-10"
               />
             </div>
+
+            {/* Filters Row */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className="space-y-2">
+                <label className="text-xs font-medium">Year</label>
+                <select 
+                  className="w-full p-2 border rounded-md text-sm bg-background"
+                  value={filterYear}
+                  onChange={(e) => setFilterYear(e.target.value)}
+                >
+                  <option value="">All Years</option>
+                  {Array.from(new Set(dischargedPatients.map(p => new Date(p.dischargeDate).getFullYear()))).sort().map(year => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-xs font-medium">Month</label>
+                <select 
+                  className="w-full p-2 border rounded-md text-sm bg-background"
+                  value={filterMonth}
+                  onChange={(e) => setFilterMonth(e.target.value)}
+                >
+                  <option value="">All Months</option>
+                  {Array.from({length: 12}, (_, i) => i + 1).map(month => (
+                    <option key={month} value={month}>{new Date(2000, month-1, 1).toLocaleString('default', { month: 'long' })}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-medium">From Date</label>
+                <Input 
+                  type="date" 
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="text-sm"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-medium">To Date</label>
+                <Input 
+                  type="date" 
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="text-sm"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-medium">Follow-up</label>
+                <select 
+                  className="w-full p-2 border rounded-md text-sm bg-background"
+                  value={followUpFilter}
+                  onChange={(e) => setFollowUpFilter(e.target.value)}
+                >
+                  <option value="all">All Status</option>
+                  <option value="yes">Required</option>
+                  <option value="no">Not Required</option>
+                </select>
+              </div>
+            </div>
           </div>
 
           <div id="printable-content" className="space-y-4">
-            <div className="print-header no-print">
-              <h2 className="text-xl font-semibold mb-4">Discharged Patients Summary</h2>
-              <div className="grid grid-cols-3 gap-4 mb-6">
-                <div className="bg-green-50 p-4 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-green-600" />
-                    <div>
-                      <p className="text-sm text-green-600 font-medium">Total Discharged</p>
-                      <p className="text-2xl font-bold text-green-800">{dischargedPatients.length}</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-5 h-5 text-blue-600" />
-                    <div>
-                      <p className="text-sm text-blue-600 font-medium">Today's Discharges</p>
-                      <p className="text-2xl font-bold text-blue-800">
-                        {dischargedPatients.filter(p => p.dischargeDate === new Date().toISOString().split('T')[0]).length}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-yellow-50 p-4 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <User className="w-5 h-5 text-yellow-600" />
-                    <div>
-                      <p className="text-sm text-yellow-600 font-medium">Follow-up Required</p>
-                      <p className="text-2xl font-bold text-yellow-800">
-                        {dischargedPatients.filter(p => p.followUpRequired).length}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            {/* Summary removed as requested */}
 
             <div className="space-y-3">
               {filteredPatients.map((patient) => (
                 <div
                   key={patient.id}
-                  className="flex items-center justify-between p-4 border border-green-200 rounded-lg bg-green-50/30"
+                  className="flex flex-col lg:flex-row lg:items-center justify-between p-4 border border-green-200 rounded-lg bg-green-50/30 gap-4"
                 >
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-2">
+                  <div className="flex-1 w-full">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-2 gap-2">
                       <h3 className="font-semibold text-lg">{patient.patientName}</h3>
                       <DischargeStatusBadge status="discharged" />
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground">
                       <div>
                         <span className="font-medium text-foreground">Room:</span> {patient.room}
                       </div>
@@ -160,10 +213,10 @@ export const DischargedPatientsReport: React.FC<DischargedPatientsReportProps> =
                       </div>
                     </div>
                   </div>
-                  <div className="ml-4 no-print">
+                  <div className="w-full lg:w-auto mt-2 lg:mt-0 lg:ml-4 no-print flex justify-end">
                     <PrintButton
                       onPrint={() => handlePrintPatientPacket(patient)}
-                      className="bg-primary hover:bg-primary/90"
+                      className="bg-primary hover:bg-primary/90 w-full lg:w-auto"
                       printData={patient}
                       printType="discharge-packet"
                     >
