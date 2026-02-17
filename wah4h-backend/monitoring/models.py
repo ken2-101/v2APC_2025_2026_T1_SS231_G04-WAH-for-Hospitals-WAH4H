@@ -13,12 +13,44 @@ class Observation(FHIRResourceModel):
     # Fortress Pattern: External References as BigIntegerField
     subject_id = models.BigIntegerField(db_index=True)
     encounter_id = models.BigIntegerField(db_index=True)
+    
+    # Trinity Approach: Requester vs Performer (aligned with Laboratory)
+    requester_id = models.BigIntegerField(
+        db_index=True, 
+        null=True, 
+        blank=True,
+        help_text="Doctor/Nurse who ordered the observation"
+    )
     performer_id = models.BigIntegerField(null=True, blank=True, db_index=True)
+    
     specimen_id = models.BigIntegerField(null=True, blank=True)
     device_id = models.BigIntegerField(null=True, blank=True)
     derived_from_id = models.BigIntegerField(null=True, blank=True)
     focus_id = models.BigIntegerField(null=True, blank=True)
     has_member_id = models.BigIntegerField(null=True, blank=True)
+    
+    # Billing Traceability (aligned with Laboratory)
+    billing_reference = models.CharField(
+        max_length=100, 
+        null=True, 
+        blank=True, 
+        db_index=True, 
+        help_text="Reference to the Claim/Invoice generated"
+    )
+    
+    # Priority field for urgent observation flagging (aligned with Laboratory)
+    PRIORITY_CHOICES = [
+        ('routine', 'Routine'),
+        ('urgent', 'Urgent'),
+        ('stat', 'STAT'),
+    ]
+    priority = models.CharField(
+        max_length=20,
+        choices=PRIORITY_CHOICES,
+        default='routine',
+        db_index=True,
+        help_text="Observation priority level"
+    )
     
     # Core Fields
     code = models.CharField(max_length=100, db_index=True)

@@ -11,6 +11,9 @@ import { Plus, FileText, AlertCircle, CheckCircle, Clock, RefreshCw, ExternalLin
 import { LabRequest, LabResult } from '../../types/monitoring';
 import { LabTestType, LabPriority } from '../../types/laboratory';
 import { useRole } from '@/contexts/RoleContext';
+import { LabResultViewModal } from '../laboratory/LabResultViewModal';
+import { laboratoryService } from '../../services/laboratoryService';
+import { useToast } from '@/hooks/use-toast';
 
 interface LaboratoryTabProps {
     labRequests: LabRequest[];
@@ -42,9 +45,11 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
     onRefresh
 }) => {
     const { currentRole, canModify } = useRole();
+    const { toast } = useToast();
 
     const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
     const [isResultModalOpen, setIsResultModalOpen] = useState(false);
+    const [isViewModalOpen, setIsViewModalOpen] = useState(false);
     const [selectedRequest, setSelectedRequest] = useState<LabRequest | null>(null);
 
     // Order Lab Test Form State
@@ -112,6 +117,29 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
     const handleDeleteClick = (request: LabRequest) => {
         if (onDeleteRequest && window.confirm('Are you sure you want to delete this lab request?')) {
             onDeleteRequest(request.id);
+        }
+    };
+
+    const handleViewResults = async (request: LabRequest) => {
+        try {
+            // Fetch full result data from laboratory service
+            // Convert id to number if it's a string
+            const requestId = typeof request.id === 'string' ? parseInt(request.id) : request.id;
+            const resultData = await laboratoryService.getLabResult(requestId);
+            const fullRequest = {
+                ...request,
+                results: [], // Clear partial results to ensure modal uses the full result record
+                result: resultData
+            };
+            setSelectedRequest(fullRequest);
+            setIsViewModalOpen(true);
+        } catch (error) {
+            console.error('Error fetching result details:', error);
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to load result details for viewing.",
+            });
         }
     };
 
@@ -270,13 +298,15 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
                                         </Button>
                                     )}
 
-                                    {request.results && request.results.length > 0 && (
-                                        <a href="/laboratory" target="_blank" rel="noopener noreferrer">
-                                            <Button size="sm" variant="outline">
-                                                <ExternalLink className="w-4 h-4 mr-1" />
-                                                View in Laboratory
-                                            </Button>
-                                        </a>
+                                    {/* View Results Action - For doctors and nurses with completed results */}
+                                    {(currentRole === 'doctor' || currentRole === 'nurse') && request.lifecycleStatus === 'completed' && (
+                                        <Button
+                                            size="sm"
+                                            onClick={() => handleViewResults(request)}
+                                            className="px-3 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors font-medium text-sm border border-purple-200"
+                                        >
+                                            View
+                                        </Button>
                                     )}
 
                                     {/* Delete Action - Only for requested items */}
@@ -367,6 +397,13 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* View Results Modal */}
+            <LabResultViewModal
+                isOpen={isViewModalOpen}
+                onClose={() => setIsViewModalOpen(false)}
+                request={selectedRequest as any}
+            />
         </div>
     );
 };

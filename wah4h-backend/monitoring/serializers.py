@@ -13,6 +13,56 @@ from admission.models import Encounter
 from accounts.models import Practitioner, Organization
 
 
+class ObservationListSerializer(serializers.ModelSerializer):
+    """
+    Lightweight serializer for list views.
+    Only includes essential fields for performance.
+    """
+    subject_display = serializers.SerializerMethodField()
+    lifecycleStatus = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Observation
+        fields = [
+            'observation_id',
+            'identifier',
+            'status',
+            'lifecycleStatus',
+            'priority',
+            'code',
+            'category',
+            'subject_id',
+            'subject_display',
+            'encounter_id',
+            'effective_datetime',
+            'value_quantity',
+            'value_string',
+            'interpretation',
+            'created_at',
+            'updated_at'
+        ]
+    
+    def get_subject_display(self, obj):
+        # Try context first (N+1 optimization)
+        patients_map = self.context.get('patients_map', {})
+        if obj.subject_id in patients_map:
+            patient = patients_map[obj.subject_id]
+            return f"{patient.first_name or ''} {patient.last_name or ''}".strip() or "Unknown"
+        return "Unknown"
+    
+    def get_lifecycleStatus(self, obj):
+        """Map FHIR status to frontend lifecycle status."""
+        status_map = {
+            'registered': 'requested',
+            'preliminary': 'verified',
+            'final': 'completed',
+            'amended': 'completed',
+            'corrected': 'completed',
+            'cancelled': 'requested'
+        }
+        return status_map.get(obj.status, 'requested')
+
+
 class ObservationSerializer(serializers.ModelSerializer):
     """
     Serializer for Observation model with resolved foreign key references.

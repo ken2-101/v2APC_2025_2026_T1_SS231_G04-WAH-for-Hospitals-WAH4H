@@ -111,6 +111,7 @@ class DiagnosticReportListSerializer(serializers.ModelSerializer):
     priority = serializers.SerializerMethodField()
     orderedBy = serializers.SerializerMethodField()
     orderedAt = serializers.SerializerMethodField()
+    results = serializers.SerializerMethodField()
 
     class Meta:
         model = DiagnosticReport
@@ -128,6 +129,7 @@ class DiagnosticReportListSerializer(serializers.ModelSerializer):
             'orderedBy',
             'orderedAt',
             'conclusion',
+            'results',
             'created_at',
             'updated_at'
         ]
@@ -177,6 +179,19 @@ class DiagnosticReportListSerializer(serializers.ModelSerializer):
     def get_orderedAt(self, obj):
         if obj.effective_datetime: return obj.effective_datetime.isoformat()
         return obj.created_at.isoformat() if hasattr(obj, 'created_at') else None
+
+    def get_results(self, obj):
+        """
+        Prioritize 'result_data' (JSON) if it exists.
+        Fallback to 'results' relation (Legacy DB Table).
+        """
+        if obj.result_data:
+            val = obj.result_data
+            if isinstance(val, dict) and 'results' in val:
+                return val['results']
+            return val
+            
+        return DiagnosticReportResultSerializer(instance=obj.results.all(), many=True).data
 class DiagnosticReportSerializer(serializers.ModelSerializer):
     """
     Enhanced serializer that fetches Patient data and formats DiagnosticReport

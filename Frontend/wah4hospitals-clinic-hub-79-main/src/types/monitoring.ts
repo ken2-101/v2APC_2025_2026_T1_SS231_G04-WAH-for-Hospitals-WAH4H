@@ -66,7 +66,8 @@ export interface HistoryEvent {
 import { LabTestType, LabPriority, LabStatus } from './laboratory';
 
 export interface LabRequest {
-    id: string;
+    id: string;                           // Numeric ID as string for internal UI tracking
+    request_id?: string;                  // Human-readable identifier (e.g. LAB-123)
     admissionId: string;
     testName: string;
     testCode: LabTestType;                // LOINC code / Internal Code
@@ -88,6 +89,10 @@ export interface LabRequest {
         flag?: string;
         interpretation?: string;
     }[];
+    result?: any; // To store full LabResult object from laboratory service
+    patient_name?: string;     // Needed for LabResultViewModal
+    patient_id?: string;       // Needed for LabResultViewModal
+    test_type_display?: string; // Needed for LabResultViewModal
 }
 
 export interface LabResult {

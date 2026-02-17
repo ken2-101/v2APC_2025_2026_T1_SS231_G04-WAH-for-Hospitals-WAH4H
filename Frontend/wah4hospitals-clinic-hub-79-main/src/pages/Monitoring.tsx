@@ -100,10 +100,14 @@ const Monitoring: React.FC = () => {
 
         // Map laboratory DiagnosticReport to monitoring LabRequest format
         const mappedLabs: LabRequest[] = labResults.map((report: any) => ({
-          id: report.request_id,
+          id: report.id.toString(), // Numeric diagnostic_report_id
+          request_id: report.request_id, // String identifier like LAB-123
           admissionId: report.admission_id,
           testName: report.test_type_display || report.test_type,
           testCode: report.test_type as any, // Cast to LabTestType
+          patient_name: report.patient_name,
+          patient_id: report.patient_id,
+          test_type_display: report.test_type_display,
           priority: (report.priority || 'routine') as any,
           notes: report.clinical_reason || '',
           lifecycleStatus: (['verified', 'registered', 'preliminary', 'partial'].includes(report.status)) ? 'verified' :
@@ -216,10 +220,14 @@ const Monitoring: React.FC = () => {
 
       const labResults = labResponse.results || [];
       const mappedLabs: LabRequest[] = labResults.map((report: any) => ({
-        id: report.request_id,
+        id: report.id.toString(), // Numeric diagnostic_report_id
+        request_id: report.request_id, // String identifier like LAB-123
         admissionId: report.admission_id,
         testName: report.test_type_display || report.test_type,
         testCode: report.test_type as any, // Cast to LabTestType
+        patient_name: report.patient_name,
+        patient_id: report.patient_id,
+        test_type_display: report.test_type_display,
         priority: (report.priority || 'routine') as any,
         notes: report.clinical_reason || '',
         lifecycleStatus: (['verified', 'registered', 'preliminary', 'partial'].includes(report.status)) ? 'verified' :

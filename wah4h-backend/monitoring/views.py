@@ -1,10 +1,12 @@
 from rest_framework import viewsets, filters
+from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 
 from .models import Observation, ChargeItem, ChargeItemDefinition
 from .serializers import (
     ObservationSerializer,
+    ObservationListSerializer,
     ChargeItemSerializer,
     ChargeItemDefinitionSerializer
 )
@@ -33,6 +35,7 @@ class ObservationViewSet(viewsets.ModelViewSet):
         - encounter_id: Encounter ID (integer)
         - code: Observation code (e.g., vital sign type)
         - category: Observation category
+        - priority: Observation priority (routine, urgent, stat)
     
     Ordering:
         - Default: Most recent first (-effective_datetime)
@@ -56,8 +59,10 @@ class ObservationViewSet(viewsets.ModelViewSet):
         'subject_id': ['exact'],
         'encounter_id': ['exact'],
         'performer_id': ['exact'],
+        'requester_id': ['exact'],
         'code': ['exact', 'icontains'],
         'category': ['exact', 'icontains'],
+        'priority': ['exact'],
     }
     
     ordering_fields = [
@@ -74,6 +79,41 @@ class ObservationViewSet(viewsets.ModelViewSet):
         'interpretation',
         'note'
     ]
+    
+    def get_serializer_class(self):
+        """Use lightweight serializer for list views."""
+        if self.action == 'list':
+            return ObservationListSerializer
+        return ObservationSerializer
+    
+    def list(self, request, *args, **kwargs):
+        """Optimized list view with prefetch to avoid N+1 queries."""
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        
+        if page is not None:
+            # Bulk fetch related entities
+            context = self._get_prefetch_context(page)
+            serializer = self.get_serializer(page, many=True, context=context)
+            return self.get_paginated_response(serializer.data)
+        
+        context = self._get_prefetch_context(queryset)
+        serializer = self.get_serializer(queryset, many=True, context=context)
+        return Response(serializer.data)
+    
+    def _get_prefetch_context(self, queryset):
+        """Bulk fetch related entities to prevent N+1 queries."""
+        from patients.models import Patient
+        
+        subject_ids = set(obj.subject_id for obj in queryset if obj.subject_id)
+        
+        # Fetch all patients in one query
+        patients = Patient.objects.filter(id__in=subject_ids)
+        patients_map = {p.id: p for p in patients}
+        
+        return {
+            'patients_map': patients_map,
+        }
 
 
 class ChargeItemViewSet(viewsets.ModelViewSet):
