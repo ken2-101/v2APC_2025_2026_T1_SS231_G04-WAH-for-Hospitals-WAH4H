@@ -7,21 +7,7 @@ import { DischargeStatusBadge } from './DischargeStatusBadge';
 import { Search, Calendar, FileText, User } from 'lucide-react';
 import { format } from 'date-fns';
 
-interface DischargedPatient {
-  id: number;
-  patient_name: string;  // Backend uses snake_case
-  room: string;
-  admission_date: string;  // Backend uses snake_case
-  dischargeDate: string;
-  condition: string;
-  physician_name: string;  // Backend uses snake_case
-  department: string;
-  age: number;
-  finalDiagnosis: string;
-  dischargeSummary: string;
-  followUpRequired: boolean;
-  followUpPlan?: string;
-}
+import { DischargedPatient } from '@/types/discharge';
 
 interface DischargedPatientsReportProps {
   dischargedPatients: DischargedPatient[];
@@ -100,7 +86,7 @@ export const DischargedPatientsReport: React.FC<DischargedPatientsReportProps> =
                     <div>
                       <p className="text-sm text-blue-600 font-medium">Today's Discharges</p>
                       <p className="text-2xl font-bold text-blue-800">
-                        {dischargedPatients.filter(p => p.dischargeDate === new Date().toISOString().split('T')[0]).length}
+                        {dischargedPatients.filter(p => p.discharge_date === new Date().toISOString().split('T')[0]).length}
                       </p>
                     </div>
                   </div>
@@ -111,7 +97,7 @@ export const DischargedPatientsReport: React.FC<DischargedPatientsReportProps> =
                     <div>
                       <p className="text-sm text-yellow-600 font-medium">Follow-up Required</p>
                       <p className="text-2xl font-bold text-yellow-800">
-                        {dischargedPatients.filter(p => p.followUpRequired).length}
+                        {dischargedPatients.filter(p => p.follow_up_required).length}
                       </p>
                     </div>
                   </div>
@@ -147,15 +133,15 @@ export const DischargedPatientsReport: React.FC<DischargedPatientsReportProps> =
                         <span className="font-medium text-foreground">Admitted:</span> {patient.admission_date}
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">Discharged:</span> {patient.dischargeDate}
+                        <span className="font-medium text-foreground">Discharged:</span> {patient.discharge_date}
                       </div>
                       <div>
                         <span className="font-medium text-foreground">Age:</span> {patient.age}
                       </div>
                       <div>
                         <span className="font-medium text-foreground">Follow-up:</span>
-                        <span className={patient.followUpRequired ? 'text-yellow-600' : 'text-green-600'}>
-                          {patient.followUpRequired ? ' Required' : ' Not Required'}
+                        <span className={patient.follow_up_required ? 'text-yellow-600' : 'text-green-600'}>
+                          {patient.follow_up_required ? ' Required' : ' Not Required'}
                         </span>
                       </div>
                     </div>

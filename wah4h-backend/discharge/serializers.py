@@ -24,6 +24,7 @@ class DischargeSerializer(serializers.ModelSerializer):
     department = serializers.SerializerMethodField()
     condition = serializers.SerializerMethodField()
     admission_date = serializers.SerializerMethodField()
+    discharge_date = serializers.SerializerMethodField()
     requirements = serializers.SerializerMethodField()
 
     class Meta:
@@ -34,7 +35,7 @@ class DischargeSerializer(serializers.ModelSerializer):
             'status', 'workflow_status', 'created_by', 'summary_of_stay',
             'discharge_instructions', 'pending_items', 'follow_up_plan',
             'patient_name', 'physician_name', 'encounter_identifier',
-            'room', 'age', 'department', 'condition', 'admission_date', 'requirements',
+            'room', 'age', 'department', 'condition', 'admission_date', 'discharge_date', 'requirements',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['discharge_id', 'created_at', 'updated_at']
@@ -102,6 +103,9 @@ class DischargeSerializer(serializers.ModelSerializer):
             return str(encounter.period_start) if encounter.period_start else ""
         except Encounter.DoesNotExist:
             return ""
+
+    def get_discharge_date(self, obj):
+        return str(obj.discharge_datetime.date()) if obj.discharge_datetime else ""
 
     def get_requirements(self, obj):
         # Try to parse requirements from pending_items (JSON field)

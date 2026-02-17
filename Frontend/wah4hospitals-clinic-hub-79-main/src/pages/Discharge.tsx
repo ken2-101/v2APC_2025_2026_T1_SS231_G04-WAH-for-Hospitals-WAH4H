@@ -26,45 +26,12 @@ import { PendingItemsSection } from '@/components/discharge/PendingItemsSection'
 import { DischargedPatientsReport } from '@/components/discharge/DischargedPatientsReport';
 import { dischargeService } from '@/services/dischargeService';
 
-interface DischargeRequirements {
-  finalDiagnosis: boolean;
-  physicianSignature: boolean;
-  medicationReconciliation: boolean;
-  dischargeSummary: boolean;
-  billingClearance: boolean;
-  nursingNotes: boolean;
-  followUpScheduled: boolean;
-}
-
-interface PendingPatient {
-  id: number;
-  patientName: string;
-  room: string;
-  admissionDate: string;
-  condition: string;
-  status: 'pending' | 'ready' | 'discharged';
-  physician: string;
-  department: string;
-  age: number;
-  estimatedDischarge: string;
-  requirements: DischargeRequirements;
-}
-
-interface DischargedPatient {
-  id: number;
-  patientName: string;
-  room: string;
-  admissionDate: string;
-  dischargeDate: string;
-  condition: string;
-  physician: string;
-  department: string;
-  age: number;
-  finalDiagnosis: string;
-  dischargeSummary: string;
-  followUpRequired: boolean;
-  followUpPlan?: string;
-}
+import {
+  DischargeRequirements,
+  PendingPatient,
+  DischargedPatient,
+  DischargeRecord
+} from '@/types/discharge';
 
 const Discharge = () => {
   const [pendingDischarges, setPendingDischarges] = useState<PendingPatient[]>([]);
@@ -189,7 +156,7 @@ const Discharge = () => {
   const handleProcessDischarge = (patient: PendingPatient) => {
     setSelectedPatient(patient);
     setDischargeForm({
-      patientId: patient.patientName,
+      patientId: patient.patient_name,
       finalDiagnosis: '',
       hospitalStaySummary: '',
       dischargeMedications: '',
@@ -290,7 +257,7 @@ const Discharge = () => {
         pendingItems: dischargeForm.pendingItems
       });
 
-      alert(`Discharge completed successfully for ${selectedPatient.patientName}`);
+      alert(`Discharge completed successfully for ${selectedPatient.patient_name}`);
 
       // Reload data
       const pendingData = await dischargeService.getPending();
@@ -425,7 +392,7 @@ const Discharge = () => {
                   <div className="ml-4">
                     <p className="text-sm font-medium text-muted-foreground">Discharged Today</p>
                     <p className="text-2xl font-bold text-foreground">
-                      {dischargedPatients.filter(p => p.dischargeDate === new Date().toISOString().split('T')[0]).length}
+                      {dischargedPatients.filter(p => p.discharge_date === new Date().toISOString().split('T')[0]).length}
                     </p>
                   </div>
                 </div>
@@ -508,7 +475,7 @@ const Discharge = () => {
                     {filteredDischarges.map((patient) => (
                       <div key={patient.id} className="border rounded-lg p-4 space-y-3">
                         <div className="flex items-center justify-between">
-                          <h3 className="font-semibold text-lg">{patient.patientName}</h3>
+                          <h3 className="font-semibold text-lg">{patient.patient_name}</h3>
                           <DischargeStatusBadge status={patient.status} />
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground">
@@ -522,7 +489,7 @@ const Discharge = () => {
                             <span className="font-medium text-foreground">Department:</span> {patient.department}
                           </div>
                           <div>
-                            <span className="font-medium text-foreground">Physician:</span> {patient.physician}
+                            <span className="font-medium text-foreground">Physician:</span> {patient.physician_name}
                           </div>
                         </div>
                         <div className="flex justify-end">
@@ -615,7 +582,7 @@ const Discharge = () => {
               <CardContent className="p-6">
                 <div className="text-center">
                   <p className="text-2xl font-bold text-green-600">
-                    {dischargedPatients.filter(p => p.followUpRequired).length}
+                    {dischargedPatients.filter(p => p.follow_up_required).length}
                   </p>
                   <p className="text-sm text-muted-foreground">Follow-up Required</p>
                 </div>
@@ -639,7 +606,7 @@ const Discharge = () => {
       <Dialog open={isDischargeModalOpen} onOpenChange={setIsDischargeModalOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Process Discharge - {selectedPatient?.patientName}</DialogTitle>
+            <DialogTitle>Process Discharge - {selectedPatient?.patient_name}</DialogTitle>
           </DialogHeader>
           <div className="space-y-6">
             {selectedPatient && (
@@ -785,7 +752,7 @@ const Discharge = () => {
                             </div>
                             <div className="col-span-2">
                               <span className="text-muted-foreground">Physician:</span>
-                              <span className="ml-2 font-medium">{patient.attending_physician}</span>
+                              <span className="ml-2 font-medium">{patient.physician_name || patient.physician || patient.attending_physician}</span>
                             </div>
                             <div className="col-span-2">
                               <span className="text-muted-foreground">Condition:</span>

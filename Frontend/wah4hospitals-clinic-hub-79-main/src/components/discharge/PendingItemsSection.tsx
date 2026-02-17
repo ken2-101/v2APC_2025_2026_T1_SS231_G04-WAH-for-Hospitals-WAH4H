@@ -123,10 +123,10 @@ export const PendingItemsSection: React.FC<PendingItemsSectionProps> = ({
             <div
               key={item.id}
               className={`flex items-center gap-3 p-3 rounded-lg border ${!item.status && item.required
-                  ? 'border-destructive/20 bg-destructive/5'
-                  : item.status
-                    ? 'border-green-200 bg-green-50'
-                    : 'border-muted bg-muted/30'
+                ? 'border-destructive/20 bg-destructive/5'
+                : item.status
+                  ? 'border-green-200 bg-green-50'
+                  : 'border-muted bg-muted/30'
                 }`}
             >
               <Checkbox
