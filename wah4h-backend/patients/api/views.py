@@ -7,13 +7,18 @@ Writes (POST/PUT): Validate -> Delegate to PatientRegistrationService
 Reads (GET): Delegate to PatientACL -> Format with OutputSerializer
 """
 
+import logging
 import os
+import threading
+import uuid
 
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import connection
 
 from rest_framework import viewsets, status
 from rest_framework.response import Response
-from rest_framework.decorators import action, api_view
+from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 
@@ -40,6 +45,8 @@ from patients.services.patients_services import (
     ClinicalDataService,
 )
 
+logger = logging.getLogger(__name__)
+
 
 # ============================================================================
 # PATIENT VIEWSET (CQRS-Lite)
@@ -48,12 +55,12 @@ from patients.services.patients_services import (
 class PatientViewSet(viewsets.ViewSet):
     """
     Patient ViewSet (Service-Driven)
-    
+
     CQRS-Lite Architecture:
     - NO direct database access (no queryset)
     - Reads: patient_acl functions -> PatientOutputSerializer
     - Writes: PatientInputSerializer -> PatientRegistrationService/PatientUpdateService
-    
+
     Endpoints:
         GET /patients/ - List patients
         GET /patients/{id}/ - Retrieve patient details
@@ -64,27 +71,27 @@ class PatientViewSet(viewsets.ViewSet):
         GET /patients/{id}/conditions/ - Get patient conditions
         GET /patients/{id}/allergies/ - Get patient allergies
     """
-    
+
     def list(self, request):
         """
         List all patients.
-        
+
         Delegates to: PatientACL.search_patients('', limit)
         Returns: List of patient summaries
         """
         limit = int(request.query_params.get('limit', 100))
-        
+
         # Delegate to ACL (empty query returns all)
         patients = patient_acl.search_patients('', limit)
-        
+
         # Serialize using Output serializer
         serializer = PatientOutputSerializer(patients, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
-    
+
     def retrieve(self, request, pk=None):
         """
         Retrieve a single patient by ID.
-        
+
         Delegates to: PatientACL.get_patient_details(id)
         Returns: Full patient details or 404
         """
@@ -95,24 +102,24 @@ class PatientViewSet(viewsets.ViewSet):
                 {'error': 'Invalid patient ID format'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Delegate to ACL
         patient = patient_acl.get_patient_details(patient_id)
-        
+
         if not patient:
             return Response(
                 {'error': 'Patient not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
-        
+
         # Serialize using Output serializer
         serializer = PatientOutputSerializer(patient)
         return Response(serializer.data, status=status.HTTP_200_OK)
-    
+
     def create(self, request):
         """
         Create a new patient.
-        
+
         Flow:
         1. Validate input with PatientInputSerializer
         2. Delegate to PatientRegistrationService.register_patient()
@@ -125,7 +132,7 @@ class PatientViewSet(viewsets.ViewSet):
                 input_serializer.errors,
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Delegate to Registration Service
         try:
             patient = PatientRegistrationService.register_patient(
@@ -136,21 +143,21 @@ class PatientViewSet(viewsets.ViewSet):
                 {'error': f'Failed to register patient: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-        
+
         # Fetch full details via ACL
         patient_details = patient_acl.get_patient_details(patient.id)
-        
+
         # Serialize output
         output_serializer = PatientOutputSerializer(patient_details)
         return Response(
             output_serializer.data,
             status=status.HTTP_201_CREATED
         )
-    
+
     def update(self, request, pk=None):
         """
         Full update of a patient.
-        
+
         Flow:
         1. Validate input with PatientInputSerializer
         2. Delegate to PatientUpdateService.update_patient()
@@ -163,7 +170,7 @@ class PatientViewSet(viewsets.ViewSet):
                 {'error': 'Invalid patient ID format'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Validate input
         input_serializer = PatientInputSerializer(data=request.data)
         if not input_serializer.is_valid():
@@ -171,7 +178,7 @@ class PatientViewSet(viewsets.ViewSet):
                 input_serializer.errors,
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Delegate to Update Service
         try:
             patient = PatientUpdateService.update_patient(
@@ -206,7 +213,7 @@ class PatientViewSet(viewsets.ViewSet):
     def partial_update(self, request, pk=None):
         """
         Partial update of a patient.
-        
+
         Flow:
         1. Validate input with PatientInputSerializer (partial=True)
         2. Delegate to PatientUpdateService.update_patient()
@@ -219,7 +226,7 @@ class PatientViewSet(viewsets.ViewSet):
                 {'error': 'Invalid patient ID format'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Validate input (partial)
         input_serializer = PatientInputSerializer(
             data=request.data,
@@ -230,7 +237,7 @@ class PatientViewSet(viewsets.ViewSet):
                 input_serializer.errors,
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Delegate to Update Service
         try:
             patient = PatientUpdateService.update_patient(
@@ -266,38 +273,38 @@ class PatientViewSet(viewsets.ViewSet):
     def search(self, request):
         """
         Search patients by query.
-        
+
         Query params:
             q: Search term (required)
             limit: Max results (optional, default: 50)
-        
+
         Example: GET /patients/search/?q=Juan&limit=10
-        
+
         Delegates to: PatientACL.search_patients(query, limit)
         """
         query = request.query_params.get('q', '').strip()
         limit = int(request.query_params.get('limit', 50))
-        
+
         if not query:
             return Response(
                 {'error': 'Search query parameter "q" is required'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Delegate to ACL
         results = patient_acl.search_patients(query, limit)
-        
+
         # Serialize output
         serializer = PatientOutputSerializer(results, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
-    
+
     @action(detail=True, methods=['get'])
     def conditions(self, request, pk=None):
         """
         Get all conditions for a patient.
-        
+
         Example: GET /patients/{id}/conditions/
-        
+
         Delegates to: PatientACL.get_patient_conditions(id)
         """
         try:
@@ -307,18 +314,18 @@ class PatientViewSet(viewsets.ViewSet):
                 {'error': 'Invalid patient ID'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Delegate to ACL
         conditions = patient_acl.get_patient_conditions(patient_id)
         return Response(conditions, status=status.HTTP_200_OK)
-    
+
     @action(detail=True, methods=['get'])
     def allergies(self, request, pk=None):
         """
         Get all allergies for a patient.
-        
+
         Example: GET /patients/{id}/allergies/
-        
+
         Delegates to: PatientACL.get_patient_allergies(id)
         """
         try:
@@ -328,7 +335,7 @@ class PatientViewSet(viewsets.ViewSet):
                 {'error': 'Invalid patient ID'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Delegate to ACL
         allergies = patient_acl.get_patient_allergies(patient_id)
         return Response(allergies, status=status.HTTP_200_OK)
@@ -393,10 +400,10 @@ class PatientViewSet(viewsets.ViewSet):
 class ConditionViewSet(viewsets.ModelViewSet):
     """
     Condition ViewSet (Fortress Pattern)
-    
+
     Reads: Standard ModelViewSet behavior (direct DB query)
     Writes: Delegated to ClinicalDataService.record_condition()
-    
+
     Endpoints:
         GET /conditions/ - List conditions (with filter)
         GET /conditions/{id}/ - Retrieve condition details
@@ -405,12 +412,12 @@ class ConditionViewSet(viewsets.ModelViewSet):
         PATCH /conditions/{id}/ - Partial update condition
         DELETE /conditions/{id}/ - Delete condition
     """
-    
+
     queryset = Condition.objects.all().select_related('patient').order_by('-created_at')
     filter_backends = [DjangoFilterBackend, SearchFilter]
     filterset_fields = ['patient', 'clinical_status', 'category', 'severity']
     search_fields = ['code', 'identifier']
-    
+
     def get_serializer_class(self):
         """
         Return appropriate serializer based on action.
@@ -418,11 +425,11 @@ class ConditionViewSet(viewsets.ModelViewSet):
         if self.action == 'create':
             return ConditionCreateSerializer
         return ConditionSerializer
-    
+
     def create(self, request, *args, **kwargs):
         """
         Create a new condition via ClinicalDataService.
-        
+
         Flow:
         1. Validate input with ConditionCreateSerializer
         2. Extract patient_id from validated data
@@ -436,12 +443,12 @@ class ConditionViewSet(viewsets.ModelViewSet):
                 serializer.errors,
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Extract patient_id (the patient field contains the Patient instance)
         validated_data = serializer.validated_data.copy()
         patient = validated_data.pop('patient')
         patient_id = patient.id
-        
+
         # Delegate to ClinicalDataService
         try:
             condition = ClinicalDataService.record_condition(
@@ -453,7 +460,7 @@ class ConditionViewSet(viewsets.ModelViewSet):
                 {'error': f'Failed to record condition: {str(e)}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Serialize output with read serializer
         output_serializer = ConditionSerializer(condition)
         return Response(
@@ -469,10 +476,10 @@ class ConditionViewSet(viewsets.ModelViewSet):
 class AllergyViewSet(viewsets.ModelViewSet):
     """
     Allergy Intolerance ViewSet (Fortress Pattern)
-    
+
     Reads: Standard ModelViewSet behavior (direct DB query)
     Writes: Delegated to ClinicalDataService.record_allergy()
-    
+
     Endpoints:
         GET /allergies/ - List allergies (with filter)
         GET /allergies/{id}/ - Retrieve allergy details
@@ -481,12 +488,12 @@ class AllergyViewSet(viewsets.ModelViewSet):
         PATCH /allergies/{id}/ - Partial update allergy
         DELETE /allergies/{id}/ - Delete allergy
     """
-    
+
     queryset = AllergyIntolerance.objects.all().select_related('patient').order_by('-created_at')
     filter_backends = [DjangoFilterBackend, SearchFilter]
     filterset_fields = ['patient', 'clinical_status', 'category', 'criticality']
     search_fields = ['code', 'identifier']
-    
+
     def get_serializer_class(self):
         """
         Return appropriate serializer based on action.
@@ -494,11 +501,11 @@ class AllergyViewSet(viewsets.ModelViewSet):
         if self.action == 'create':
             return AllergyCreateSerializer
         return AllergySerializer
-    
+
     def create(self, request, *args, **kwargs):
         """
         Create a new allergy via ClinicalDataService.
-        
+
         Flow:
         1. Validate input with AllergyCreateSerializer
         2. Extract patient_id from validated data
@@ -512,12 +519,12 @@ class AllergyViewSet(viewsets.ModelViewSet):
                 serializer.errors,
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Extract patient_id (the patient field contains the Patient instance)
         validated_data = serializer.validated_data.copy()
         patient = validated_data.pop('patient')
         patient_id = patient.id
-        
+
         # Delegate to ClinicalDataService
         try:
             allergy = ClinicalDataService.record_allergy(
@@ -529,7 +536,7 @@ class AllergyViewSet(viewsets.ModelViewSet):
                 {'error': f'Failed to record allergy: {str(e)}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Serialize output with read serializer
         output_serializer = AllergySerializer(allergy)
         return Response(
@@ -545,10 +552,10 @@ class AllergyViewSet(viewsets.ModelViewSet):
 class ImmunizationViewSet(viewsets.ModelViewSet):
     """
     Immunization ViewSet (Fortress Pattern)
-    
+
     Reads: Standard ModelViewSet behavior (direct DB query)
     Writes: Delegated to ClinicalDataService.record_immunization()
-    
+
     Endpoints:
         GET /immunizations/ - List immunizations (with filter)
         GET /immunizations/{id}/ - Retrieve immunization details
@@ -557,12 +564,12 @@ class ImmunizationViewSet(viewsets.ModelViewSet):
         PATCH /immunizations/{id}/ - Partial update immunization
         DELETE /immunizations/{id}/ - Delete immunization
     """
-    
+
     queryset = Immunization.objects.all().select_related('patient').order_by('-created_at')
     filter_backends = [DjangoFilterBackend, SearchFilter]
     filterset_fields = ['patient', 'status', 'vaccine_code']
     search_fields = ['identifier', 'vaccine_display', 'lot_number']
-    
+
     def get_serializer_class(self):
         """
         Return appropriate serializer based on action.
@@ -570,11 +577,11 @@ class ImmunizationViewSet(viewsets.ModelViewSet):
         if self.action == 'create':
             return ImmunizationCreateSerializer
         return ImmunizationSerializer
-    
+
     def create(self, request, *args, **kwargs):
         """
         Create a new immunization via ClinicalDataService.
-        
+
         Flow:
         1. Validate input with ImmunizationCreateSerializer
         2. Extract patient_id from validated data
@@ -588,12 +595,12 @@ class ImmunizationViewSet(viewsets.ModelViewSet):
                 serializer.errors,
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Extract patient_id (the patient field contains the Patient instance)
         validated_data = serializer.validated_data.copy()
         patient = validated_data.pop('patient')
         patient_id = patient.id
-        
+
         # Delegate to ClinicalDataService
         try:
             immunization = ClinicalDataService.record_immunization(
@@ -605,7 +612,7 @@ class ImmunizationViewSet(viewsets.ModelViewSet):
                 {'error': f'Failed to record immunization: {str(e)}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Serialize output with read serializer
         output_serializer = ImmunizationSerializer(immunization)
         return Response(
@@ -619,6 +626,7 @@ class ImmunizationViewSet(viewsets.ModelViewSet):
 # ============================================================================
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def fetch_wah4pc(request):
     """Fetch patient data from WAH4PC gateway."""
     target_id = request.data.get('targetProviderId')
@@ -655,31 +663,60 @@ def fetch_wah4pc(request):
 
 @api_view(['POST'])
 def webhook_receive(request):
-    """Receive webhook from WAH4PC gateway."""
+    """
+    Receive the async result from the gateway after a fetch request.
+
+    Protocol:
+        1. Validate X-Gateway-Auth — reject immediately if invalid.
+        2. Require a transactionId in the payload.
+        3. Look up a PENDING WAH4PCTransaction by that transactionId.
+             - If found and PENDING   → process and return 200.
+             - If found but not PENDING → already processed; return 200 (idempotent).
+             - If not found at all      → return 404 so the gateway flags the anomaly.
+        4. Persist the full inbound JSON to raw_payload.
+        5. Update the transaction status to COMPLETED or FAILED.
+    """
     gateway_key = os.getenv('GATEWAY_AUTH_KEY')
     auth_header = request.headers.get('X-Gateway-Auth')
     if not gateway_key or not auth_header or auth_header != gateway_key:
         return Response({'error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
 
     txn_id = request.data.get('transactionId')
-    txn = WAH4PCTransaction.objects.filter(transaction_id=txn_id).first() if txn_id else None
+    if not txn_id:
+        return Response(
+            {'error': 'transactionId is required'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    raw_payload = dict(request.data)
+
+    # Only process if the transaction is still PENDING
+    txn = WAH4PCTransaction.objects.filter(transaction_id=txn_id, status='PENDING').first()
+
+    if txn is None:
+        # Distinguish "already finished" (idempotent 200) from "never existed" (404)
+        if WAH4PCTransaction.objects.filter(transaction_id=txn_id).exists():
+            return Response({'status': 'already_processed'}, status=status.HTTP_200_OK)
+        return Response(
+            {'error': 'Transaction not found'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
 
     if request.data.get('status') == 'SUCCESS':
-        patient_data = fhir_to_dict(request.data['data'])
-        request.session[f"wah4pc_{txn_id}"] = patient_data
-        if txn:
-            txn.status = 'COMPLETED'
-            txn.save()
+        txn.raw_payload = raw_payload
+        txn.status = 'COMPLETED'
+        txn.save()
     else:
-        if txn:
-            txn.status = 'FAILED'
-            txn.error_message = request.data.get('data', {}).get('error', 'Unknown')
-            txn.save()
+        txn.raw_payload = raw_payload
+        txn.status = 'FAILED'
+        txn.error_message = request.data.get('data', {}).get('error', 'Unknown')
+        txn.save()
 
-    return Response({'message': 'Received'})
+    return Response({'status': 'received'}, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def send_to_wah4pc(request):
     """Send local patient data to another provider via WAH4PC gateway."""
     patient_id = request.data.get('patientId')
@@ -712,6 +749,7 @@ def send_to_wah4pc(request):
             type='send',
             status=result.get('status', 'PENDING'),
             patient_id=patient.id,
+            related_patient=patient,
             target_provider_id=target_id,
             idempotency_key=idempotency_key,
         )
@@ -721,7 +759,21 @@ def send_to_wah4pc(request):
 
 @api_view(['POST'])
 def webhook_receive_push(request):
-    """Receive pushed patient data from another provider via WAH4PC gateway."""
+    """
+    Receive a resource pushed by another provider via the gateway.
+
+    Protocol:
+        1. Validate X-Gateway-Auth — reject immediately if invalid.
+        2. Validate the four required envelope fields.
+        3. Persist the raw JSON body to the audit log before any processing.
+        4. Non-Patient resources (Appointments, Observations, etc.):
+             Log, store in WAH4PCTransaction, and return 200 OK.
+             Do NOT reject — the gateway must always get a success acknowledgement.
+        5. Patient resources:
+             Use PatientRegistrationService.register_patient() so deduplication
+             and WAH-YYYY-XXXXX ID generation are handled consistently.
+             Return 400 for validation / duplicate errors; 500 for unexpected ones.
+    """
     gateway_key = os.getenv('GATEWAY_AUTH_KEY')
     auth_header = request.headers.get('X-Gateway-Auth')
     if not gateway_key or not auth_header or auth_header != gateway_key:
@@ -738,63 +790,74 @@ def webhook_receive_push(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    # Only handle Patient resources for now
+    # Capture raw payload before any processing so it is always persisted
+    raw_payload = dict(request.data)
+
+    # ------------------------------------------------------------------
+    # Non-Patient resource types: accept, log, store — never reject.
+    # The gateway does not need us to understand the payload to succeed.
+    # ------------------------------------------------------------------
     if resource_type != 'Patient':
-        return Response(
-            {'error': f'Unsupported resource type: {resource_type}'},
-            status=status.HTTP_400_BAD_REQUEST,
+        logger.info(
+            '[WAH4PC] Received unsolicited %s push (txn=%s, sender=%s) — stored for review.',
+            resource_type, txn_id, sender_id,
         )
-
-    try:
-        # Convert FHIR to dict
-        patient_data = fhir_to_dict(data)
-
-        # Check if patient already exists by PhilHealth ID
-        philhealth_id = patient_data.get('philhealth_id')
-        if philhealth_id:
-            existing_patient = Patient.objects.filter(philhealth_id=philhealth_id).first()
-            if existing_patient:
-                # Update existing patient
-                for key, value in patient_data.items():
-                    if value is not None:
-                        setattr(existing_patient, key, value)
-                existing_patient.save()
-                patient = existing_patient
-                action = 'updated'
-            else:
-                # Create new patient
-                patient = Patient.objects.create(**patient_data)
-                action = 'created'
-        else:
-            # No PhilHealth ID, create new patient
-            patient = Patient.objects.create(**patient_data)
-            action = 'created'
-
-        # Record transaction
         WAH4PCTransaction.objects.create(
             transaction_id=txn_id,
             type='receive_push',
             status='COMPLETED',
-            patient_id=patient.id,
-            target_provider_id=sender_id,
+            sender_id=sender_id,
+            raw_payload=raw_payload,
+        )
+        return Response(
+            {'status': 'accepted', 'note': f'{resource_type} resource stored for review'},
+            status=status.HTTP_200_OK,
         )
 
-        return Response({
-            'message': f'Patient {action} successfully',
-            'patientId': patient.id,
-            'action': action
-        }, status=status.HTTP_200_OK)
+    # ------------------------------------------------------------------
+    # Patient resource: register via service layer
+    # ------------------------------------------------------------------
+    try:
+        patient_data = fhir_to_dict(data)
+        patient = PatientRegistrationService.register_patient(patient_data)
 
-    except Exception as e:
-        # Record failed transaction
+        WAH4PCTransaction.objects.create(
+            transaction_id=txn_id,
+            type='receive_push',
+            status='COMPLETED',
+            sender_id=sender_id,
+            raw_payload=raw_payload,
+            patient_id=patient.id,
+            related_patient=patient,
+        )
+
+        return Response(
+            {'message': 'Patient created successfully', 'patientId': patient.id},
+            status=status.HTTP_200_OK,
+        )
+
+    except DjangoValidationError as e:
+        message = e.message if hasattr(e, 'message') else str(e)
         WAH4PCTransaction.objects.create(
             transaction_id=txn_id,
             type='receive_push',
             status='FAILED',
-            target_provider_id=sender_id,
+            sender_id=sender_id,
+            raw_payload=raw_payload,
+            error_message=message,
+        )
+        return Response({'error': message}, status=status.HTTP_400_BAD_REQUEST)
+
+    except Exception as e:
+        logger.exception('[WAH4PC] Unexpected error in webhook_receive_push for txn %s', txn_id)
+        WAH4PCTransaction.objects.create(
+            transaction_id=txn_id,
+            type='receive_push',
+            status='FAILED',
+            sender_id=sender_id,
+            raw_payload=raw_payload,
             error_message=str(e),
         )
-
         return Response(
             {'error': f'Failed to process pushed patient: {str(e)}'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -803,9 +866,21 @@ def webhook_receive_push(request):
 
 @api_view(['POST'])
 def webhook_process_query(request):
-    """Process incoming query from another provider via WAH4PC gateway."""
-    import uuid
+    """
+    Handle an incoming patient query from another provider via the gateway.
 
+    Protocol (non-blocking):
+        1. Validate X-Gateway-Auth — reject immediately if invalid.
+        2. Validate that transactionId and gatewayReturnUrl are present.
+        3. Acknowledge the gateway with HTTP 200 immediately — this prevents
+           gateway timeouts regardless of how long the DB lookup takes.
+        4. Spawn a daemon thread that:
+             a. Searches for the patient using the supplied identifiers.
+             b. Creates a WAH4PCTransaction audit record.
+             c. POSTs the result back to gatewayReturnUrl (10 s timeout).
+             d. Updates the transaction status to COMPLETED or FAILED.
+             e. Closes the thread-local DB connection to avoid leaks.
+    """
     gateway_key = os.getenv('GATEWAY_AUTH_KEY')
     auth_header = request.headers.get('X-Gateway-Auth')
     if not gateway_key or not auth_header or auth_header != gateway_key:
@@ -814,6 +889,7 @@ def webhook_process_query(request):
     txn_id = request.data.get('transactionId')
     identifiers = request.data.get('identifiers', [])
     return_url = request.data.get('gatewayReturnUrl')
+    requester_id = request.data.get('requesterId')
 
     if not txn_id or not return_url:
         return Response(
@@ -821,55 +897,95 @@ def webhook_process_query(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    # Enhanced identifier matching - supports multiple identifier systems
-    patient = None
-    for ident in identifiers:
-        system = ident.get('system', '').lower()
-        value = ident.get('value')
-
-        if not value:
-            continue
-
-        # PhilHealth ID
-        if 'philhealth' in system:
-            patient = Patient.objects.filter(philhealth_id=value).first()
-
-        # Medical Record Number (MRN) - matches patient_id field
-        elif 'mrn' in system or 'medical-record' in system:
-            patient = Patient.objects.filter(patient_id=value).first()
-
-        # Mobile number (for additional matching)
-        elif 'phone' in system or 'mobile' in system:
-            patient = Patient.objects.filter(mobile_number=value).first()
-
-        # If patient found, stop searching
-        if patient:
-            break
-
-    # Generate idempotency key for the response
+    # Capture everything needed by the thread before the response is sent.
+    # request.data may not be safe to access after the view returns.
+    raw_payload = dict(request.data)
     idempotency_key = str(uuid.uuid4())
 
-    try:
-        http_requests.post(
-            return_url,
-            headers={
-                "X-API-Key": os.getenv('WAH4PC_API_KEY'),
-                "X-Provider-ID": os.getenv('WAH4PC_PROVIDER_ID'),
-                "Idempotency-Key": idempotency_key,
-            },
-            json={
-                "transactionId": txn_id,
-                "status": "SUCCESS" if patient else "REJECTED",
-                "data": patient_to_fhir(patient) if patient else {"error": "Not found"},
-            },
-        )
-    except http_requests.RequestException:
-        return Response(
-            {'error': 'Failed to send response to gateway'},
-            status=status.HTTP_502_BAD_GATEWAY,
-        )
+    def _process_query():
+        txn = None
+        try:
+            # ----------------------------------------------------------------
+            # 1. Match patient using the supplied identifier list
+            # ----------------------------------------------------------------
+            patient = None
+            for ident in identifiers:
+                system = ident.get('system', '').lower()
+                value = ident.get('value')
 
-    return Response({'message': 'Processing'})
+                if not value:
+                    continue
+
+                if 'philhealth' in system:
+                    patient = Patient.objects.filter(philhealth_id=value).first()
+                elif 'mrn' in system or 'medical-record' in system:
+                    patient = Patient.objects.filter(patient_id=value).first()
+                elif 'phone' in system or 'mobile' in system:
+                    patient = Patient.objects.filter(mobile_number=value).first()
+
+                if patient:
+                    break
+
+            # ----------------------------------------------------------------
+            # 2. Create audit record (idempotent — skip if already exists)
+            # ----------------------------------------------------------------
+            txn, created = WAH4PCTransaction.objects.get_or_create(
+                transaction_id=txn_id,
+                defaults={
+                    'type': 'receive_query',
+                    'status': 'PROCESSING',
+                    'requester_id': requester_id,
+                    'raw_payload': raw_payload,
+                    'related_patient': patient,
+                },
+            )
+            if not created:
+                # Already handled by a previous delivery attempt
+                logger.warning('[WAH4PC] Duplicate process_query for txn %s — skipping', txn_id)
+                return
+
+            # ----------------------------------------------------------------
+            # 3. Send the result back to the gateway (10 s hard timeout)
+            # ----------------------------------------------------------------
+            http_requests.post(
+                return_url,
+                headers={
+                    'X-API-Key': os.getenv('WAH4PC_API_KEY'),
+                    'X-Provider-ID': os.getenv('WAH4PC_PROVIDER_ID'),
+                    'Idempotency-Key': idempotency_key,
+                },
+                json={
+                    'transactionId': txn_id,
+                    'status': 'SUCCESS' if patient else 'REJECTED',
+                    'data': patient_to_fhir(patient) if patient else {'error': 'Patient not found'},
+                },
+                timeout=10,
+            )
+
+            txn.status = 'COMPLETED'
+            txn.save()
+
+        except Exception as e:
+            logger.exception('[WAH4PC] process_query thread error for txn %s', txn_id)
+            if txn is not None:
+                txn.status = 'FAILED'
+                txn.error_message = str(e)
+                txn.save()
+            else:
+                # Thread failed before the transaction record was created
+                WAH4PCTransaction.objects.filter(transaction_id=txn_id).update(
+                    status='FAILED',
+                    error_message=str(e),
+                )
+        finally:
+            # Return the thread-local database connection to the pool
+            connection.close()
+
+    thread = threading.Thread(target=_process_query, daemon=True)
+    thread.start()
+
+    # Acknowledge immediately — the gateway must not wait for the thread
+    return Response({'status': 'acknowledged'}, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
@@ -948,7 +1064,10 @@ def get_transaction(request, transaction_id):
         'type': txn.type,
         'status': txn.status,
         'patientId': txn.patient_id,
+        'relatedPatientId': txn.related_patient_id,
         'targetProviderId': txn.target_provider_id,
+        'requesterId': txn.requester_id,
+        'senderId': txn.sender_id,
         'error': txn.error_message,
         'idempotencyKey': txn.idempotency_key,
         'createdAt': txn.created_at,

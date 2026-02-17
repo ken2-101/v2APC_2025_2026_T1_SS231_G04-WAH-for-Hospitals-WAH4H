@@ -1,10 +1,21 @@
-import requests
 import os
+import time
 import uuid
 
+import requests
+
 URL = "https://wah4pc.echosphere.cfd"
-API_KEY = os.getenv("WAH4PC_API_KEY")
-PROVIDER_ID = os.getenv("WAH4PC_PROVIDER_ID")
+
+# ---------------------------------------------------------------------------
+# Retry configuration
+# ---------------------------------------------------------------------------
+# 409 Conflict  — gateway already has an identical request in flight.
+# 429 Too Many  — rate limit hit.
+# Both are transient; a short back-off and re-send is the correct response.
+# ---------------------------------------------------------------------------
+_RETRY_STATUSES = {409, 429}
+_MAX_ATTEMPTS = 3
+_BACKOFF_SECONDS = [1, 2]  # sleep before attempt 2, then before attempt 3
 
 
 def request_patient(target_id, philhealth_id, idempotency_key=None):
@@ -16,61 +27,77 @@ def request_patient(target_id, philhealth_id, idempotency_key=None):
         idempotency_key: Optional idempotency key for retry safety (generated if not provided)
 
     Returns:
-        dict: Response with 'data' key on success, or 'error' and 'status_code' on failure
+        dict: Response with 'data' key on success, or 'error' and 'status_code' on failure.
+              Retries up to _MAX_ATTEMPTS times on 409/429 before giving up.
     """
+    # Read credentials at call time so key rotation takes effect without a restart
+    api_key = os.getenv("WAH4PC_API_KEY")
+    provider_id = os.getenv("WAH4PC_PROVIDER_ID")
+
     if not idempotency_key:
         idempotency_key = str(uuid.uuid4())
 
-    try:
-        response = requests.post(
-            f"{URL}/api/v1/fhir/request/Patient",
-            headers={
-                "X-API-Key": API_KEY,
-                "X-Provider-ID": PROVIDER_ID,
-                "Idempotency-Key": idempotency_key,
-            },
-            json={
-                "requesterId": PROVIDER_ID,
-                "targetId": target_id,
-                "identifiers": [
-                    {"system": "http://philhealth.gov.ph", "value": philhealth_id}
-                ],
-            },
-        )
+    last_retryable_result = None
 
-        # Handle specific error codes
-        if response.status_code == 409:
+    for attempt in range(_MAX_ATTEMPTS):
+        if attempt > 0:
+            # Exponential-ish back-off: 1 s, then 2 s
+            time.sleep(_BACKOFF_SECONDS[min(attempt - 1, len(_BACKOFF_SECONDS) - 1)])
+
+        try:
+            response = requests.post(
+                f"{URL}/api/v1/fhir/request/Patient",
+                headers={
+                    "X-API-Key": api_key,
+                    "X-Provider-ID": provider_id,
+                    "Idempotency-Key": idempotency_key,
+                },
+                json={
+                    "requesterId": provider_id,
+                    "targetId": target_id,
+                    "identifiers": [
+                        {"system": "http://philhealth.gov.ph", "value": philhealth_id}
+                    ],
+                },
+            )
+
+            if response.status_code in _RETRY_STATUSES:
+                last_retryable_result = {
+                    "error": (
+                        "Request already in progress — retrying"
+                        if response.status_code == 409
+                        else "Rate limit exceeded — retrying"
+                    ),
+                    "status_code": response.status_code,
+                    "idempotency_key": idempotency_key,
+                }
+                continue  # wait (top of loop) then retry
+
+            if response.status_code >= 400:
+                error_msg = (
+                    response.json().get("error", "Unknown error")
+                    if response.text
+                    else "Unknown error"
+                )
+                return {
+                    "error": error_msg,
+                    "status_code": response.status_code,
+                    "idempotency_key": idempotency_key,
+                }
+
+            result = response.json()
+            result["idempotency_key"] = idempotency_key
+            return result
+
+        except requests.RequestException as e:
             return {
-                'error': 'Request in progress, retry later',
-                'status_code': 409,
-                'idempotency_key': idempotency_key
+                "error": f"Network error: {str(e)}",
+                "status_code": 500,
+                "idempotency_key": idempotency_key,
             }
 
-        if response.status_code == 429:
-            return {
-                'error': 'Rate limit exceeded or duplicate request',
-                'status_code': 429,
-                'idempotency_key': idempotency_key
-            }
-
-        if response.status_code >= 400:
-            error_msg = response.json().get('error', 'Unknown error') if response.text else 'Unknown error'
-            return {
-                'error': error_msg,
-                'status_code': response.status_code,
-                'idempotency_key': idempotency_key
-            }
-
-        result = response.json()
-        result['idempotency_key'] = idempotency_key
-        return result
-
-    except requests.RequestException as e:
-        return {
-            'error': f'Network error: {str(e)}',
-            'status_code': 500,
-            'idempotency_key': idempotency_key
-        }
+    # All _MAX_ATTEMPTS exhausted on a retryable status
+    return last_retryable_result
 
 
 def patient_to_fhir(patient):
@@ -213,60 +240,75 @@ def push_patient(target_id, patient, idempotency_key=None):
         idempotency_key: Optional idempotency key for retry safety (generated if not provided)
 
     Returns:
-        dict: Response with transaction data on success, or 'error' and 'status_code' on failure
+        dict: Response with transaction data on success, or 'error' and 'status_code' on failure.
+              Retries up to _MAX_ATTEMPTS times on 409/429 before giving up.
     """
+    # Read credentials at call time so key rotation takes effect without a restart
+    api_key = os.getenv("WAH4PC_API_KEY")
+    provider_id = os.getenv("WAH4PC_PROVIDER_ID")
+
     if not idempotency_key:
         idempotency_key = str(uuid.uuid4())
 
-    try:
-        response = requests.post(
-            f"{URL}/api/v1/fhir/push/Patient",
-            headers={
-                "X-API-Key": API_KEY,
-                "X-Provider-ID": PROVIDER_ID,
-                "Idempotency-Key": idempotency_key,
-            },
-            json={
-                "senderId": PROVIDER_ID,
-                "targetId": target_id,
-                "resourceType": "Patient",
-                "data": patient_to_fhir(patient),
-            },
-        )
+    last_retryable_result = None
 
-        # Handle specific error codes
-        if response.status_code == 409:
+    for attempt in range(_MAX_ATTEMPTS):
+        if attempt > 0:
+            time.sleep(_BACKOFF_SECONDS[min(attempt - 1, len(_BACKOFF_SECONDS) - 1)])
+
+        try:
+            response = requests.post(
+                f"{URL}/api/v1/fhir/push/Patient",
+                headers={
+                    "X-API-Key": api_key,
+                    "X-Provider-ID": provider_id,
+                    "Idempotency-Key": idempotency_key,
+                },
+                json={
+                    "senderId": provider_id,
+                    "targetId": target_id,
+                    "resourceType": "Patient",
+                    "data": patient_to_fhir(patient),
+                },
+            )
+
+            if response.status_code in _RETRY_STATUSES:
+                last_retryable_result = {
+                    "error": (
+                        "Request already in progress — retrying"
+                        if response.status_code == 409
+                        else "Rate limit exceeded — retrying"
+                    ),
+                    "status_code": response.status_code,
+                    "idempotency_key": idempotency_key,
+                }
+                continue  # wait (top of loop) then retry
+
+            if response.status_code >= 400:
+                error_msg = (
+                    response.json().get("error", "Unknown error")
+                    if response.text
+                    else "Unknown error"
+                )
+                return {
+                    "error": error_msg,
+                    "status_code": response.status_code,
+                    "idempotency_key": idempotency_key,
+                }
+
+            result = response.json()
+            result["idempotency_key"] = idempotency_key
+            return result
+
+        except requests.RequestException as e:
             return {
-                'error': 'Request in progress, retry later',
-                'status_code': 409,
-                'idempotency_key': idempotency_key
+                "error": f"Network error: {str(e)}",
+                "status_code": 500,
+                "idempotency_key": idempotency_key,
             }
 
-        if response.status_code == 429:
-            return {
-                'error': 'Rate limit exceeded or duplicate request',
-                'status_code': 429,
-                'idempotency_key': idempotency_key
-            }
-
-        if response.status_code >= 400:
-            error_msg = response.json().get('error', 'Unknown error') if response.text else 'Unknown error'
-            return {
-                'error': error_msg,
-                'status_code': response.status_code,
-                'idempotency_key': idempotency_key
-            }
-
-        result = response.json()
-        result['idempotency_key'] = idempotency_key
-        return result
-
-    except requests.RequestException as e:
-        return {
-            'error': f'Network error: {str(e)}',
-            'status_code': 500,
-            'idempotency_key': idempotency_key
-        }
+    # All _MAX_ATTEMPTS exhausted on a retryable status
+    return last_retryable_result
 
 
 def _get_extension(extensions, url):
@@ -314,34 +356,36 @@ def gateway_list_transactions(status_filter=None, limit=50):
     Returns:
         dict: Response with 'data' key containing transaction list, or 'error' and 'status_code' on failure
     """
+    # Read credentials at call time so key rotation takes effect without a restart
+    api_key = os.getenv("WAH4PC_API_KEY")
+    provider_id = os.getenv("WAH4PC_PROVIDER_ID")
+
     try:
-        params = {'limit': limit}
+        params = {"limit": limit}
         if status_filter:
-            params['status'] = status_filter
+            params["status"] = status_filter
 
         response = requests.get(
             f"{URL}/api/v1/transactions",
             headers={
-                "X-API-Key": API_KEY,
-                "X-Provider-ID": PROVIDER_ID,
+                "X-API-Key": api_key,
+                "X-Provider-ID": provider_id,
             },
             params=params,
         )
 
         if response.status_code >= 400:
-            error_msg = response.json().get('error', 'Unknown error') if response.text else 'Unknown error'
-            return {
-                'error': error_msg,
-                'status_code': response.status_code
-            }
+            error_msg = (
+                response.json().get("error", "Unknown error")
+                if response.text
+                else "Unknown error"
+            )
+            return {"error": error_msg, "status_code": response.status_code}
 
         return response.json()
 
     except requests.RequestException as e:
-        return {
-            'error': f'Network error: {str(e)}',
-            'status_code': 500
-        }
+        return {"error": f"Network error: {str(e)}", "status_code": 500}
 
 
 def gateway_get_transaction(transaction_id):
@@ -353,29 +397,31 @@ def gateway_get_transaction(transaction_id):
     Returns:
         dict: Response with transaction details, or 'error' and 'status_code' on failure
     """
+    # Read credentials at call time so key rotation takes effect without a restart
+    api_key = os.getenv("WAH4PC_API_KEY")
+    provider_id = os.getenv("WAH4PC_PROVIDER_ID")
+
     try:
         response = requests.get(
             f"{URL}/api/v1/transactions/{transaction_id}",
             headers={
-                "X-API-Key": API_KEY,
-                "X-Provider-ID": PROVIDER_ID,
+                "X-API-Key": api_key,
+                "X-Provider-ID": provider_id,
             },
         )
 
         if response.status_code >= 400:
-            error_msg = response.json().get('error', 'Unknown error') if response.text else 'Unknown error'
-            return {
-                'error': error_msg,
-                'status_code': response.status_code
-            }
+            error_msg = (
+                response.json().get("error", "Unknown error")
+                if response.text
+                else "Unknown error"
+            )
+            return {"error": error_msg, "status_code": response.status_code}
 
         return response.json()
 
     except requests.RequestException as e:
-        return {
-            'error': f'Network error: {str(e)}',
-            'status_code': 500
-        }
+        return {"error": f"Network error: {str(e)}", "status_code": 500}
 
 
 def fhir_to_dict(fhir):
