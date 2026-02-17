@@ -137,11 +137,11 @@ export const LabResultViewModal: React.FC<LabResultViewModalProps> = ({ isOpen, 
                             </div>
                             <div className="flex">
                                 <span className="font-semibold text-gray-700 w-32">Test Type:</span>
-                                <span className="font-medium flex-1">{request.test_type_display}</span>
+                                <span className="font-medium flex-1">{request.test_type_display || (request as any).testName}</span>
                             </div>
                             <div className="flex">
                                 <span className="font-semibold text-gray-700 w-32">Request ID:</span>
-                                <span className="flex-1 font-mono">{request.request_id}</span>
+                                <span className="flex-1 font-mono">{request.request_id || (request as any).id}</span>
                             </div>
                         </div>
                     </div>

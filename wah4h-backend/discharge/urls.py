@@ -20,7 +20,7 @@ from discharge.views import (
 router = DefaultRouter()
 
 # Register ViewSets with specific route prefixes
-router.register(r'discharges', DischargeViewSet, basename='discharge')
+router.register(r'discharge-records', DischargeViewSet, basename='discharge-record')
 
 # URL patterns
 urlpatterns = [

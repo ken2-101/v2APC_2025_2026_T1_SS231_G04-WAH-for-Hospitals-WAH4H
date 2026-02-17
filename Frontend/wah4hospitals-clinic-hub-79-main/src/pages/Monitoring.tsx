@@ -116,6 +116,8 @@ const Monitoring: React.FC = () => {
           })(),
           orderedBy: report.doctor_name || report.orderedBy || 'Unknown',
           orderedAt: report.created_at,
+          patient_name: report.patient_name || report.subject_display || 'Unknown Patient',
+          patient_id: report.patient_id || report.subject_patient_id || '',
           completedAt: report.updated_at,
 
           results: report.results ? report.results.map((r: any) => ({
@@ -232,6 +234,8 @@ const Monitoring: React.FC = () => {
         })(),
         orderedBy: report.doctor_name || report.orderedBy || 'Unknown',
         orderedAt: report.created_at,
+        patient_name: report.patient_name || report.subject_display || 'Unknown Patient',
+        patient_id: report.patient_id || report.subject_patient_id || '',
         completedAt: report.updated_at,
         results: report.results ? report.results.map((r: any) => ({
           parameter: r.parameter,

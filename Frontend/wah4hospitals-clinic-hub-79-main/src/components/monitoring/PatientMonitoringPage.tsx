@@ -175,6 +175,8 @@ export const PatientMonitoringPage: React.FC<PatientMonitoringPageProps> = ({
                 <TabsContent value="laboratory" className="mt-6">
                     <LaboratoryTab
                         labRequests={labRequests}
+                        patientName={patient.patientName}
+                        patientId={patient.patientId.toString()}
                         onAddRequest={onAddLabRequest}
                         onUpdateResult={onUpdateLabResult}
                     />

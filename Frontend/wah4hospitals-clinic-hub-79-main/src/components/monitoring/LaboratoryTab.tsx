@@ -11,9 +11,12 @@ import { Plus, FileText, AlertCircle, CheckCircle, Clock, RefreshCw, ExternalLin
 import { LabRequest, LabResult } from '../../types/monitoring';
 import { LabTestType, LabPriority } from '../../types/laboratory';
 import { useRole } from '@/contexts/RoleContext';
+import { LabResultViewModal } from '../laboratory/LabResultViewModal';
 
 interface LaboratoryTabProps {
     labRequests: LabRequest[];
+    patientName?: string;
+    patientId?: string;
     onAddRequest?: (request: Omit<LabRequest, 'id'>) => void;
     onUpdateResult?: (requestId: string, result: LabResult) => void;
     onVerifyRequest?: (requestId: number | string) => void;
@@ -35,6 +38,8 @@ const COMMON_LAB_TESTS: { code: LabTestType; name: string }[] = [
 
 export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
     labRequests,
+    patientName = 'Unknown Patient',
+    patientId = '',
     onAddRequest,
     onUpdateResult,
     onVerifyRequest,
@@ -96,6 +101,8 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
             lifecycleStatus: 'requested', // Default to requested (Active/Registered)
             orderedBy: currentRole,
             orderedAt: new Date().toISOString(),
+            patient_name: patientName,
+            patient_id: patientId,
         };
 
         onAddRequest?.(newRequest);
@@ -270,11 +277,25 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
                                         </Button>
                                     )}
 
+                                    <button
+                                        onClick={() => {
+                                            setSelectedRequest(request);
+                                            setIsResultModalOpen(true);
+                                        }}
+                                        className="px-3 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors flex items-center gap-2 font-medium text-sm border border-purple-200"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="lucide lucide-eye">
+                                            <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"></path>
+                                            <circle cx="12" cy="12" r="3"></circle>
+                                        </svg>
+                                        View
+                                    </button>
+
                                     {request.results && request.results.length > 0 && (
                                         <a href="/laboratory" target="_blank" rel="noopener noreferrer">
-                                            <Button size="sm" variant="outline">
+                                            <Button size="sm" variant="ghost" className="text-gray-500 hover:text-blue-600">
                                                 <ExternalLink className="w-4 h-4 mr-1" />
-                                                View in Laboratory
+                                                Open Lab
                                             </Button>
                                         </a>
                                     )}
@@ -367,6 +388,13 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* View Lab Result Modal */}
+            <LabResultViewModal
+                isOpen={isResultModalOpen}
+                onClose={() => setIsResultModalOpen(false)}
+                request={selectedRequest as any}
+            />
         </div>
     );
 };
