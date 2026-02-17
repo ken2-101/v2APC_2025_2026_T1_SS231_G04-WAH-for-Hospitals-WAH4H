@@ -21,6 +21,12 @@ const optionalEnum = <T extends z.ZodTypeAny>(enumSchema: T) =>
 const optionalString = (max = 255) =>
   z.preprocess((val) => (val === '' ? undefined : val), z.string().max(max).optional());
 
+// Helper: PhilHealth ID — optional but must match XX-XXXXXXXXX-X when provided
+const philhealthIdSchema = z.preprocess(
+  (val) => (val === '' ? undefined : val),
+  z.string().regex(/^\d{2}-\d{9}-\d$/, 'PhilHealth ID must follow the format XX-XXXXXXXXX-X').max(14).optional()
+);
+
 // ============================================================================
 // STEP 1: BASIC INFO & ADDITIONAL INFO
 // first_name, middle_name, last_name, suffix_name,
@@ -44,7 +50,7 @@ export const patientStep1Schema = z.object({
   religion: optionalString(255),
   occupation: optionalString(255),
   education: optionalString(255),
-  philhealth_id: optionalString(255),
+  philhealth_id: philhealthIdSchema,
   image_url: optionalString(255),
 });
 
@@ -103,7 +109,7 @@ export const patientStep4Schema = z.object({
   religion: optionalString(255),
   occupation: optionalString(255),
   education: optionalString(255),
-  philhealth_id: optionalString(255),
+  philhealth_id: philhealthIdSchema,
   consent_flag: z.boolean().optional(),
   image_url: optionalString(255),
 });
@@ -150,7 +156,7 @@ export const patientFormDataSchema = z.object({
   religion: optionalString(255),
   occupation: optionalString(255),
   education: optionalString(255),
-  philhealth_id: optionalString(255),
+  philhealth_id: philhealthIdSchema,
   image_url: optionalString(255),
 });
 

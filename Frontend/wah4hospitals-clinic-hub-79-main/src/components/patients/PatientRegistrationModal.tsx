@@ -302,7 +302,7 @@ export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> =
 // STEP 1: BASIC INFO
 // ============================================================================
 const Step1Form = ({ form }: { form: any }) => {
-  const { register, formState: { errors }, watch } = form;
+  const { register, setValue, formState: { errors }, watch } = form;
   const indigenousFlag = watch('indigenous_flag');
 
   return (
@@ -427,16 +427,21 @@ const Step1Form = ({ form }: { form: any }) => {
       <FormField
         label="PhilHealth ID"
         error={errors.philhealth_id}
-        inputMode="text"
-        pattern="^[A-Z0-9-]{3,20}$"
-        maxLength={20}
-        {...register('philhealth_id', {
-          onChange: (e: any) => {
-            const v = (e.target.value || '').toUpperCase().replace(/\s+/g, '').replace(/[^A-Z0-9-]/g, '').slice(0, 20);
-            e.target.value = v;
-          },
-        })}
-        placeholder="e.g., PH-123456-789"
+        inputMode="numeric"
+        maxLength={14}
+        {...register('philhealth_id')}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+          const digits = e.target.value.replace(/\D/g, '').slice(0, 12);
+          let masked = digits;
+          if (digits.length > 11) {
+            masked = digits.slice(0, 2) + '-' + digits.slice(2, 11) + '-' + digits.slice(11);
+          } else if (digits.length > 2) {
+            masked = digits.slice(0, 2) + '-' + digits.slice(2);
+          }
+          e.target.value = masked;
+          setValue('philhealth_id', masked, { shouldValidate: true });
+        }}
+        placeholder="12-345678901-2"
       />
 
       <FormField

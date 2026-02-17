@@ -39,6 +39,21 @@ export const PatientRegistration: React.FC = () => {
   const [formError, setFormError] = useState('');
   // WAH4PC integration state
   const [philHealthId, setPhilHealthId] = useState('');
+  const [philHealthIdError, setPhilHealthIdError] = useState('');
+
+  const PHILHEALTH_REGEX = /^\d{2}-\d{9}-\d$/;
+
+  const handlePhilHealthIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digits = e.target.value.replace(/\D/g, '').slice(0, 12);
+    let masked = digits;
+    if (digits.length > 11) {
+      masked = digits.slice(0, 2) + '-' + digits.slice(2, 11) + '-' + digits.slice(11);
+    } else if (digits.length > 2) {
+      masked = digits.slice(0, 2) + '-' + digits.slice(2);
+    }
+    setPhilHealthId(masked);
+    setPhilHealthIdError(masked && !PHILHEALTH_REGEX.test(masked) ? 'Format must be XX-XXXXXXXXX-X (e.g. 12-345678901-2)' : '');
+  };
   const [targetProvider, setTargetProvider] = useState('');
   const [providers, setProviders] = useState<Array<{id: string; name: string; type: string; isActive: boolean}>>([]);
   const [wah4pcLoading, setWah4pcLoading] = useState(false);
@@ -228,12 +243,19 @@ export const PatientRegistration: React.FC = () => {
 
           {/* WAH4PC Fetch Section */}
           <div className="flex flex-col md:flex-row gap-2 mb-4 p-3 border rounded-lg bg-gray-50">
-            <Input
-              value={philHealthId}
-              onChange={e => setPhilHealthId(e.target.value)}
-              placeholder="PhilHealth ID"
-              className="max-w-xs"
-            />
+            <div className="flex flex-col max-w-xs">
+              <Input
+                value={philHealthId}
+                onChange={handlePhilHealthIdChange}
+                placeholder="12-345678901-2"
+                maxLength={14}
+                inputMode="numeric"
+                className={philHealthIdError ? 'border-red-500' : ''}
+              />
+              {philHealthIdError && (
+                <p className="text-red-500 text-xs mt-1">{philHealthIdError}</p>
+              )}
+            </div>
             <Select value={targetProvider} onValueChange={setTargetProvider}>
               <SelectTrigger className="max-w-xs">
                 <SelectValue placeholder="Select Target Provider" />
@@ -252,7 +274,7 @@ export const PatientRegistration: React.FC = () => {
             </Select>
             <Button
               onClick={fetchFromWAH4PC}
-              disabled={wah4pcLoading || !philHealthId || !targetProvider}
+              disabled={wah4pcLoading || !philHealthId || !targetProvider || !!philHealthIdError || !PHILHEALTH_REGEX.test(philHealthId)}
               variant="outline"
               className="flex items-center gap-2"
             >

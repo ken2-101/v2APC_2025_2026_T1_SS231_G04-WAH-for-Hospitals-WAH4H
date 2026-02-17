@@ -1,3 +1,4 @@
+from django.core.validators import RegexValidator
 from django.db import models
 from core.models import TimeStampedModel, FHIRResourceModel
 
@@ -24,7 +25,17 @@ class Patient(TimeStampedModel):
     religion = models.CharField(max_length=255, null=True, blank=True)
     
     # Health identifiers
-    philhealth_id = models.CharField(max_length=255, null=True, blank=True)
+    philhealth_id = models.CharField(
+        max_length=14,
+        null=True,
+        blank=True,
+        validators=[
+            RegexValidator(
+                regex=r'^\d{2}-\d{9}-\d$',
+                message='PhilHealth ID must follow the format XX-XXXXXXXXX-X (e.g. 12-345678901-2).',
+            )
+        ],
+    )
     blood_type = models.CharField(max_length=100, null=True, blank=True)
     pwd_type = models.CharField(max_length=100, null=True, blank=True)
     
