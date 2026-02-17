@@ -134,7 +134,11 @@ export const patientFormDataSchema = z.object({
   indigenous_group: z.string().max(255).optional(),
 
   // Step 2: Contact & Address
-  mobile_number: z.string().min(1, 'Mobile number is required').max(255),
+  mobile_number: z
+    .string()
+    .min(1, 'Mobile number is required')
+    .regex(/^09\d{9}$/, 'Mobile number must be in 09XXXXXXXXX format (11 digits)')
+    .max(11),
   address_line: z.string().min(1, 'Barangay is required').max(255),
   address_city: z.string().min(1, 'City/Municipality is required').max(255),
   address_district: optionalString(255),

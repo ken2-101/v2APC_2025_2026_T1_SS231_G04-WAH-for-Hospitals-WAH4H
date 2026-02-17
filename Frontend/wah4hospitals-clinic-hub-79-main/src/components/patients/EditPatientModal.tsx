@@ -2,7 +2,8 @@
  * Edit Patient Modal - React Hook Form + Zod Validation
  * Provides comprehensive patient editing functionality
  */
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
@@ -21,6 +22,8 @@ import {
   CONTACT_RELATIONSHIP_OPTIONS,
 } from '../../constants/patientConstants';
 import addressData from '../../data/addressData.json';
+
+const API_URL = import.meta.env.BACKEND_PATIENTS as string;
 
 interface EditPatientModalProps {
   isOpen: boolean;
@@ -42,6 +45,7 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
 }) => {
   const {
     register,
+    setValue,
     handleSubmit,
     formState: { errors, isSubmitting },
     reset,
@@ -51,14 +55,17 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
     mode: 'onChange',
   });
 
+  const [apiError, setApiError] = useState('');
+
   // Watch address fields for cascading selects
   const selectedRegion = watch('address_state');
   const selectedProvince = watch('address_district');
   const selectedCity = watch('address_city');
 
-  // Populate form when patient changes
+  // Clear API error and repopulate form whenever the modal opens with a new patient
   useEffect(() => {
     if (patient && isOpen) {
+      setApiError('');
       reset({
         patient_id: patient.patient_id,
         first_name: patient.first_name || '',
@@ -96,16 +103,20 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
 
   const onSubmit = async (formData: PatientFormData) => {
     if (!patient) return;
+    setApiError('');
     try {
-      // Call parent handler with patient ID and form data
-      if (onSuccess) {
-        onSuccess({
-          ...patient,
-          ...formData,
-        });
-      }
-    } catch (err) {
-      console.error('Failed to update patient:', err);
+      // PATCH /api/patients/{id}/ — numeric DB primary key, not the WAH-XXXX string
+      await axios.patch(`${API_URL}${patient.id}/`, formData);
+      // Refresh the patient list in the parent so the table shows updated data
+      if (fetchPatients) await fetchPatients();
+      onClose();
+    } catch (err: any) {
+      const data = err.response?.data;
+      const message =
+        data && typeof data === 'object'
+          ? Object.values(data).flat().join(' ')
+          : String(data ?? err.message ?? 'Failed to update patient.');
+      setApiError(message);
     }
   };
 
@@ -123,11 +134,19 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
           </DialogClose>
         </DialogHeader>
 
-        {/* Error Message */}
+        {/* Prop-level error (e.g. passed by parent) */}
         {error && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {/* API error from the PATCH call */}
+        {apiError && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{apiError}</AlertDescription>
           </Alert>
         )}
 
@@ -214,47 +233,51 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
             <FormField
               label="Mobile Number"
               error={errors.mobile_number}
-              inputMode="tel"
-              pattern="^(?:\\+63\\d{10}|0\\d{10})$"
-              maxLength={13}
-              {...register('mobile_number', {
-                onChange: (e: any) => {
-                  const raw = e.target.value || '';
-                  const hadPlus = raw.startsWith('+');
-                  const digits = raw.replace(/\D/g, '');
-                  if (hadPlus) {
-                    const trimmed = digits.slice(0, 12);
-                    e.target.value = '+' + trimmed;
-                  } else {
-                    e.target.value = digits.slice(0, 11);
-                  }
-                },
-              })}
+              inputMode="numeric"
+              maxLength={11}
+              {...register('mobile_number')}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                const digits = e.target.value.replace(/\D/g, '').slice(0, 11);
+                e.target.value = digits;
+                setValue('mobile_number', digits, { shouldValidate: true });
+              }}
               placeholder="e.g., 09123456789"
             />
 
             <div className="mt-4 pt-4 border-t">
               <h4 className="text-sm font-semibold mb-4">Address (PSGC)</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                {/* Region — value must be the region CODE (NCR, III…) not the array index */}
                 <SelectField
                   label="Region"
                   error={errors.address_state}
-                  {...register('address_state')}
+                  {...register('address_state', {
+                    onChange: () => {
+                      setValue('address_district', '');
+                      setValue('address_city', '');
+                      setValue('address_line', '');
+                    },
+                  })}
                   options={[
                     { value: '', label: 'Select Region' },
-                    ...Object.entries(addressData.regions || {}).map(([code, name]: any) => ({
-                      value: code,
-                      label: typeof name === 'object' ? name.name : name,
+                    ...Object.values(addressData.regions || {}).map((r: any) => ({
+                      value: r.code,
+                      label: r.name,
                     })),
                   ]}
                 />
+                {/* Province — never disabled; options derive from watched region */}
                 <SelectField
                   label="Province"
                   error={errors.address_district}
-                  {...register('address_district')}
-                  disabled={!selectedRegion}
+                  {...register('address_district', {
+                    onChange: () => {
+                      setValue('address_city', '');
+                      setValue('address_line', '');
+                    },
+                  })}
                   options={[
-                    { value: '', label: 'Select Province' },
+                    { value: '', label: selectedRegion ? 'Select Province' : 'Select a region first' },
                     ...(selectedRegion && addressData.provinces?.[selectedRegion]
                       ? addressData.provinces[selectedRegion].map((p: any) => ({
                           value: p.code,
@@ -266,13 +289,17 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* City — never disabled; options derive from watched province */}
                 <SelectField
                   label="City/Municipality"
                   error={errors.address_city}
-                  {...register('address_city')}
-                  disabled={!selectedProvince}
+                  {...register('address_city', {
+                    onChange: () => {
+                      setValue('address_line', '');
+                    },
+                  })}
                   options={[
-                    { value: '', label: 'Select City/Municipality' },
+                    { value: '', label: selectedProvince ? 'Select City/Municipality' : 'Select a province first' },
                     ...(selectedProvince && addressData.cities?.[selectedProvince]
                       ? addressData.cities[selectedProvince].map((c: any) => ({
                           value: c.code,
@@ -281,13 +308,13 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
                       : []),
                   ]}
                 />
+                {/* Barangay — never disabled; options derive from watched city */}
                 <SelectField
                   label="Barangay"
                   error={errors.address_line}
                   {...register('address_line')}
-                  disabled={!selectedCity}
                   options={[
-                    { value: '', label: 'Select Barangay' },
+                    { value: '', label: selectedCity ? 'Select Barangay' : 'Select a city first' },
                     ...(selectedCity && addressData.barangays?.[selectedCity]
                       ? addressData.barangays[selectedCity].map((b: any) => ({
                           value: b,
@@ -329,16 +356,21 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
             <FormField
               label="PhilHealth ID"
               error={errors.philhealth_id}
-              inputMode="text"
-              pattern="^[A-Z0-9-]{3,20}$"
-              maxLength={20}
-              {...register('philhealth_id', {
-                onChange: (e: any) => {
-                  const v = (e.target.value || '').toUpperCase().replace(/\s+/g, '').replace(/[^A-Z0-9-]/g, '').slice(0, 20);
-                  e.target.value = v;
-                },
-              })}
-              placeholder="e.g., PH-123456-789"
+              inputMode="numeric"
+              maxLength={14}
+              {...register('philhealth_id')}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                const digits = e.target.value.replace(/\D/g, '').slice(0, 12);
+                let masked = digits;
+                if (digits.length > 11) {
+                  masked = digits.slice(0, 2) + '-' + digits.slice(2, 11) + '-' + digits.slice(11);
+                } else if (digits.length > 2) {
+                  masked = digits.slice(0, 2) + '-' + digits.slice(2);
+                }
+                e.target.value = masked;
+                setValue('philhealth_id', masked, { shouldValidate: true });
+              }}
+              placeholder="12-345678901-2"
             />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
