@@ -1003,13 +1003,16 @@ def list_providers(request):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def list_transactions(request):
-    """List WAH4PC transactions with optional filters.
+    """List WAH4PC transactions with optional filters and pagination.
 
     Query params:
         patient_id: Filter by patient ID
         status: Filter by transaction status (PENDING, COMPLETED, FAILED, etc.)
-        type: Filter by transaction type (fetch, send)
+        type: Filter by transaction type (fetch, send, receive_push, process_query)
+        page: Page number (1-based, default 1)
+        page_size: Records per page (default 50, max 200)
     """
     txns = WAH4PCTransaction.objects.all().order_by('-created_at')
 
@@ -1026,22 +1029,45 @@ def list_transactions(request):
     if type_filter:
         txns = txns.filter(type=type_filter)
 
-    return Response([
-        {
-            'id': t.transaction_id,
-            'type': t.type,
-            'status': t.status,
-            'patientId': t.patient_id,
-            'targetProviderId': t.target_provider_id,
-            'error': t.error_message,
-            'createdAt': t.created_at,
-            'updatedAt': t.updated_at,
-        }
-        for t in txns
-    ])
+    # Pagination
+    try:
+        page = max(1, int(request.query_params.get('page', 1)))
+        page_size = min(200, max(1, int(request.query_params.get('page_size', 50))))
+    except (ValueError, TypeError):
+        page = 1
+        page_size = 50
+
+    total = txns.count()
+    offset = (page - 1) * page_size
+    page_txns = txns[offset: offset + page_size]
+
+    return Response({
+        'count': total,
+        'page': page,
+        'pageSize': page_size,
+        'totalPages': max(1, (total + page_size - 1) // page_size),
+        'results': [
+            {
+                'id': t.transaction_id,
+                'type': t.type,
+                'status': t.status,
+                'patientId': t.patient_id,
+                'relatedPatientId': t.related_patient_id,
+                'targetProviderId': t.target_provider_id,
+                'requesterId': t.requester_id,
+                'senderId': t.sender_id,
+                'rawPayload': t.raw_payload,
+                'error': t.error_message,
+                'createdAt': t.created_at,
+                'updatedAt': t.updated_at,
+            }
+            for t in page_txns
+        ],
+    })
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_transaction(request, transaction_id):
     """Get detailed information about a specific WAH4PC transaction.
 
@@ -1068,6 +1094,7 @@ def get_transaction(request, transaction_id):
         'targetProviderId': txn.target_provider_id,
         'requesterId': txn.requester_id,
         'senderId': txn.sender_id,
+        'rawPayload': txn.raw_payload,
         'error': txn.error_message,
         'idempotencyKey': txn.idempotency_key,
         'createdAt': txn.created_at,
