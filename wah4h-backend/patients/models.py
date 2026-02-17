@@ -70,6 +70,20 @@ class Patient(TimeStampedModel):
         today = date.today()
         return today.year - self.birthdate.year - ((today.month, today.day) < (self.birthdate.month, self.birthdate.day))
 
+    def save(self, *args, **kwargs):
+        """
+        Override save() to keep active (bool) and status (str) in sync.
+
+        Single source of truth: `active` drives `status`.
+            active=True  → status='active'
+            active=False → status='inactive'
+
+        This prevents the two fields from ever diverging, regardless of
+        which field a caller sets.
+        """
+        self.status = 'active' if self.active else 'inactive'
+        super().save(*args, **kwargs)
+
     class Meta:
         db_table = 'patient'
         indexes = [
@@ -107,8 +121,10 @@ class Condition(FHIRResourceModel):
         blank=False,
         related_name='conditions'
     )
-    encounter_id = models.BigIntegerField(db_index=True, null=False, blank=False)
-    
+    # nullable so conditions can be recorded from the patient profile
+    # without a formal encounter context.
+    encounter_id = models.BigIntegerField(db_index=True, null=True, blank=True)
+
     # Body site
     body_site = models.CharField(max_length=255, null=True, blank=True)
     
@@ -180,8 +196,10 @@ class AllergyIntolerance(FHIRResourceModel):
         blank=False,
         related_name='allergies'
     )
-    encounter_id = models.BigIntegerField(db_index=True, null=False, blank=False)
-    
+    # nullable so allergies can be recorded from the patient profile
+    # without a formal encounter context.
+    encounter_id = models.BigIntegerField(db_index=True, null=True, blank=True)
+
     # Onset timing
     onset_datetime = models.DateTimeField(null=True, blank=True)
     onset_age = models.DateField(null=True, blank=True)

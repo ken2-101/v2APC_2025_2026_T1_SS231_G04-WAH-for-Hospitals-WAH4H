@@ -206,7 +206,9 @@ class ConditionCreateSerializer(serializers.ModelSerializer):
             'identifier': {'required': True},
             'code': {'required': True},
             'patient': {'required': True},
-            'encounter_id': {'required': True},
+            # encounter_id is optional: conditions can be recorded from the
+            # patient profile view where no encounter context exists.
+            'encounter_id': {'required': False, 'allow_null': True},
         }
 
 
@@ -264,7 +266,9 @@ class AllergyCreateSerializer(serializers.ModelSerializer):
             'identifier': {'required': True},
             'code': {'required': True},
             'patient': {'required': True},
-            'encounter_id': {'required': True},
+            # encounter_id is optional: allergies can be recorded from the
+            # patient profile view where no encounter context exists.
+            'encounter_id': {'required': False, 'allow_null': True},
         }
 
 

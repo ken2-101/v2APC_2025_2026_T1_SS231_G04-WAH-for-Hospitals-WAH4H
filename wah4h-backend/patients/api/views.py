@@ -9,6 +9,8 @@ Reads (GET): Delegate to PatientACL -> Format with OutputSerializer
 
 import os
 
+from django.core.exceptions import ValidationError as DjangoValidationError
+
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action, api_view
@@ -176,9 +178,13 @@ class PatientViewSet(viewsets.ViewSet):
                 patient_id,
                 input_serializer.validated_data
             )
-        except ValueError as e:
+        except (ValueError, DjangoValidationError) as e:
+            # PatientUpdateService raises DjangoValidationError when the
+            # patient is not found (ObjectDoesNotExist).  Both exception
+            # types from this service mean "not found".
+            message = e.message if hasattr(e, 'message') else str(e)
             return Response(
-                {'error': str(e)},
+                {'error': message},
                 status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
@@ -186,17 +192,17 @@ class PatientViewSet(viewsets.ViewSet):
                 {'error': f'Failed to update patient: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-        
+
         # Fetch full details via ACL
         patient_details = patient_acl.get_patient_details(patient.id)
-        
+
         # Serialize output
         output_serializer = PatientOutputSerializer(patient_details)
         return Response(
             output_serializer.data,
             status=status.HTTP_200_OK
         )
-    
+
     def partial_update(self, request, pk=None):
         """
         Partial update of a patient.
@@ -231,9 +237,13 @@ class PatientViewSet(viewsets.ViewSet):
                 patient_id,
                 input_serializer.validated_data
             )
-        except ValueError as e:
+        except (ValueError, DjangoValidationError) as e:
+            # PatientUpdateService raises DjangoValidationError when the
+            # patient is not found (ObjectDoesNotExist).  Both exception
+            # types from this service mean "not found".
+            message = e.message if hasattr(e, 'message') else str(e)
             return Response(
-                {'error': str(e)},
+                {'error': message},
                 status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
@@ -241,17 +251,17 @@ class PatientViewSet(viewsets.ViewSet):
                 {'error': f'Failed to update patient: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-        
+
         # Fetch full details via ACL
         patient_details = patient_acl.get_patient_details(patient.id)
-        
+
         # Serialize output
         output_serializer = PatientOutputSerializer(patient_details)
         return Response(
             output_serializer.data,
             status=status.HTTP_200_OK
         )
-    
+
     @action(detail=False, methods=['get'])
     def search(self, request):
         """

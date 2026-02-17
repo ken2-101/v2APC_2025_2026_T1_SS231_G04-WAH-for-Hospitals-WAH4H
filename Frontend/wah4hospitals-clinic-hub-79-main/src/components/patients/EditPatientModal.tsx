@@ -7,7 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { X, AlertCircle } from 'lucide-react';
 import type { Patient, PatientFormData } from '../../types/patient';
@@ -17,7 +17,6 @@ import {
   BLOOD_TYPE_OPTIONS,
   MARITAL_STATUS_OPTIONS,
   PWD_TYPE_OPTIONS,
-  NATIONALITY_OPTIONS,
   RELIGION_OPTIONS,
   CONTACT_RELATIONSHIP_OPTIONS,
 } from '../../constants/patientConstants';
@@ -28,6 +27,7 @@ interface EditPatientModalProps {
   patient: Patient | null;
   onClose: () => void;
   onSuccess?: (patient: Patient) => void;
+  fetchPatients?: () => Promise<void>;
   isLoading?: boolean;
   error?: string;
 }

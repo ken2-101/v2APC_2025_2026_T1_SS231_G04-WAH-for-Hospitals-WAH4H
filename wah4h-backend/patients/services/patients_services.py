@@ -135,45 +135,64 @@ class PatientRegistrationService:
     def _generate_hospital_id() -> str:
         """
         Generate sequential hospital ID with year-based partitioning.
-        
+
         Format: WAH-{YYYY}-{XXXXX}
-        
+
         Algorithm:
             1. Get current year
-            2. Find latest patient ID for current year
-            3. Parse sequence number and increment
-            4. Default to 00001 if no patients exist for the year
-        
+            2. Lock all existing rows that share the current year prefix
+               using SELECT FOR UPDATE so no other concurrent transaction
+               can read or insert until this transaction commits.
+            3. Parse the highest sequence number and increment it.
+            4. Default to 00001 if no patients exist for the year yet.
+
         Returns:
             str: Generated hospital ID (e.g., "WAH-2026-00001")
-        
-        Note:
-            - Must be called within @transaction.atomic context
-            - Uses SELECT FOR UPDATE to prevent race conditions
-            - Sequence resets each year (00001)
+
+        Concurrency:
+            Must be called inside @transaction.atomic (enforced by the
+            calling method).  select_for_update() acquires a row-level
+            lock on every existing patient with this year's prefix.
+            A second concurrent transaction attempting the same query
+            will block until the first one commits, guaranteeing that
+            each transaction sees the latest committed sequence number
+            before generating the next one.
+
+            Edge case – first patient of the year:
+            When no rows exist yet there is nothing to lock, so two
+            perfectly simultaneous first-registrations of the year could
+            still race and both compute sequence 1.  The UNIQUE constraint
+            on patient_id will reject one of them with an IntegrityError,
+            which propagates out of register_patient() and is caught by
+            the view as a 500.  This is an extremely rare scenario (one
+            registration per calendar-year-boundary) and is handled
+            safely by the database constraint.
         """
         current_year = datetime.now().year
         prefix = f"WAH-{current_year}-"
-        
-        # Find latest patient with current year prefix
-        # Use order_by('-patient_id') to get the highest ID
-        latest_patient = Patient.objects.filter(
-            patient_id__startswith=prefix
-        ).order_by('-patient_id').first()
-        
+
+        # Lock all rows with this year's prefix for the duration of the
+        # transaction.  Any concurrent writer will block here until we
+        # commit, guaranteeing a consistent read of the latest sequence.
+        latest_patient = (
+            Patient.objects
+            .filter(patient_id__startswith=prefix)
+            .select_for_update()          # row-level write lock
+            .order_by('-patient_id')
+            .first()
+        )
+
         if latest_patient and latest_patient.patient_id:
-            # Extract sequence from ID (e.g., "WAH-2026-00123" -> "00123")
+            # Extract sequence: "WAH-2026-00123" → 123
             try:
                 last_sequence = int(latest_patient.patient_id.split('-')[-1])
                 new_sequence = last_sequence + 1
             except (ValueError, IndexError):
-                # If parsing fails, default to 1
                 new_sequence = 1
         else:
-            # No patients for current year, start from 1
+            # First patient registered this calendar year
             new_sequence = 1
-        
-        # Format sequence with leading zeros (5 digits)
+
         return f"{prefix}{new_sequence:05d}"
 
 

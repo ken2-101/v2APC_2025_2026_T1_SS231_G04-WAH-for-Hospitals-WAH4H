@@ -1,5 +1,5 @@
 // PatientRegistration.tsx
-import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,10 +15,15 @@ import type { Patient, PatientFormData } from '../types/patient';
 import axios from 'axios';
 
 // NOTE: Ensure trailing slash for Django
-const API_URL = 'http://127.0.0.1:8000/api/patients/';
+const API_URL = import.meta.env.BACKEND_PATIENTS;
+
+// How long (ms) to wait after the user stops typing before firing the search.
+const SEARCH_DEBOUNCE_MS = 350;
 
 export const PatientRegistration: React.FC = () => {
+  // The full "baseline" list returned by the server when there is no search.
   const [patients, setPatients] = useState<Patient[]>([]);
+  // The list currently shown in the table (baseline or search results).
   const [filteredPatients, setFilteredPatients] = useState<Patient[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showRegistrationModal, setShowRegistrationModal] = useState(false);
@@ -27,41 +32,11 @@ export const PatientRegistration: React.FC = () => {
   const [editPatient, setEditPatient] = useState<Patient | null>(null);
   const [deletePatient, setDeletePatient] = useState<Patient | null>(null);
 
-  const initialFormData: Omit<PatientFormData, 'patient_id'> = {
-    first_name: '',
-    last_name: '',
-    middle_name: '',
-    suffix_name: '',
-    gender: 'M',
-    birthdate: '',
-    civil_status: '',
-    nationality: '',
-    religion: '',
-    philhealth_id: '',
-    blood_type: '',
-    pwd_type: '',
-    occupation: '',
-    education: '',
-    mobile_number: '',
-    address_line: '',
-    address_city: '',
-    address_district: '',
-    address_state: '',
-    address_postal_code: '',
-    address_country: 'Philippines', // Default
-    contact_first_name: '',
-    contact_last_name: '',
-    contact_mobile_number: '',
-    contact_relationship: '',
-    indigenous_flag: false,
-    indigenous_group: '',
-    consent_flag: true
-  };
+  // Timer ref for debouncing the search input.
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [formData, setFormData] = useState({ ...initialFormData });
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState('');
-  const [formSuccess, setFormSuccess] = useState('');
   // WAH4PC integration state
   const [philHealthId, setPhilHealthId] = useState('');
   const [targetProvider, setTargetProvider] = useState('');
@@ -105,13 +80,15 @@ export const PatientRegistration: React.FC = () => {
     civilStatus: [] as string[],
   });
 
-  // Fetch patients
+  // Fetch the baseline patient list (no search term → all active patients).
   useEffect(() => { fetchPatients(); }, []);
+
   const fetchPatients = async () => {
     try {
       const res = await axios.get<Patient[]>(API_URL);
-      setPatients(Array.isArray(res.data) ? res.data : []);
-      setFilteredPatients(Array.isArray(res.data) ? res.data : []);
+      const data = Array.isArray(res.data) ? res.data : [];
+      setPatients(data);
+      setFilteredPatients(data);
     } catch (err) {
       console.error('Error fetching patients:', err);
       setPatients([]);
@@ -119,45 +96,79 @@ export const PatientRegistration: React.FC = () => {
     }
   };
 
-  // Filter & search
-  useEffect(() => {
-    let temp = [...patients];
-    if (activeFilters.status.length) {
+  /**
+   * Hit the server-side search endpoint and update the table.
+   * Called after the debounce delay so we don't fire on every keystroke.
+   */
+  const runServerSearch = useCallback(async (query: string) => {
+    if (!query.trim()) {
+      // Empty search → restore the baseline list and apply local filters.
+      applyLocalFilters(patients, activeFilters);
+      return;
+    }
+
+    try {
+      const res = await axios.get<Patient[]>(`${API_URL}search/`, {
+        params: { q: query, limit: 100 },
+      });
+      const results = Array.isArray(res.data) ? res.data : [];
+      // Apply the dropdown filters on top of the server search results.
+      applyLocalFilters(results, activeFilters);
+    } catch (err) {
+      console.error('Search error:', err);
+    }
+  }, [patients, activeFilters]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /**
+   * Apply the dropdown filters (status, gender, civil status) to a list.
+   * These are always local because they filter a small already-fetched set.
+   */
+  const applyLocalFilters = (source: Patient[], filters: typeof activeFilters) => {
+    let temp = [...source];
+    if (filters.status.length) {
       temp = temp.filter(p => {
-        const status = p.active ? 'Active' : 'Inactive';
-        return activeFilters.status.includes(status);
+        const s = p.active ? 'Active' : 'Inactive';
+        return filters.status.includes(s);
       });
     }
-    if (activeFilters.gender.length) temp = temp.filter(p => activeFilters.gender.includes(p.gender));
-    if (activeFilters.civilStatus.length) temp = temp.filter(p => activeFilters.civilStatus.includes(p.civil_status));
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      temp = temp.filter(
-        p => `${p.last_name} ${p.first_name} ${p.middle_name || ''}`.toLowerCase().includes(q) ||
-          (p.patient_id && p.patient_id.toLowerCase().includes(q)) ||
-          (p.mobile_number && p.mobile_number.includes(searchQuery))
-      );
-    }
+    if (filters.gender.length) temp = temp.filter(p => filters.gender.includes(p.gender));
+    if (filters.civilStatus.length) temp = temp.filter(p => filters.civilStatus.includes(p.civil_status));
     setFilteredPatients(temp);
-  }, [patients, activeFilters, searchQuery]);
+  };
 
-  // Form handlers
-  const handleFormChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+  // Re-apply filters whenever the dropdown filters change.
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      // Re-run the search so filter changes take effect on search results too.
+      runServerSearch(searchQuery);
+    } else {
+      applyLocalFilters(patients, activeFilters);
+    }
+  }, [activeFilters, patients]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /**
+   * Handle the search input change.
+   * Debounces the API call so we only fire after the user stops typing.
+   */
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+
+    // Cancel any pending debounce timer.
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+
+    searchDebounceRef.current = setTimeout(() => {
+      runServerSearch(value);
+    }, SEARCH_DEBOUNCE_MS);
   };
 
   const handleRegisterPatient = async (patientData: PatientFormData) => {
     setFormLoading(true);
     setFormError('');
-    setFormSuccess('');
     try {
-      const res = await axios.post(API_URL, patientData);
-      const registeredPatient: Patient = res.data;
-      setFormSuccess(`Patient registered successfully! ID: ${registeredPatient.patient_id}`);
-      // Don't close modal here - let modal close itself on success
+      await axios.post(API_URL, patientData);
+      // Refresh the baseline list so the new patient appears.
       fetchPatients();
-      // Return success - modal will close after this resolves
     } catch (err: any) {
       console.error('Full Axios error:', err);
       console.error('Error response data:', err.response?.data);
@@ -206,7 +217,7 @@ export const PatientRegistration: React.FC = () => {
               <Input
                 placeholder="Search patients..."
                 value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
+                onChange={handleSearchChange}
                 className="pl-8 max-w-sm"
               />
             </div>
