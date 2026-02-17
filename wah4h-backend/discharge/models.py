@@ -20,10 +20,16 @@ class Discharge(TimeStampedModel):
     created_by = models.CharField(max_length=255, null=True, blank=True)
     
     # Clinical documentation
+    final_diagnosis = models.TextField(null=True, blank=True)
     summary_of_stay = models.TextField(null=True, blank=True)
     discharge_instructions = models.TextField(null=True, blank=True)
     pending_items = models.TextField(null=True, blank=True)
     follow_up_plan = models.CharField(max_length=255, null=True, blank=True)
+    
+    # Discharge requirements checklist - Only track requirements from OTHER modules
+    # Discharge form fields (diagnosis, summary, follow-up) are tracked in the form itself
+    # Requirements: billing_cleared, medication_reconciliation, nursing_notes
+    requirements = models.JSONField(null=True, blank=True, default=dict)
     
     class Meta:
         db_table = 'discharge_summary'
