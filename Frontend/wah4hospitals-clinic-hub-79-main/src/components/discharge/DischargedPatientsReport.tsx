@@ -9,12 +9,12 @@ import { format } from 'date-fns';
 
 interface DischargedPatient {
   id: number;
-  patientName: string;
+  patient_name: string;  // Backend uses snake_case
   room: string;
-  admissionDate: string;
+  admission_date: string;  // Backend uses snake_case
   dischargeDate: string;
   condition: string;
-  physician: string;
+  physician_name: string;  // Backend uses snake_case
   department: string;
   age: number;
   finalDiagnosis: string;
@@ -38,15 +38,15 @@ export const DischargedPatientsReport: React.FC<DischargedPatientsReportProps> =
   };
 
   const handlePrintPatientPacket = (patient: DischargedPatient) => {
-    console.log(`Printing discharge packet for ${patient.patientName}...`);
+    console.log(`Printing discharge packet for ${patient.patient_name}...`);
   };
 
   const filteredPatients = dischargedPatients.filter(patient =>
-    patient.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.room.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.condition.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.physician.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.department.toLowerCase().includes(searchTerm.toLowerCase())
+    (patient.patient_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (patient.room || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (patient.condition || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (patient.physician_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (patient.department || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -127,7 +127,7 @@ export const DischargedPatientsReport: React.FC<DischargedPatientsReportProps> =
                 >
                   <div className="flex-1">
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-semibold text-lg">{patient.patientName}</h3>
+                      <h3 className="font-semibold text-lg">{patient.patient_name}</h3>
                       <DischargeStatusBadge status="discharged" />
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground">
@@ -141,10 +141,10 @@ export const DischargedPatientsReport: React.FC<DischargedPatientsReportProps> =
                         <span className="font-medium text-foreground">Department:</span> {patient.department}
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">Physician:</span> {patient.physician}
+                        <span className="font-medium text-foreground">Physician:</span> {patient.physician_name}
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">Admitted:</span> {patient.admissionDate}
+                        <span className="font-medium text-foreground">Admitted:</span> {patient.admission_date}
                       </div>
                       <div>
                         <span className="font-medium text-foreground">Discharged:</span> {patient.dischargeDate}
@@ -153,7 +153,7 @@ export const DischargedPatientsReport: React.FC<DischargedPatientsReportProps> =
                         <span className="font-medium text-foreground">Age:</span> {patient.age}
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">Follow-up:</span> 
+                        <span className="font-medium text-foreground">Follow-up:</span>
                         <span className={patient.followUpRequired ? 'text-yellow-600' : 'text-green-600'}>
                           {patient.followUpRequired ? ' Required' : ' Not Required'}
                         </span>
@@ -176,7 +176,7 @@ export const DischargedPatientsReport: React.FC<DischargedPatientsReportProps> =
 
             {filteredPatients.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">
-                {searchTerm ? 
+                {searchTerm ?
                   'No discharged patients found matching your search.' :
                   'No patients have been discharged yet.'
                 }

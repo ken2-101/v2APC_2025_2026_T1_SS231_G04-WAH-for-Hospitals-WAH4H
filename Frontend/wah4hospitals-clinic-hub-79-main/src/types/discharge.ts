@@ -35,26 +35,26 @@ export interface DischargeRecord {
 
 export interface PendingPatient {
   id: number;
-  patientName: string;
+  patient_name: string;  // Backend uses snake_case
   room: string;
-  admissionDate: string;
+  admission_date: string;  // Backend uses snake_case
   condition: string;
   status: 'pending' | 'ready' | 'discharged';
-  physician: string;
+  physician_name: string;  // Backend uses snake_case
   department: string;
   age: number;
-  estimatedDischarge: string;
+  estimatedDischarge?: string;
   requirements: DischargeRequirements;
 }
 
 export interface DischargedPatient {
   id: number;
-  patientName: string;
+  patient_name: string;  // Backend uses snake_case
   room: string;
-  admissionDate: string;
+  admission_date: string;  // Backend uses snake_case
   dischargeDate: string;
   condition: string;
-  physician: string;
+  physician_name: string;  // Backend uses snake_case
   department: string;
   age: number;
   finalDiagnosis: string;

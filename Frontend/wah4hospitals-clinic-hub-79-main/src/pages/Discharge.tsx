@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -68,7 +68,6 @@ interface DischargedPatient {
 
 const Discharge = () => {
   const [pendingDischarges, setPendingDischarges] = useState<PendingPatient[]>([]);
-
   const [dischargedPatients, setDischargedPatients] = useState<DischargedPatient[]>([]);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -95,6 +94,76 @@ const Discharge = () => {
   const [billingPatients, setBillingPatients] = useState<any[]>([]);
   const [selectedBillingIds, setSelectedBillingIds] = useState<number[]>([]);
   const [isLoadingBilling, setIsLoadingBilling] = useState(false);
+
+  // Load discharge data on mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        // Fetch pending discharges
+        const pendingData = await dischargeService.getPending();
+        setPendingDischarges(pendingData as any);
+
+        // Fetch discharged patients
+        const dischargedData = await dischargeService.getDischarged();
+        setDischargedPatients(dischargedData as any);
+      } catch (error) {
+        console.error('Error loading discharge data:', error);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  const handleSyncFromAdmissions = async () => {
+    try {
+      const result = await dischargeService.syncFromAdmissions();
+
+      if (result.success) {
+        alert(result.message || `Synced ${result.created} patient(s) from admissions`);
+
+        // Reload pending discharges to show newly synced patients
+        const pendingData = await dischargeService.getPending();
+        setPendingDischarges(pendingData as any);
+      } else {
+        alert('Failed to sync from admissions: ' + (result.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Error syncing from admissions:', error);
+      alert('Failed to sync from admissions. Please try again.');
+    }
+  };
+
+  const handleRequirementChange = async (patientId: number, requirementKey: string, value: boolean) => {
+    try {
+      // Find the patient to get current requirements
+      const patient = pendingDischarges.find(p => p.id === patientId);
+      if (!patient) return;
+
+      // Update requirements
+      const updatedRequirements = {
+        ...patient.requirements,
+        [requirementKey]: value
+      };
+
+      // Call API to update
+      await dischargeService.updateRequirements(patientId, updatedRequirements);
+
+      // Update local state
+      setPendingDischarges(prev => prev.map(p =>
+        p.id === patientId
+          ? { ...p, requirements: updatedRequirements }
+          : p
+      ));
+
+      // If this is the selected patient, update it too
+      if (selectedPatient?.id === patientId) {
+        setSelectedPatient(prev => prev ? { ...prev, requirements: updatedRequirements } : null);
+      }
+    } catch (error) {
+      console.error('Error updating requirement:', error);
+      alert('Failed to update requirement. Please try again.');
+    }
+  };
 
   const handlePrintDischarge = () => {
     console.log('Printing discharge report...');
@@ -164,7 +233,7 @@ const Discharge = () => {
     setIsLoadingBilling(true);
     try {
       const response = await dischargeService.createFromBilling(selectedBillingIds);
-      
+
       if (response.errors && response.errors.length > 0) {
         const errorMessages = response.errors.map((err: any) => err.error).join('\n');
         alert(`Some records could not be added:\n${errorMessages}\n\nSuccessfully added: ${response.created} patient(s)`);
@@ -187,7 +256,7 @@ const Discharge = () => {
     }
   };
 
-  const handleSubmitDischarge = () => {
+  const handleSubmitDischarge = async () => {
     if (!selectedPatient) return;
 
     if (!dischargeForm.finalDiagnosis || !dischargeForm.hospitalStaySummary) {
@@ -208,39 +277,44 @@ const Discharge = () => {
       return;
     }
 
-    // Move patient to discharged list
-    const dischargedPatient: DischargedPatient = {
-      id: Date.now(),
-      patientName: selectedPatient.patientName,
-      room: selectedPatient.room,
-      admissionDate: selectedPatient.admissionDate,
-      dischargeDate: new Date().toISOString().split('T')[0],
-      condition: selectedPatient.condition,
-      physician: selectedPatient.physician,
-      department: selectedPatient.department,
-      age: selectedPatient.age,
-      finalDiagnosis: dischargeForm.finalDiagnosis,
-      dischargeSummary: dischargeForm.hospitalStaySummary,
-      followUpRequired: !!dischargeForm.followUpPlan,
-      followUpPlan: dischargeForm.followUpPlan
-    };
+    try {
+      // Call backend API to process discharge
+      await dischargeService.processDischarge(selectedPatient.id, {
+        patientId: selectedPatient.id,
+        finalDiagnosis: dischargeForm.finalDiagnosis,
+        hospitalStaySummary: dischargeForm.hospitalStaySummary,
+        dischargeMedications: dischargeForm.dischargeMedications,
+        dischargeInstructions: dischargeForm.dischargeInstructions,
+        followUpPlan: dischargeForm.followUpPlan,
+        billingStatus: dischargeForm.billingStatus,
+        pendingItems: dischargeForm.pendingItems
+      });
 
-    setDischargedPatients(prev => [...prev, dischargedPatient]);
-    setPendingDischarges(prev => prev.filter(p => p.id !== selectedPatient.id));
+      alert(`Discharge completed successfully for ${selectedPatient.patientName}`);
 
-    alert(`Discharge completed successfully for ${selectedPatient.patientName}`);
-    setIsDischargeModalOpen(false);
-    setSelectedPatient(null);
-    setDischargeForm({
-      patientId: '',
-      finalDiagnosis: '',
-      hospitalStaySummary: '',
-      dischargeMedications: '',
-      dischargeInstructions: '',
-      followUpPlan: '',
-      billingStatus: '',
-      pendingItems: ''
-    });
+      // Reload data
+      const pendingData = await dischargeService.getPending();
+      setPendingDischarges(pendingData as any);
+
+      const dischargedData = await dischargeService.getDischarged();
+      setDischargedPatients(dischargedData as any);
+
+      setIsDischargeModalOpen(false);
+      setSelectedPatient(null);
+      setDischargeForm({
+        patientId: '',
+        finalDiagnosis: '',
+        hospitalStaySummary: '',
+        dischargeMedications: '',
+        dischargeInstructions: '',
+        followUpPlan: '',
+        billingStatus: '',
+        pendingItems: ''
+      });
+    } catch (error) {
+      console.error('Error processing discharge:', error);
+      alert('Failed to process discharge. Please try again.');
+    }
   };
 
   const canPrint = () => {
@@ -248,12 +322,13 @@ const Discharge = () => {
   };
 
   const filteredDischarges = pendingDischarges.filter(patient => {
-    const matchesSearch = patient.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      patient.room.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      patient.condition.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      patient.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      patient.physician.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      patient.department.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch =
+      (patient.patient_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (patient.room || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (patient.condition || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (patient.status || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (patient.physician_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (patient.department || '').toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus = activeFilters.status.length === 0 || activeFilters.status.includes(patient.status);
     const matchesDepartment = activeFilters.department.length === 0 || activeFilters.department.includes(patient.department);
@@ -273,21 +348,11 @@ const Discharge = () => {
         </div>
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <Button
-            onClick={handleLoadBillingPatients}
-            disabled={isLoadingBilling}
-            className="bg-primary hover:bg-primary/90 flex-1 sm:flex-none"
+            onClick={handleSyncFromAdmissions}
+            className="bg-blue-600 hover:bg-blue-700 flex-1 sm:flex-none"
           >
-            {isLoadingBilling ? (
-              <>
-                <AlertTriangle className="w-4 h-4 mr-2 animate-spin" />
-                Loading...
-              </>
-            ) : (
-              <>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Record
-              </>
-            )}
+            <Users className="w-4 h-4 mr-2" />
+            Sync with Admissions
           </Button>
           {canPrint() ? (
             <PrintButton
@@ -485,6 +550,7 @@ const Discharge = () => {
               {selectedPatient && (
                 <PendingItemsSection
                   requirements={selectedPatient.requirements}
+                  onRequirementChange={(key, value) => handleRequirementChange(selectedPatient.id, key, value)}
                   className="mb-6"
                 />
               )}
@@ -579,6 +645,7 @@ const Discharge = () => {
             {selectedPatient && (
               <PendingItemsSection
                 requirements={selectedPatient.requirements}
+                onRequirementChange={(key, value) => handleRequirementChange(selectedPatient.id, key, value)}
                 className="mb-6"
               />
             )}
@@ -680,11 +747,10 @@ const Discharge = () => {
                   {billingPatients.map((patient) => (
                     <div
                       key={patient.billing_id}
-                      className={`flex items-start p-4 border-2 rounded-lg transition-all cursor-pointer ${
-                        selectedBillingIds.includes(patient.billing_id)
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border hover:border-primary/50 hover:bg-muted/50'
-                      }`}
+                      className={`flex items-start p-4 border-2 rounded-lg transition-all cursor-pointer ${selectedBillingIds.includes(patient.billing_id)
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                        }`}
                       onClick={() => handleToggleBillingPatient(patient.billing_id)}
                     >
                       <div className="flex items-start gap-4 flex-1">
@@ -735,8 +801,8 @@ const Discharge = () => {
             )}
 
             <div className="flex justify-end space-x-3 pt-4 border-t">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => {
                   setIsAddRecordModalOpen(false);
                   setBillingPatients([]);
@@ -745,7 +811,7 @@ const Discharge = () => {
               >
                 Cancel
               </Button>
-              <Button 
+              <Button
                 onClick={handleImportFromBilling}
                 disabled={selectedBillingIds.length === 0 || isLoadingBilling}
                 className="bg-primary hover:bg-primary/90"

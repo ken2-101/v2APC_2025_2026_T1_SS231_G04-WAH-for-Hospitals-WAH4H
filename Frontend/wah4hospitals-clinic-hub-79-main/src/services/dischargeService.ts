@@ -180,4 +180,15 @@ export const dischargeService = {
       throw error;
     }
   },
+
+  // Sync admitted patients from admissions module
+  syncFromAdmissions: async (): Promise<any> => {
+    try {
+      const { data } = await api.post("sync_from_admissions/");
+      return data;
+    } catch (error) {
+      handleError(error);
+      throw error;
+    }
+  },
 };

@@ -16,45 +16,10 @@ logger = logging.getLogger(__name__)
 class DischargeViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing the Discharge workflow.
-    Optimized with prefetching and atomic discharge processing.
+    Simplified for MVP - direct queries in serializer.
     """
     queryset = Discharge.objects.all().order_by('-created_at')
     serializer_class = DischargeSerializer
-
-    def get_serializer_context(self):
-        """
-        Enrich context with a data map for O(1) lookups in the serializer.
-        Prevents N+1 queries during list serialization.
-        """
-        context = super().get_serializer_context()
-        if self.action in ['list', 'retrieve', 'pending', 'discharged']:
-            queryset = self.get_queryset()
-            if self.action == 'retrieve':
-                # Use obj since we might be retrieving a single object
-                pass 
-            
-            # Extract IDs for bulk fetching
-            patient_ids = list(queryset.values_list('patient_id', flat=True).distinct())
-            practitioner_ids = list(queryset.values_list('physician_id', flat=True).distinct())
-            encounter_ids = list(queryset.values_list('encounter_id', flat=True).distinct())
-
-            # Build data map
-            data_map = {
-                'patients': {
-                    p.id: f"{p.first_name} {p.last_name}" 
-                    for p in Patient.objects.filter(id__in=patient_ids)
-                },
-                'practitioners': {
-                    pr.practitioner_id: f"{pr.first_name} {pr.last_name}"
-                    for pr in Practitioner.objects.filter(practitioner_id__in=practitioner_ids)
-                },
-                'encounters': {
-                    e.encounter_id: e.identifier
-                    for e in Encounter.objects.filter(encounter_id__in=encounter_ids)
-                }
-            }
-            context['data_map'] = data_map
-        return context
 
     @action(detail=False, methods=['get'])
     def pending(self, request):
@@ -103,14 +68,64 @@ class DischargeViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(discharge_record)
         return response.Response(serializer.data)
 
+    @action(detail=False, methods=['post'])
+    def sync_from_admissions(self, request):
+        """
+        Syncs admitted patients from the Admission module.
+        Creates discharge records for any admitted patients not yet in the discharge queue.
+        """
+        try:
+            # Query for active inpatient encounters
+            active_encounters = Encounter.objects.filter(
+                class_field__in=['IMP', 'inpatient'],
+                status__in=['in-progress', 'arrived']
+            )
+            
+            created_count = 0
+            skipped_count = 0
+            
+            for encounter in active_encounters:
+                # Check if discharge record already exists
+                if not Discharge.objects.filter(encounter_id=encounter.encounter_id).exists():
+                    try:
+                        Discharge.objects.create(
+                            encounter_id=encounter.encounter_id,
+                            patient_id=encounter.subject_id,
+                            physician_id=encounter.participant_individual_id if hasattr(encounter, 'participant_individual_id') else None,
+                            workflow_status='pending',
+                            created_by='SYSTEM (Sync from Admissions)'
+                        )
+                        created_count += 1
+                    except Exception as e:
+                        logger.error(f"Failed to create discharge record for encounter {encounter.encounter_id}: {str(e)}")
+                        skipped_count += 1
+                else:
+                    skipped_count += 1
+            
+            return response.Response({
+                'success': True,
+                'created': created_count,
+                'skipped': skipped_count,
+                'total_active_encounters': active_encounters.count(),
+                'message': f'Successfully synced {created_count} patient(s) from admissions'
+            })
+        
+        except Exception as e:
+            logger.error(f"Error syncing from admissions: {str(e)}")
+            return response.Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     @action(detail=True, methods=['patch'])
     def update_requirements(self, request, pk=None):
         """Updates the discharge requirements checklist."""
         discharge_record = self.get_object()
-        # Simple implementation for MVP checklist
-        # In a full FHIR implementation, this might be a QuestionaireResponse
         requirements = request.data.get('requirements', {})
-        discharge_record.pending_items = str(requirements)
+        
+        # Store requirements as JSON in pending_items field
+        import json
+        discharge_record.pending_items = json.dumps(requirements)
         discharge_record.save()
         
         serializer = self.get_serializer(discharge_record)
