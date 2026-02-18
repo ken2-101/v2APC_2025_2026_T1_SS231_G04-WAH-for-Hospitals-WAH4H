@@ -200,6 +200,19 @@ export const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({
    };
 
 
+   // Helper to calculate age
+   const calculateAge = (dob: string) => {
+      if (!dob) return 'N/A';
+      const birthDate = new Date(dob);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const m = today.getMonth() - birthDate.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+         age--;
+      }
+      return age;
+   };
+
    const renderHeader = () => (
       <div className="bg-blue-600 p-6 text-white text-left">
          <div className="flex justify-between items-start">
@@ -212,7 +225,7 @@ export const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({
                </div>
                <div className="flex gap-4 text-sm mt-1 opacity-90">
                   <span>Patient ID: {data.patientId || 'N/A'}</span>
-                  <span>Age: {data.patient_summary?.age || 'N/A'}</span>
+                  <span>Age: {calculateAge(data.patient_summary?.birthdate)}</span>
                   <span>Sex: {data.patient_summary?.gender || 'N/A'}</span>
                </div>
                <div className="flex gap-6 mt-4 text-sm font-medium">
