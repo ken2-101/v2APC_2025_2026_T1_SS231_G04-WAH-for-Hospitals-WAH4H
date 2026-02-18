@@ -196,19 +196,7 @@ export const LabResultViewModal: React.FC<LabResultViewModalProps> = ({ isOpen, 
                         </div>
                     )}
 
-                    {/* Footer / Signatories - Compact for Print */}
-                    <div className="grid grid-cols-2 gap-8 mt-8 border-t pt-6 print:mt-4 print:pt-4 print:gap-4 print:border-t-black">
-                        <div>
-                            <p className="text-xs text-gray-500 uppercase font-semibold print:text-black">Performed By:</p>
-                            <p className="text-sm font-bold text-gray-900 mt-1 print:text-sm">{request.result?.medical_technologist || '—'}</p>
-                            <p className="text-xs text-gray-500 print:text-xs">Lic. No. {request.result?.prc_number || '—'}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-gray-500 uppercase font-semibold print:text-black">Verified By:</p>
-                            <p className="text-sm font-bold text-gray-900 mt-1 print:text-sm">{request.released_by || '—'}</p>
-                            <p className="text-xs text-gray-500 print:text-xs">Pathologist / Physician</p>
-                        </div>
-                    </div>
+
                 </div>
             </div>
         </div>
