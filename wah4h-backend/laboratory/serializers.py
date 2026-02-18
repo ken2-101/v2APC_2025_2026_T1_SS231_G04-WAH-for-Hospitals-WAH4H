@@ -64,18 +64,8 @@ class DiagnosticReportResultSerializer(serializers.Serializer):
                 elif obs.reference_range_text:
                     ref_range = obs.reference_range_text
                 
-                # Determine flag based on interpretation or value comparison
+                # Automatic flagging/interpretation logic removed as per requirements
                 flag = None
-                if obs.interpretation:
-                    interp_lower = obs.interpretation.lower()
-                    if 'high' in interp_lower or 'increased' in interp_lower:
-                        flag = 'HIGH'
-                    elif 'low' in interp_lower or 'decreased' in interp_lower:
-                        flag = 'LOW'
-                    elif 'critical' in interp_lower:
-                        flag = 'CRITICAL'
-                    else:
-                        flag = 'NORMAL'
                 
                 return {
                     'parameter': obs.code or 'Unknown',

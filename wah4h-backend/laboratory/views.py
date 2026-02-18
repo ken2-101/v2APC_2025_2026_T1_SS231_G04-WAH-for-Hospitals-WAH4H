@@ -83,6 +83,7 @@ class DiagnosticReportViewSet(viewsets.ModelViewSet):
         'code_code': ['exact', 'icontains'],
         'category_code': ['exact'],
         'priority': ['exact'],  # Enable priority filtering
+        'issued_datetime': ['exact', 'isnull'],
     }
     
     ordering_fields = [
