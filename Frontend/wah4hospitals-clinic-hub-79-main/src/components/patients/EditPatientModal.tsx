@@ -8,7 +8,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { X, AlertCircle } from 'lucide-react';
 import type { Patient, PatientFormData } from '../../types/patient';
@@ -40,6 +40,7 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
   patient,
   onClose,
   onSuccess,
+  fetchPatients,
   isLoading = false,
   error,
 }) => {
@@ -125,13 +126,13 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader className="flex items-center justify-between">
-          <DialogTitle>Edit Patient - {String(patient.patient_id || '').toUpperCase()}</DialogTitle>
-          <DialogClose asChild>
-            <Button variant="ghost" size="sm" aria-label="Close">
+        <DialogHeader>
+          <div className="flex items-center justify-between">
+            <DialogTitle>Edit Patient - {String(patient.patient_id || '').toUpperCase()}</DialogTitle>
+            <Button variant="ghost" size="sm" aria-label="Close" onClick={onClose}>
               <X className="w-5 h-5" />
             </Button>
-          </DialogClose>
+          </div>
         </DialogHeader>
 
         {/* Prop-level error (e.g. passed by parent) */}
@@ -251,6 +252,7 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
                 <SelectField
                   label="Region"
                   error={errors.address_state}
+                  value={selectedRegion || ''}
                   {...register('address_state', {
                     onChange: () => {
                       setValue('address_district', '');
@@ -266,10 +268,11 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
                     })),
                   ]}
                 />
-                {/* Province — never disabled; options derive from watched region */}
+                {/* Province — options derive from watched region */}
                 <SelectField
                   label="Province"
                   error={errors.address_district}
+                  value={selectedProvince || ''}
                   {...register('address_district', {
                     onChange: () => {
                       setValue('address_city', '');
@@ -289,10 +292,11 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* City — never disabled; options derive from watched province */}
+                {/* City — options derive from watched province */}
                 <SelectField
                   label="City/Municipality"
                   error={errors.address_city}
+                  value={selectedCity || ''}
                   {...register('address_city', {
                     onChange: () => {
                       setValue('address_line', '');
@@ -308,10 +312,11 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
                       : []),
                   ]}
                 />
-                {/* Barangay — never disabled; options derive from watched city */}
+                {/* Barangay — options derive from watched city */}
                 <SelectField
                   label="Barangay"
                   error={errors.address_line}
+                  value={watch('address_line') || ''}
                   {...register('address_line')}
                   options={[
                     { value: '', label: selectedCity ? 'Select Barangay' : 'Select a city first' },

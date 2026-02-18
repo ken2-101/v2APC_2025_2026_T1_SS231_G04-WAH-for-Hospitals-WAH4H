@@ -158,6 +158,7 @@ export const patientFormDataSchema = z.object({
   // Step 4: Additional Info (merged into Step 1)
   nationality: optionalString(255),
   religion: optionalString(255),
+  race: optionalString(255),
   occupation: optionalString(255),
   education: optionalString(255),
   philhealth_id: philhealthIdSchema,
