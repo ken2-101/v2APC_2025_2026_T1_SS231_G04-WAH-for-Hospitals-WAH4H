@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Lock, Paperclip, FileText, Clock, User } from 'lucide-react';
+import { Plus, Lock, Paperclip, FileText, Clock, User, Trash2 } from 'lucide-react';
 import { ClinicalNote } from '../../types/monitoring';
 import monitoringService from '../../services/monitoringService';
 import { toast } from 'sonner';
@@ -16,8 +16,9 @@ import { toast } from 'sonner';
 interface ClinicalNotesTabProps {
     notes: ClinicalNote[];
     admissionId: string;
-    patientId: number; // Added to get subject_id for service
-    onAddNote: (note: ClinicalNote) => void;
+    patientId: number;
+    onAddNote: (note: ClinicalNote) => Promise<void>;
+    onDeleteNote: (noteId: string) => Promise<void>;
 }
 
 export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({
@@ -25,10 +26,13 @@ export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({
     admissionId,
     patientId,
     onAddNote,
+    onDeleteNote,
 }) => {
     const { user } = useAuth();
     const { currentRole } = useRole();
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [isDeleting, setIsDeleting] = useState<string | null>(null);
     const [type, setType] = useState<'SOAP' | 'Progress'>('SOAP');
     const [subjective, setSubjective] = useState('');
     const [objective, setObjective] = useState('');
@@ -43,6 +47,7 @@ export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({
     };
 
     const handleSave = async () => {
+        setIsSaving(true);
         const newNote: ClinicalNote = {
             id: Date.now().toString(), // Temporary ID for frontend rendering
             admissionId,
@@ -56,14 +61,31 @@ export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({
         };
 
         try {
-            await monitoringService.addNote(newNote, patientId);
-            onAddNote(newNote); // Update parent state
+            // Updated: Delegate save operation to parent via onAddNote to avoid duplicate API calls
+            await onAddNote(newNote); 
             toast.success('Clinical note added successfully');
             setIsModalOpen(false);
             resetForm();
         } catch (err: any) {
             console.error('Failed to save note', err);
             toast.error('Failed to save note. Please try again.');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleDelete = async (noteId: string) => {
+        if (!confirm('Are you sure you want to delete this clinical note? This action cannot be undone.')) return;
+        
+        setIsDeleting(noteId);
+        try {
+            await onDeleteNote(noteId);
+            toast.success('Clinical note deleted successfully');
+        } catch (err) {
+            console.error('Failed to delete note', err);
+            toast.error('Failed to delete note');
+        } finally {
+            setIsDeleting(null);
         }
     };
 
@@ -115,13 +137,26 @@ export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({
                                                 minute: '2-digit'
                                             })}
                                         </span>
-                                        <span className="flex items-center gap-1">
-                                            <User className="w-3 h-3" />
-                                            {note.providerName || 'Unknown Provider'}
-                                        </span>
                                     </div>
                                 </div>
-                                <Lock className="w-4 h-4 text-gray-400" />
+                                <div className="flex items-center gap-2">
+                                     {(currentRole === 'doctor' || currentRole === 'nurse') && (
+                                        <Button 
+                                            variant="ghost" 
+                                            size="sm" 
+                                            onClick={() => handleDelete(note.id)}
+                                            disabled={isDeleting === note.id}
+                                            className="text-gray-400 hover:text-red-600 hover:bg-red-50 p-1 h-auto"
+                                        >
+                                            {isDeleting === note.id ? (
+                                                <Clock className="w-4 h-4 animate-spin" />
+                                            ) : (
+                                                <Trash2 className="w-4 h-4" />
+                                            )}
+                                        </Button>
+                                    )}
+                                    <Lock className="w-4 h-4 text-gray-400" />
+                                </div>
                             </div>
                         </CardHeader>
 
@@ -268,8 +303,8 @@ export const ClinicalNotesTab: React.FC<ClinicalNotesTabProps> = ({
                         <Button variant="outline" onClick={() => setIsModalOpen(false)}>
                             Cancel
                         </Button>
-                        <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700">
-                            Finalize & Sign Note
+                        <Button onClick={handleSave} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700">
+                            {isSaving ? 'Signing...' : 'Finalize & Sign Note'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

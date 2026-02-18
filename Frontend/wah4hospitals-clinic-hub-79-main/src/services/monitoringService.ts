@@ -248,6 +248,18 @@ class MonitoringService {
     }
 
     /**
+     * Delete Note
+     */
+    async deleteNote(id: string): Promise<void> {
+        try {
+            await api.delete(`${MONITORING_BASE_URL}/observations/${id}/`);
+        } catch (error: any) {
+            console.error('Error deleting clinical note:', error);
+            throw new Error(JSON.stringify(error.response?.data) || 'Failed to delete clinical note');
+        }
+    }
+
+    /**
      * Get Dietary (Mapped from Observations)
      */
     async getDietary(encounterId: number): Promise<DietaryOrder | null> {

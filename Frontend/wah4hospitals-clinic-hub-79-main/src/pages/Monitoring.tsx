@@ -177,6 +177,19 @@ const Monitoring: React.FC = () => {
       setNotes(updatedNotes);
     } catch (err) {
       console.error(err);
+      throw err; // Propagate error for UI feedback
+    }
+  };
+
+  const handleDeleteNote = async (noteId: string) => {
+    if (!selectedAdmission) return;
+    try {
+      await monitoringService.deleteNote(noteId);
+      const updatedNotes = await monitoringService.getNotes(selectedAdmission.id);
+      setNotes(updatedNotes);
+    } catch (err) {
+      console.error('Error deleting note:', err);
+      throw err;
     }
   };
 
@@ -544,6 +557,7 @@ const Monitoring: React.FC = () => {
                     patientId={selectedAdmission.patientId}
                     notes={notes}
                     onAddNote={handleAddNote}
+                    onDeleteNote={handleDeleteNote}
                   />
                 </TabsContent>
 
