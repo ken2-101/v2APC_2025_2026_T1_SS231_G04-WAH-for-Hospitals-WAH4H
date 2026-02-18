@@ -29,12 +29,70 @@ const handleError = (error: any) => {
   throw error;
 };
 
+/**
+ * Mapper to align backend camelCase response with frontend snake_case types.
+ * This ensures consistency with other modules (Admission, Pharmacy, etc.)
+ * and fixes the empty dashboard issue.
+ */
+const mapToDischargeRecord = (d: any): DischargeRecord => ({
+  id: d.id,
+  patient_id: d.patient,
+  encounter_id: d.admission,
+  patient_name: d.patientName || "Unknown Patient",
+  room: d.room || "Unassigned",
+  admission_date: d.admissionDate,
+  discharge_date: d.dischargeDate,
+  condition: d.condition || "Stable",
+  status: d.status,
+  physician_name: d.physician || "Dr. On-Duty",
+  department: d.department || "General",
+  age: d.age || 0,
+  estimated_discharge: d.estimatedDischarge,
+  requirements: d.requirements,
+  final_diagnosis: d.finalDiagnosis,
+  discharge_summary: d.dischargeSummary,
+  follow_up_required: d.followUpRequired,
+  follow_up_plan: d.followUpPlan,
+  created_at: d.created_at,
+  updated_at: d.updated_at,
+});
+
+const mapToPendingPatient = (d: any): PendingPatient => ({
+  id: d.id,
+  patient_name: d.patientName || "Unknown Patient",
+  room: d.room || "Unassigned",
+  admission_date: d.admissionDate,
+  condition: d.condition || "Stable",
+  status: d.status,
+  physician_name: d.physician || "Dr. On-Duty",
+  department: d.department || "General",
+  age: d.age || 0,
+  estimated_discharge: d.estimatedDischarge,
+  requirements: d.requirements,
+});
+
+const mapToDischargedPatient = (d: any): DischargedPatient => ({
+  id: d.id,
+  patient_name: d.patientName || "Unknown Patient",
+  room: d.room || "Unassigned",
+  admission_date: d.admissionDate,
+  discharge_date: d.dischargeDate,
+  condition: d.condition || "Stable",
+  physician_name: d.physician || "Dr. On-Duty",
+  department: d.department || "General",
+  age: d.age || 0,
+  final_diagnosis: d.finalDiagnosis,
+  discharge_summary: d.dischargeSummary,
+  follow_up_required: d.followUpRequired,
+  follow_up_plan: d.followUpPlan,
+});
+
 export const dischargeService = {
   // Get all discharge records
   getAll: async (): Promise<DischargeRecord[]> => {
     try {
-      const { data } = await api.get<DischargeRecord[]>("");
-      return data;
+      const { data } = await api.get<any[]>("");
+      return Array.isArray(data) ? data.map(mapToDischargeRecord) : [];
     } catch (error) {
       handleError(error);
       return [];
@@ -44,8 +102,8 @@ export const dischargeService = {
   // Get a single discharge record by ID
   getById: async (id: number): Promise<DischargeRecord> => {
     try {
-      const { data } = await api.get<DischargeRecord>(`${id}/`);
-      return data;
+      const { data } = await api.get<any>(`${id}/`);
+      return mapToDischargeRecord(data);
     } catch (error) {
       handleError(error);
       throw error;
@@ -55,8 +113,8 @@ export const dischargeService = {
   // Get pending discharges (pending or ready status)
   getPending: async (): Promise<PendingPatient[]> => {
     try {
-      const { data } = await api.get<PendingPatient[]>("pending/");
-      return data;
+      const { data } = await api.get<any[]>("pending/");
+      return Array.isArray(data) ? data.map(mapToPendingPatient) : [];
     } catch (error) {
       handleError(error);
       return [];
@@ -66,8 +124,8 @@ export const dischargeService = {
   // Get discharged patients
   getDischarged: async (): Promise<DischargedPatient[]> => {
     try {
-      const { data } = await api.get<DischargedPatient[]>("discharged/");
-      return data;
+      const { data } = await api.get<any[]>("discharged/");
+      return Array.isArray(data) ? data.map(mapToDischargedPatient) : [];
     } catch (error) {
       handleError(error);
       return [];

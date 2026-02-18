@@ -62,7 +62,7 @@ class DischargeWorkflowTests(APITestCase):
         discharge = Discharge.objects.get(encounter_id=encounter.encounter_id)
         
         # 2. Call process_discharge action
-        url = reverse('discharge-record-process-discharge', kwargs={'pk': discharge.discharge_id})
+        url = reverse('discharge-process-discharge', kwargs={'pk': discharge.discharge_id})
         response = self.client.post(url, {'discharge_datetime': '2026-02-17T20:40:00Z'}, format='json')
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -89,18 +89,14 @@ class DischargeWorkflowTests(APITestCase):
         discharge.physician_id = self.practitioner.practitioner_id
         discharge.save()
         
-        # Mock context for O(1) lookups
-        context = {
-            'data_map': {
-                'patients': {self.patient.id: "Test Patient"},
-                'practitioners': {self.practitioner.practitioner_id: "Test Doctor"},
-                'encounters': {encounter.encounter_id: "ENC-DIS-003"}
-            }
-        }
+        # Attach pre-fetched objects as expected by the optimized serializer
+        discharge.patient_obj = self.patient
+        discharge.encounter_obj = encounter
+        discharge.encounter_obj.practitioner_obj = self.practitioner
         
-        serializer = DischargeSerializer(discharge, context=context)
+        serializer = DischargeSerializer(discharge)
         data = serializer.data
         
-        self.assertEqual(data['patient_name'], "Test Patient")
-        self.assertEqual(data['physician_name'], "Test Doctor")
-        self.assertEqual(data['encounter_identifier'], "ENC-DIS-003")
+        self.assertEqual(data['patientName'], "Test Patient")
+        self.assertEqual(data['physician'], "Dr. Test Doctor")
+        self.assertEqual(data['id'], discharge.discharge_id)

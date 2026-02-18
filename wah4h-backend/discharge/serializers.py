@@ -41,7 +41,7 @@ class DischargeSerializer(serializers.ModelSerializer):
             'id', 'discharge_id', 'encounter_id', 'patient', 'admission', 'physician_id',
             'discharge_datetime', 'notice_datetime', 'billing_cleared_datetime',
             'status', 'workflow_status', 'created_by', 'summary_of_stay',
-            'discharge_instructions', 'pending_items', 'follow_up_plan',
+            'discharge_instructions', 'pending_items', 'follow_up_plan', 'followUpPlan',
             'patientName', 'room', 'age', 'department', 'condition', 
             'admissionDate', 'dischargeDate', 'estimatedDischarge',
             'physician', 'finalDiagnosis', 'dischargeSummary', 
