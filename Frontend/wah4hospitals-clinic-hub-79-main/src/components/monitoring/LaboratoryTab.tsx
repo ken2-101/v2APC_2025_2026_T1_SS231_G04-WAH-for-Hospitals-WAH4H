@@ -15,6 +15,7 @@ import { LabResultViewModal } from '../laboratory/LabResultViewModal';
 
 interface LaboratoryTabProps {
     labRequests: LabRequest[];
+    currentUserName?: string;
     patientName?: string;
     patientId?: string;
     onAddRequest?: (request: Omit<LabRequest, 'id'>) => void;
@@ -38,6 +39,7 @@ const COMMON_LAB_TESTS: { code: LabTestType; name: string }[] = [
 
 export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
     labRequests,
+    currentUserName,
     patientName = 'Unknown Patient',
     patientId = '',
     onAddRequest,
@@ -99,7 +101,8 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
             priority: orderForm.priority,
             notes: orderForm.notes,
             lifecycleStatus: 'requested', // Default to requested (Active/Registered)
-            orderedBy: currentRole,
+            lifecycleStatus: 'requested', // Default to requested (Active/Registered)
+            orderedBy: currentUserName || currentRole,
             orderedAt: new Date().toISOString(),
             patient_name: patientName,
             patient_id: patientId,

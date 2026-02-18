@@ -290,33 +290,36 @@ const ModernLayout: React.FC<ModernLayoutProps> = ({
                     <div className="w-8 h-8 gradient-primary rounded-full flex items-center justify-center">
                       <span className="text-white font-medium">
                         {(() => {
-                          if (!user) return 'GU';
-                          // Support both snake_case and camelCase for robustness
-                          const fName = (user as any).firstName || (user as any).first_name || '';
-                          const lName = (user as any).lastName || (user as any).last_name || '';
+                          const fName = ((user as any)?.firstName || (user as any)?.first_name || '').trim();
+                          const lName = ((user as any)?.lastName || (user as any)?.last_name || '').trim();
 
                           if (fName && lName) {
                             return `${fName[0]}${lName[0]}`.toUpperCase();
                           }
                           if (fName) {
-                            const parts = fName.trim().split(/\s+/);
+                            // If only first name, try to split it
+                            const parts = fName.split(/\s+/);
                             if (parts.length > 1) {
                               return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
                             }
-                            return fName[0].toUpperCase();
+                            return fName.slice(0, 2).toUpperCase();
                           }
-                          return 'U';
+                          if (lName) {
+                            return lName.slice(0, 2).toUpperCase();
+                          }
+                          return 'GU';
                         })()}
                       </span>
                     </div>
                     <div className="text-left hidden md:block">
                       <p className="text-sm font-medium">
                         {(() => {
-                          if (!user) return 'Guest User';
-                          const fName = (user as any).firstName || (user as any).first_name;
-                          const lName = (user as any).lastName || (user as any).last_name;
-                          if (fName && lName) return `${fName} ${lName}`;
-                          return fName || lName || 'Unknown User';
+                           if (!user) return 'Guest User';
+                           const fName = ((user as any)?.firstName || (user as any)?.first_name || '').trim();
+                           const lName = ((user as any)?.lastName || (user as any)?.last_name || '').trim();
+                           
+                           if (fName && lName) return `${fName} ${lName}`;
+                           return fName || lName || 'Unknown User';
                         })()}
                       </p>
                       <p className="text-xs text-gray-500">{getRoleDisplayName()}</p>

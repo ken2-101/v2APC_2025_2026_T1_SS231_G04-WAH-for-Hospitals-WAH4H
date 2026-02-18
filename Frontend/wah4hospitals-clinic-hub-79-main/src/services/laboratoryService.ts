@@ -181,7 +181,8 @@ export const laboratoryService = {
       category_code: 'LAB',
       priority: data.priority,
       status: 'requested',
-      conclusion: data.clinical_reason || ''
+      conclusion: data.clinical_reason || '',
+      requester_name: data.requester_name // Pass explicit name if available
     };
 
     const response = await api.post(`${LABORATORY_BASE_URL}/reports/`, payload);

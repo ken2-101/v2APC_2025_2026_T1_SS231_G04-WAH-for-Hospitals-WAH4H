@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Search, Activity, Users, AlertTriangle, Heart, User, ChevronRight, ArrowLeft, Clock } from 'lucide-react';
@@ -26,6 +27,7 @@ import laboratoryService from '@/services/laboratoryService';  // For lab reques
 
 const Monitoring: React.FC = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [admissions, setAdmissions] = useState<MonitoringAdmission[]>([]);
   const [selectedAdmission, setSelectedAdmission] = useState<MonitoringAdmission | null>(null);
 
@@ -209,10 +211,11 @@ const Monitoring: React.FC = () => {
       const labRequestPayload = {
         subject_id: selectedAdmission.patientId,
         admission: selectedAdmission.id,  // Backend expects 'admission', not 'encounter_id'
-        requesting_doctor: null,  // Will be set by backend based on current user
+        requesting_doctor: user ? parseInt(user.id) : null,  // Use current user ID to override token if backend supports it
         test_type: request.testCode as any,  // Type assertion for cross-module integration
         priority: request.priority as any,  // Type assertion for cross-module integration
-        clinical_reason: request.notes
+        clinical_reason: request.notes,
+        requester_name: request.orderedBy // Pass frontend user name to service
       };
 
       console.log('Creating lab request with payload:', labRequestPayload);
@@ -560,6 +563,13 @@ const Monitoring: React.FC = () => {
                 <TabsContent value="laboratory">
                   <LaboratoryTab
                     labRequests={labRequests}
+                    currentUserName={(() => {
+                        if (!user) return '';
+                        const fName = ((user as any)?.firstName || (user as any)?.first_name || '').trim();
+                        const lName = ((user as any)?.lastName || (user as any)?.last_name || '').trim();
+                        const fullName = fName && lName ? `${fName} ${lName}` : (fName || lName || '');
+                        return ((user as any).role === 'doctor' && fullName) ? `Dr. ${fullName}` : fullName;
+                    })()}
                     onAddRequest={handleAddLabRequest}
                     onUpdateResult={handleUpdateLabResult}
                     onVerifyRequest={handleVerifyLabRequest}

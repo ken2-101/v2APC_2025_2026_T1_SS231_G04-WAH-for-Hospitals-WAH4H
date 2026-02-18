@@ -102,7 +102,7 @@ const PharmacistDashboard: React.FC<PharmacistDashboardProps> = ({ visibleWidget
             {recentTasks.length > 0 ? (
               <div className="space-y-4">
                 {recentTasks.map((task, index) => (
-                  <div key={index} className="flex items-center space-x-4 p-3 border border-border/40 rounded-lg hover:border-primary/30 hover:bg-accent/5 transition-all group cursor-pointer">
+                  <div key={index} className="flex items-center space-x-4 p-3 border border-border/40 rounded-lg">
                     <div className={cn("p-2 rounded-md", task.urgent ? "bg-red-50 text-red-600" : "bg-blue-50 text-blue-600")}>
                       {task.icon}
                     </div>
@@ -118,9 +118,7 @@ const PharmacistDashboard: React.FC<PharmacistDashboardProps> = ({ visibleWidget
                     )}>
                       {task.count}
                     </div>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="w-4 h-4" >→</div>
-                    </Button>
+
                   </div>
                 ))}
               </div>

@@ -116,6 +116,7 @@ export interface LabRequestFormData {
   test_type: LabTestType;
   priority: LabPriority;
   clinical_reason?: string;
+  requester_name?: string; // Optional - allow frontend to specify requester name directly
 }
 
 // Dashboard Stats
