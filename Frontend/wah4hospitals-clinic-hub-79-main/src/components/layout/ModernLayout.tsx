@@ -213,71 +213,22 @@ const ModernLayout: React.FC<ModernLayoutProps> = ({
             </div>
           </div>
 
-          {/* Item 2: Search Bar (grid area: two - spans 2 cols on mobile, center col on desktop) */}
+
+          {/* Item 2: Empty Spacer (was Search Bar) */}
           <div className="col-start-1 col-end-3 row-start-2 row-end-3 sm:col-start-2 sm:col-end-3 sm:row-start-1 sm:row-end-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input
-                placeholder="Search patients, records, or modules..."
-                className="pl-10 input-modern w-full"
-              />
-            </div>
+             {/* Search bar removed */}
           </div>
 
           {/* Item 3: Right Actions (grid area: three) */}
           <div className="col-start-2 col-end-3 row-start-1 row-end-2 sm:col-start-3 sm:col-end-4 flex items-center justify-end">
             <div className="flex items-center space-x-4">
-              {/* Notifications */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="relative hover-lift">
-                    <Bell className="w-5 h-5" />
-                    {notifications.length > 0 && (
-                      <Badge className="justify-center absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs bg-red-500 text-white">
-                        {2}
-                      </Badge>
-                    )}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-80 modal-content">
-                  <div className="p-4 border-b">
-                    <h3 className="font-semibold">Notifications</h3>
-                  </div>
-                  <div className="max-h-64 overflow-y-auto">
-                    {notifications.map((notification) => (
-                      <DropdownMenuItem key={notification.id} className="p-4 border-b last:border-b-0">
-                        <div className="flex items-start space-x-3">
-                          <div
-                            className={`w-2 h-2 rounded-full mt-2 ${notification.type === 'success'
-                                ? 'bg-green-500'
-                                : notification.type === 'warning'
-                                  ? 'bg-yellow-500'
-                                  : 'bg-blue-500'
-                              }`}
-                          />
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">{notification.title}</p>
-                            <p className="text-xs text-gray-500">{notification.time}</p>
-                          </div>
-                        </div>
-                      </DropdownMenuItem>
-                    ))}
-                  </div>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              {/* Help */}
+              
+              {/* Help Only */}
               <HelpSupportModal>
                 <Button variant="ghost" size="sm" className="hover-lift">
                   <HelpCircle className="w-5 h-5" />
                 </Button>
               </HelpSupportModal>
-
-              {/* Customization */}
-              <CustomizationPanel
-                isDarkMode={isDarkMode}
-                onToggleDarkMode={setIsDarkMode}
-              />
 
               {/* User Menu */}
               <DropdownMenu>

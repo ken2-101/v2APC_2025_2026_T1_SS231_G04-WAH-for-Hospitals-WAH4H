@@ -79,8 +79,7 @@ const roleAccessConfig: Record<UserRole, string[]> = {
     'laboratory',     // Order and review lab tests
     'monitoring',     // Monitor patient vital signs and progress
     'discharge',      // Discharge patients and create discharge summaries
-    'appointments',   // View and manage patient appointments
-    'philhealth',     // View insurance coverage for treatment decisions
+    'discharge',      // Discharge patients and create discharge summaries
     'settings',       // Personal settings
   ],
 
@@ -94,7 +93,6 @@ const roleAccessConfig: Record<UserRole, string[]> = {
     'laboratory',     // View lab results for patient care
     'pharmacy',       // View medication orders for administration
     'inventory',      // Manage medical supplies and equipment
-    'appointments',   // Coordinate patient scheduling
     'settings',       // Personal settings
   ],
 
@@ -125,7 +123,7 @@ const roleAccessConfig: Record<UserRole, string[]> = {
   billing_clerk: [
     'dashboard',      // View billing summaries and pending claims
     'billing',        // Create and manage invoices
-    'philhealth',     // Process insurance claims
+    'billing',        // Create and manage invoices
     'erp',            // Financial reporting and integration
     'patients',       // Access patient information for billing
     'settings',       // Personal settings

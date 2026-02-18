@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { UserX, FileText, CheckCircle, Search, Filter, X, Plus, AlertTriangle, Users, Download } from 'lucide-react';
+import { UserX, FileText, CheckCircle, Search, Filter, X, Plus, AlertTriangle, Users, Download, RefreshCw, Trash2 } from 'lucide-react';
 import { PrintButton } from '@/components/ui/PrintButton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -333,33 +333,13 @@ const Discharge = () => {
         </div>
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <Button
-            onClick={handleLoadBillingPatients}
-            variant="outline"
-            className="flex-1 sm:flex-none"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add from Billing
-          </Button>
-          <Button
             onClick={handleSyncFromAdmissions}
             className="bg-blue-600 hover:bg-blue-700 flex-1 sm:flex-none"
           >
-            <Users className="w-4 h-4 mr-2" />
-            Sync with Admissions
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Refresh Module
           </Button>
-          {canPrint() ? (
-            <PrintButton
-              onPrint={handlePrintDischarge}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              Print Available - {dischargedPatients.length} Patients
-            </PrintButton>
-          ) : (
-            <Button disabled variant="outline" className="cursor-not-allowed">
-              <FileText className="w-4 h-4 mr-2" />
-              No Discharged Patients to Print
-            </Button>
-          )}
+
         </div>
       </div>
 
@@ -380,7 +360,7 @@ const Discharge = () => {
         </TabsList>
 
         <TabsContent value="active" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center">
@@ -404,22 +384,6 @@ const Discharge = () => {
                   <div className="ml-4">
                     <p className="text-sm font-medium text-muted-foreground">Ready for Discharge</p>
                     <p className="text-2xl font-bold text-foreground">{pendingDischarges.filter(p => p.status === 'ready').length}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center">
-                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                    <CheckCircle className="w-6 h-6 text-green-600" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-muted-foreground">Discharged Today</p>
-                    <p className="text-2xl font-bold text-foreground">
-                      {dischargedPatients.filter(p => p.discharge_date === new Date().toISOString().split('T')[0]).length}
-                    </p>
                   </div>
                 </div>
               </CardContent>

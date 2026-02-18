@@ -52,10 +52,8 @@ const tabs = [
   { id: 'dashboard', name: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
   { id: 'patients', name: 'Patients', icon: <UserPlus className="w-4 h-4" /> },
   { id: 'admission', name: 'Admission', icon: <Bed className="w-4 h-4" /> },
-  { id: 'philhealth', name: 'PhilHealth', icon: <FileText className="w-4 h-4" /> },
   { id: 'pharmacy', name: 'Pharmacy', icon: <Pill className="w-4 h-4" /> },
   { id: 'laboratory', name: 'Laboratory', icon: <TestTube className="w-4 h-4" /> },
-  { id: 'appointments', name: 'Appointments', icon: <Calendar className="w-4 h-4" /> },
   { id: 'monitoring', name: 'Monitoring', icon: <Activity className="w-4 h-4" /> },
   { id: 'discharge', name: 'Discharge', icon: <UserX className="w-4 h-4" /> },
   { id: 'inventory', name: 'Inventory', icon: <Package className="w-4 h-4" /> },
@@ -84,14 +82,10 @@ const AppContent = () => {
       setActiveTab('patients');
     } else if (path === '/admission') {
       setActiveTab('admission');
-    } else if (path === '/philhealth' || path === '/philhealth-claims') {
-      setActiveTab('philhealth');
     } else if (path === '/pharmacy') {
       setActiveTab('pharmacy');
     } else if (path === '/laboratory') {
       setActiveTab('laboratory');
-    } else if (path === '/appointments') {
-      setActiveTab('appointments');
     } else if (path === '/monitoring') {
       setActiveTab('monitoring');
     } else if (path === '/discharge') {
@@ -119,14 +113,10 @@ const AppContent = () => {
         return <PatientRegistration />;
       case 'admission':
         return <AdmissionPage onNavigate={(tabId: string) => setActiveTab(tabId)} />;
-      case 'philhealth':
-        return <PhilHealthClaims />;
       case 'pharmacy':
         return <Pharmacy />;
       case 'laboratory':
         return <Laboratory />;
-      case 'appointments':
-        return <div className="p-6">Appointments Module (Coming Soon)</div>;
       case 'monitoring':
         return <Monitoring />;
       case 'discharge':
@@ -179,11 +169,8 @@ const App = () => (
                 <Route path="/patients" element={<AppContent />} />
                 <Route path="/patient-registration" element={<AppContent />} />
                 <Route path="/admission" element={<AppContent />} />
-                <Route path="/philhealth" element={<AppContent />} />
-                <Route path="/philhealth-claims" element={<AppContent />} />
                 <Route path="/pharmacy" element={<AppContent />} />
                 <Route path="/laboratory" element={<AppContent />} />
-                <Route path="/appointments" element={<AppContent />} />
                 <Route path="/monitoring" element={<AppContent />} />
                 <Route path="/discharge" element={<AppContent />} />
                 <Route path="/inventory" element={<AppContent />} />
