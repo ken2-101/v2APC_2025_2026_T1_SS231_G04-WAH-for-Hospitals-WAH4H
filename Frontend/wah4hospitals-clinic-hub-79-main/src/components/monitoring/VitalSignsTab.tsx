@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Plus, Printer, AlertTriangle } from 'lucide-react';
+import { Plus, AlertTriangle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { VitalSign } from '../../types/monitoring';
 import { useAuth } from '@/contexts/AuthContext';
@@ -108,10 +108,7 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
                     </Button>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => window.print()}>
-                        <Printer className="w-4 h-4 mr-2" />
-                        Print
-                    </Button>
+
                     {(currentRole === 'nurse' || currentRole === 'doctor') && (
                         <Button onClick={() => setIsModalOpen(true)} className="bg-green-600 hover:bg-green-700">
                             <Plus className="w-4 h-4 mr-2" />

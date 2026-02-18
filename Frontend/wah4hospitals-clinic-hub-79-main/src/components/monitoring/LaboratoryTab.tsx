@@ -197,7 +197,7 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
                             className="bg-blue-600 hover:bg-blue-700 text-white"
                         >
                             <Plus className="w-4 h-4 mr-2" />
-                            Request Lab Test
+                            {currentRole === 'doctor' ? 'Order Lab Test' : 'Request Lab Test'}
                         </Button>
                     )}
                 </div>
@@ -271,7 +271,7 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
                                             className="bg-purple-600 hover:bg-purple-700 text-white"
                                             onClick={() => handleVerifyClick(request)}
                                         >
-                                            Verify Request
+                                            Request Lab Test
                                         </Button>
                                     )}
 
@@ -374,7 +374,7 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
                             Cancel
                         </Button>
                         <Button onClick={handleOrderSubmit} className="bg-blue-600 hover:bg-blue-700 text-white">
-                            Request Test
+                            {currentRole === 'doctor' ? 'Order Lab Test' : 'Request Lab Test'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
