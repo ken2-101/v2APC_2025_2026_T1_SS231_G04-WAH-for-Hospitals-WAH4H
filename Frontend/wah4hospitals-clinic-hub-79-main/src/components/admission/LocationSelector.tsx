@@ -27,9 +27,9 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
   className = '',
   admissions = []
 }) => {
-  
+
   const buildings = useMemo(() => locations?.buildings || [], [locations]);
-  
+
   const wards = useMemo(() => {
     if (!value?.building || !locations) return [];
     const wings = locations.wings[value.building] || [];
@@ -46,12 +46,12 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
     if (!value?.room || !locations) return [];
     const roomObj = rooms.find(r => r.code === value.room);
     if (!roomObj) return [];
-    
+
     return Array.from({ length: roomObj.beds }, (_, i) => {
       const code = String.fromCharCode(65 + i);
-      const isOccupied = admissions?.some(a => 
-        a.status === 'in-progress' && 
-        a.location?.room === value.room && 
+      const isOccupied = admissions?.some(a =>
+        a.status === 'in-progress' &&
+        a.location?.room === value.room &&
         a.location?.bed === code
       );
       return { code, status: isOccupied ? 'occupied' : 'available' };
@@ -68,7 +68,7 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
       {/* Building */}
       <div className="flex-1">
         <label className={labelClass}>Building</label>
-        <select 
+        <select
           className={selectClass}
           value={value.building}
           onChange={(e) => onChange('building', e.target.value)}
@@ -83,7 +83,7 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
       {/* Ward */}
       <div className="flex-1">
         <label className={labelClass}>Ward</label>
-        <select 
+        <select
           className={selectClass}
           value={value.ward}
           onChange={(e) => onChange('ward', e.target.value)}
@@ -100,7 +100,7 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
       {showRoom && (
         <div className={layout === 'grid' ? 'col-span-full' : 'flex-1'}>
           <label className={labelClass}>Room</label>
-          <select 
+          <select
             className={selectClass}
             value={value.room}
             onChange={(e) => onChange('room', e.target.value)}
@@ -123,27 +123,26 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
       {/* Bed Select (Buttons) */}
       {showBed && value.room && (
         <div className="col-span-full space-y-2 mt-2">
-            <label className={labelClass}>Select Bed</label>
-            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
-                {beds.map((bed) => (
-                    <button 
-                        key={bed.code}
-                        type="button"
-                        disabled={bed.status === 'occupied'}
-                        onClick={() => onChange('bed', bed.code)}
-                        className={`p-3 rounded-lg border flex flex-col items-center justify-center transition-all ${
-                            value.bed === bed.code 
-                            ? 'bg-blue-600 border-blue-600 text-white shadow-md' 
-                            : bed.status === 'occupied'
-                            ? 'bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed'
-                            : 'bg-white border-slate-200 text-slate-600 hover:border-blue-400'
-                        }`}
-                    >
-                        <span className="font-bold">{bed.code}</span>
-                        <span className="text-[9px] uppercase font-medium">{bed.status}</span>
-                    </button>
-                ))}
-            </div>
+          <label className={labelClass}>Select Bed</label>
+          <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
+            {beds.map((bed) => (
+              <button
+                key={bed.code}
+                type="button"
+                disabled={bed.status === 'occupied'}
+                onClick={() => onChange('bed', bed.code)}
+                className={`p-3 rounded-lg border flex flex-col items-center justify-center transition-all ${value.bed === bed.code
+                    ? 'bg-blue-600 border-blue-600 text-white shadow-md'
+                    : bed.status === 'occupied'
+                      ? 'bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed'
+                      : 'bg-white border-slate-200 text-slate-600 hover:border-blue-400'
+                  }`}
+              >
+                <span className="font-bold">{bed.code}</span>
+                <span className="text-[9px] uppercase font-medium">{bed.status}</span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>

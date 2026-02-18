@@ -3,7 +3,7 @@ import api from "./api"; // Shared Axios instance
 import type { Admission, NewAdmission } from "@/types/admission";
 
 export const admissionService = {
-    
+
     /**
      * Get Practitioners (Physicians)
      */
@@ -41,7 +41,7 @@ export const admissionService = {
         try {
             const response = await api.get('/api/admission/encounters/');
             let data = response.data;
-            
+
             // Handle pagination (DRF returns { count, next, previous, results })
             if (data.results && Array.isArray(data.results)) {
                 data = data.results;
@@ -57,11 +57,11 @@ export const admissionService = {
                 return {
                     id: d.identifier,
                     encounter_id: d.encounter_id,
-                    admissionNo: d.identifier || `ENC-${d.encounter_id}`, 
-                    patientId: d.patient_summary?.patient_id || d.subject_id?.toString() || "N/A", 
+                    admissionNo: d.identifier || `ENC-${d.encounter_id}`,
+                    patientId: d.patient_summary?.patient_id || d.subject_id?.toString() || "N/A",
                     patientName: d.patient_summary?.full_name || "Unknown Patient",
                     admissionDate: d.period_start?.split('T')[0] || '',
-                    admissionTime: d.period_start?.split('T')[1]?.slice(0,5) || '',
+                    admissionTime: d.period_start?.split('T')[1]?.slice(0, 5) || '',
                     physician: d.practitioner_summary?.full_name || d.participant_name || "Unassigned",
                     serviceType: d.service_type || "General",
                     reasonForAdmission: d.reason_code || 'Pending',
@@ -70,7 +70,7 @@ export const admissionService = {
                     status: d.status,
                     location: {
                         ward: d.ward || locParts[0] || '',
-                        room: d.room || locParts[1] || '', 
+                        room: d.room || locParts[1] || '',
                         bed: d.bed || locParts[2] || '',
                         building: d.location_ids && d.location_ids.length > 0 ? d.location_ids[0] : ''
                     },
@@ -91,21 +91,21 @@ export const admissionService = {
                 } as Admission;
             });
         } catch (error) {
-           console.error("Failed to fetch admissions", error);
-           return [];
+            console.error("Failed to fetch admissions", error);
+            return [];
         }
     },
-    
+
     /**
      * Search Patients
      */
     async searchPatients(query: string) {
         try {
-             const response = await api.get(`/api/admission/encounters/search_patients/?q=${query}`);
-             return response.data;
+            const response = await api.get(`/api/admission/encounters/search_patients/?q=${query}`);
+            return response.data;
         } catch (error) {
-             console.error("Search failed", error);
-             return [];
+            console.error("Search failed", error);
+            return [];
         }
     },
 
@@ -125,15 +125,15 @@ export const admissionService = {
             // ✅ Fixed Code (Sends only YYYY-MM-DD)
             period_start: admission.admissionDate,
             reason_code: admission.reasonForAdmission,
-            participant_individual_id: admission.participant_individual_id || admission.physicianId || 1, 
-            location_id: null, 
+            participant_individual_id: admission.participant_individual_id || admission.physicianId || 1,
+            location_id: null,
             location_ids: admission.location_ids,
             // Save standardized location string
-            location_status: `${admission.location.ward}|${admission.location.room}|${admission.location.bed}`, 
+            location_status: `${admission.location.ward}|${admission.location.room}|${admission.location.bed}`,
             ward: admission.location.ward,
             room: admission.location.room,
             bed: admission.location.bed,
-            admit_source: admission.admitSource, 
+            admit_source: admission.admitSource,
             pre_admission_identifier: admission.preAdmissionIdentifier,
             diet_preference: Array.isArray(admission.dietPreference) ? admission.dietPreference.join(',') : '',
             special_courtesy: Array.isArray(admission.specialCourtesy) ? admission.specialCourtesy.join(',') : '',
@@ -150,9 +150,9 @@ export const admissionService = {
     getById: async (id: number | string): Promise<Admission> => {
         const { data } = await api.get<any>(`/api/admission/encounters/${id}/`);
         const locParts = data.location_status ? data.location_status.split('|') : [];
-        
+
         return {
-            ...data, 
+            ...data,
             id: data.identifier,
             encounter_id: data.encounter_id,
             admissionNo: data.identifier,
@@ -161,15 +161,15 @@ export const admissionService = {
             patientId: data.patient_summary?.patient_id || data.subject_id?.toString() || 'N/A',
             patientName: data.patient_summary?.full_name || "Unknown Patient",
             location: {
-                ward: data.ward || locParts[0] || '', 
-                room: data.room || locParts[1] || '', 
+                ward: data.ward || locParts[0] || '',
+                room: data.room || locParts[1] || '',
                 bed: data.bed || locParts[2] || '',
                 building: data.location_ids && data.location_ids.length > 0 ? data.location_ids[0] : ''
             },
             physician: data.practitioner_summary?.full_name || '',
             serviceType: data.service_type || '',
             admissionDate: data.period_start?.split('T')[0] || '',
-            admissionTime: data.period_start?.split('T')[1]?.slice(0,5) || '',
+            admissionTime: data.period_start?.split('T')[1]?.slice(0, 5) || '',
             reasonForAdmission: data.reason_code || 'Pending',
             encounterType: data.class_field || 'IMP',
             admitSource: data.admit_source || 'Physician Referral',
@@ -195,14 +195,14 @@ export const admissionService = {
     async update(id: number | string, admission: Partial<Admission>): Promise<Admission> {
         try {
             const payload: any = { ...admission };
-            
+
             // Map UI fields back to backend names if they exist
             if ('encounterType' in admission) payload.class_field = admission.encounterType;
             if ('serviceType' in admission) payload.service_type = admission.serviceType;
             if ('admitSource' in admission) payload.admit_source = admission.admitSource;
             if ('priority' in admission) payload.priority = admission.priority;
             if ('preAdmissionIdentifier' in admission) payload.pre_admission_identifier = admission.preAdmissionIdentifier;
-            
+
             if ('reasonForAdmission' in admission) {
                 payload.reason_code = admission.reasonForAdmission;
             }
@@ -230,7 +230,7 @@ export const admissionService = {
             // Transform back to Admission type using existing logic structure
             const data = response.data;
             const locParts = data.location_status ? data.location_status.split('|') : [];
-            
+
             return {
                 ...data,
                 id: data.identifier,
@@ -241,15 +241,15 @@ export const admissionService = {
                 patientId: data.patient_summary?.patient_id || data.subject_id?.toString() || 'N/A',
                 patientName: data.patient_summary?.full_name || "Unknown Patient",
                 location: {
-                    ward: data.ward || locParts[0] || '', 
-                    room: data.room || locParts[1] || '', 
+                    ward: data.ward || locParts[0] || '',
+                    room: data.room || locParts[1] || '',
                     bed: data.bed || locParts[2] || '',
                     building: data.location_ids && data.location_ids.length > 0 ? data.location_ids[0] : ''
                 },
                 physician: data.practitioner_summary?.full_name || '',
                 serviceType: data.service_type || '',
                 admissionDate: data.period_start?.split('T')[0] || '',
-                admissionTime: data.period_start?.split('T')[1]?.slice(0,5) || '',
+                admissionTime: data.period_start?.split('T')[1]?.slice(0, 5) || '',
                 reasonForAdmission: data.reason_code || 'Pending',
                 encounterType: data.class_field || 'IMP',
                 admitSource: data.admit_source || 'Physician Referral',

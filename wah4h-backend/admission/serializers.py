@@ -72,9 +72,26 @@ class EncounterSerializer(serializers.ModelSerializer):
                 "first_name": patient.first_name,
                 "last_name": patient.last_name,
                 "gender": patient.gender,
+                "age": patient.age,
                 "birthdate": patient.birthdate,
+                "civil_status": patient.civil_status,
+                "religion": patient.religion,
+                "blood_type": patient.blood_type,
                 "mobile_number": patient.mobile_number,
                 "philhealth_id": patient.philhealth_id,
+                "address": {
+                    "line": patient.address_line,
+                    "city": patient.address_city,
+                    "district": patient.address_district,
+                    "state": patient.address_state,
+                    "postal_code": patient.address_postal_code,
+                    "country": patient.address_country,
+                },
+                "emergency_contact": {
+                    "name": f"{patient.contact_first_name or ''} {patient.contact_last_name or ''}".strip(),
+                    "mobile": patient.contact_mobile_number,
+                    "relationship": patient.contact_relationship,
+                }
             }
         except Patient.DoesNotExist:
             return None
@@ -104,7 +121,7 @@ class EncounterSerializer(serializers.ModelSerializer):
                 "full_name": f"{practitioner.first_name} {practitioner.last_name}",
                 "first_name": practitioner.first_name,
                 "last_name": practitioner.last_name,
-                "role": "Physician",
+                "role": practitioner.qualification_code or "Physician",
             }
         except Practitioner.DoesNotExist:
             return None
@@ -141,13 +158,16 @@ class EncounterSerializer(serializers.ModelSerializer):
                 })
             
             # BLOCK DUPLICATE ACTIVE ADMISSIONS
-            # Check if patient already has an 'in-progress' encounter
-            active_encounter = Encounter.objects.filter(
-                subject_id=subject_id, 
+            # Check if patient already has an 'in-progress' encounter (excluding the current instance if updating)
+            active_encounter_query = Encounter.objects.filter(
+                subject_id=subject_id,
                 status='in-progress'
-            ).exists()
-            
-            if active_encounter:
+            )
+
+            if self.instance:
+                active_encounter_query = active_encounter_query.exclude(encounter_id=self.instance.encounter_id)
+
+            if active_encounter_query.exists():
                 raise serializers.ValidationError({
                     "non_field_errors": ["Patient is already admitted with an active encounter. Please discharge or finish the existing encounter before starting a new one."]
                 })
@@ -285,7 +305,7 @@ class ProcedurePerformerSerializer(serializers.ModelSerializer):
                 "full_name": f"{practitioner.first_name} {practitioner.last_name}",
                 "first_name": practitioner.first_name,
                 "last_name": practitioner.last_name,
-                "role": "Physician",
+                "role": practitioner.qualification_code or "Physician",
             }
         except Practitioner.DoesNotExist:
             return None
