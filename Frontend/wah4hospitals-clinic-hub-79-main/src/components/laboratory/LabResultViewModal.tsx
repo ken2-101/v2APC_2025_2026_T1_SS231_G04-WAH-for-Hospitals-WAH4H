@@ -16,31 +16,7 @@ export const LabResultViewModal: React.FC<LabResultViewModalProps> = ({ isOpen, 
         window.print();
     };
 
-    const handleDownloadPDF = async () => {
-        try {
-            // Assuming the PDF endpoint is at /api/laboratory/reports/{id}/pdf/
-            const response = await fetch(`http://127.0.0.1:8000/api/laboratory/reports/${request.id}/pdf/`, {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`, // Ensure auth if needed
-                }
-            });
 
-            if (!response.ok) throw new Error('Download failed');
-
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `LabResult_${request.id}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-        } catch (error) {
-            console.error("PDF Download Error:", error);
-            alert("Failed to download PDF. Please try again.");
-        }
-    };
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 print:p-0 print:bg-white print:static">
@@ -108,10 +84,7 @@ export const LabResultViewModal: React.FC<LabResultViewModalProps> = ({ isOpen, 
                 <div className="flex justify-between items-center p-6 border-b no-print">
                     <h2 className="text-xl font-bold text-gray-900">Lab Request Details</h2>
                     <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={handleDownloadPDF} className="gap-2">
-                            <Printer size={16} />
-                            Download PDF
-                        </Button>
+
                         <Button variant="outline" size="sm" onClick={handlePrint} className="gap-2">
                             <Printer size={16} />
                             Print View

@@ -50,9 +50,20 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         if not subject_id:
             return Response({"error": "subject_id is required"}, status=status.HTTP_400_BAD_REQUEST)
         
+        # Capture user if available (linked practitioner)
+        user = request.user
+        actor_id = None
+        if user.is_authenticated and hasattr(user, 'practitioner'):
+            actor_id = user.practitioner.practitioner_id
+            
         invoice = Invoice.objects.generate_from_pending_orders(subject_id)
         
         if invoice:
+            # Update with actor_id if available
+            if actor_id:
+                invoice.participant_actor_id = actor_id
+                invoice.save(update_fields=['participant_actor_id'])
+                
             return Response(self.get_serializer(invoice).data, status=status.HTTP_201_CREATED)
         else:
             return Response({"message": "No pending items to bill"}, status=status.HTTP_200_OK)
@@ -67,6 +78,13 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             return Response({"error": "subject_id is required"}, status=status.HTTP_400_BAD_REQUEST)
             
         invoice = Invoice.objects.create_empty_invoice(subject_id)
+        
+        # Capture user if available
+        user = request.user
+        if user.is_authenticated and hasattr(user, 'practitioner'):
+            invoice.participant_actor_id = user.practitioner.practitioner_id
+            invoice.save(update_fields=['participant_actor_id'])
+            
         return Response(self.get_serializer(invoice).data, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=['get'])
@@ -163,6 +181,12 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         except ValueError:
              return Response({"error": "Invalid amount format"}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Capture user if available (linked practitioner) for Payment Processor
+        user = request.user
+        requestor_id = None
+        if user.is_authenticated and hasattr(user, 'practitioner'):
+            requestor_id = user.practitioner.practitioner_id
+            
         # Create Payment Record
         # Note: In a real world scenario, this might need a more complex link (e.g. via PaymentNotice or LineItem)
         # For now, we creating a PaymentReconciliation record to track the event
@@ -175,7 +199,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             payment_amount_currency='PHP',
             payment_identifier=reference,
             disposition=f"Payment for Invoice {invoice.identifier} via {method}",
-            created_datetime=timezone.now()
+            created_datetime=timezone.now(),
+            requestor_id=requestor_id # Save the Payment Processor
         )
         
         # Calculate balance based on direct invoice link

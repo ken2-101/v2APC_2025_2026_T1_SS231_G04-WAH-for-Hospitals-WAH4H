@@ -211,7 +211,7 @@ export const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({
                <div className="flex gap-6 mt-4 text-sm font-medium">
                   <div className="flex items-center gap-2">
                      <Calendar className="w-4 h-4 opacity-80" />
-                     Admission: {data.admissionDate || data.period_start ? new Date(data.admissionDate || data.period_start!).toLocaleString() : 'N/A'}
+                     Admission: {data.created_at ? new Date(data.created_at).toLocaleString() : (data.admissionDate || data.period_start ? new Date(data.admissionDate || data.period_start!).toLocaleString() : 'N/A')}
                   </div>
                   <div className="flex items-center gap-2">
                      <div className="w-4 h-4 rounded-full border border-white/40 flex items-center justify-center text-[10px]">D</div>
@@ -430,19 +430,7 @@ export const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({
                            ))}
                         </select>
                      </div>
-                     <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-500 mb-1 block uppercase tracking-wider">Participant Role</label>
-                        <select
-                           className="w-full p-2 border border-slate-200 rounded-md text-sm bg-white"
-                           value={editData?.participant_type || 'Primary Performer'}
-                           onChange={e => handleEditChange('participant_type', e.target.value)}
-                        >
-                           <option value="Primary Performer">Primary Performer</option>
-                           <option value="Consultant">Consultant</option>
-                           <option value="Referring Physician">Referring Physician</option>
-                           <option value="Admitting Physician">Admitting Physician</option>
-                        </select>
-                     </div>
+
                   </div>
                </div>
             </section>

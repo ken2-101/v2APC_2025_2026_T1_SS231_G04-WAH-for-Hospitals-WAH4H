@@ -36,7 +36,7 @@ const INITIAL_FORM: NewAdmission = {
   specialArrangements: [],
   specialCourtesy: [],
   type: 'admission',
-  participant_type: 'Primary Performer',
+
   diagnosis_rank: '1',
   diagnosis_use: 'admission'
 };
@@ -401,16 +401,7 @@ const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({ isOpen, onClose, 
                   </select>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">Participant Type</label>
-                  <select className="w-full p-3 bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" value={formData.participant_type} onChange={e => setFormData({ ...formData, participant_type: e.target.value })}>
-                    <option value="Primary Performer">Primary Performer</option>
-                    <option value="Consultant">Consultant</option>
-                    <option value="Referring Physician">Referring Physician</option>
-                    <option value="Admitting Physician">Admitting Physician</option>
-                  </select>
-                  <div className="text-xs text-slate-400">Specify the role of {formData.physician || 'the physician'}</div>
-                </div>
+
 
                 <button className="w-full py-2 border-2 border-dashed border-slate-300 rounded-lg text-slate-500 hover:border-blue-400 hover:text-blue-500 transition-all text-sm font-bold flex items-center justify-center gap-2">
                   + Add Additional Staff Member

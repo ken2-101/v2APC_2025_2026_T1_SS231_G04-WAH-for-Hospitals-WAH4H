@@ -6,8 +6,10 @@ from billing.models import (
     InvoiceLineItemPriceComponent, 
     Claim, 
     PaymentReconciliation, 
-    PaymentNotice
+    PaymentNotice,
+    PaymentReconciliation
 )
+from accounts.models import Practitioner
 from django.db import transaction
 
 
@@ -29,10 +31,35 @@ class InvoiceLineItemSerializer(serializers.ModelSerializer):
 
 class InvoiceSerializer(serializers.ModelSerializer):
     line_items = InvoiceLineItemSerializer(many=True, required=False)
+    processed_by = serializers.SerializerMethodField()
 
     class Meta:
         model = Invoice
         fields = '__all__'
+
+    def get_processed_by(self, obj):
+        # 1. Check if there is a payment reconciliation with a requestor (Payment Processor)
+        # We prioritize the person who took the payment (Last Touch)
+        last_payment = PaymentReconciliation.objects.filter(
+            invoice=obj,
+            requestor_id__isnull=False
+        ).order_by('-created_datetime').first()
+        
+        if last_payment:
+            try:
+                practitioner = Practitioner.objects.get(pk=last_payment.requestor_id)
+                return f"{practitioner.first_name} {practitioner.last_name}"
+            except Practitioner.DoesNotExist:
+                pass # Fallback to invoice creator
+        
+        # 2. Fallback to Invoice Creator
+        if obj.participant_actor_id:
+            try:
+                practitioner = Practitioner.objects.get(pk=obj.participant_actor_id)
+                return f"{practitioner.first_name} {practitioner.last_name}"
+            except Practitioner.DoesNotExist:
+                return None
+        return None
     
     def create(self, validated_data):
         line_items_data = validated_data.pop('line_items', [])

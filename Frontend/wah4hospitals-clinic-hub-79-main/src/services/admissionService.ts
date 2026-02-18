@@ -83,13 +83,14 @@ export const admissionService = {
                     specialArrangements: d.special_arrangement ? d.special_arrangement.split(',').filter(Boolean) : [],
                     specialCourtesy: d.special_courtesy ? d.special_courtesy.split(',').filter(Boolean) : [],
                     type: d.type || 'admission',
-                    participant_type: d.participant_type || 'Primary Performer',
+
                     diagnosis_rank: d.diagnosis_rank || '1',
                     diagnosis_use: d.diagnosis_use || 'admission',
                     location_ids: d.location_ids || [],
                     physicianId: d.participant_individual_id,
                     participant_individual_id: d.participant_individual_id,
-                    subject_id: d.subject_id
+                    subject_id: d.subject_id,
+                    created_at: d.created_at
                 } as Admission;
             });
         } catch (error) {
@@ -119,7 +120,7 @@ export const admissionService = {
             subject_id: admission.patientId,
             class_field: admission.encounterType,
             type: admission.type || 'admission',
-            participant_type: admission.participant_type,
+
             diagnosis_rank: admission.diagnosis_rank,
             diagnosis_use: admission.diagnosis_use,
             service_type: admission.serviceType,
@@ -181,13 +182,14 @@ export const admissionService = {
             specialArrangements: data.special_arrangement ? data.special_arrangement.split(',').filter(Boolean) : [],
             specialCourtesy: data.special_courtesy ? data.special_courtesy.split(',').filter(Boolean) : [],
             type: data.type || 'admission',
-            participant_type: data.participant_type || 'Primary Performer',
+
             diagnosis_rank: data.diagnosis_rank || '1',
             diagnosis_use: data.diagnosis_use || 'admission',
             location_ids: data.location_ids || [],
             physicianId: data.participant_individual_id,
             participant_individual_id: data.participant_individual_id,
-            subject_id: data.subject_id
+            subject_id: data.subject_id,
+            created_at: data.created_at
         } as Admission;
     },
 
@@ -261,13 +263,14 @@ export const admissionService = {
                 specialArrangements: data.special_arrangement ? data.special_arrangement.split(',').filter(Boolean) : [],
                 specialCourtesy: data.special_courtesy ? data.special_courtesy.split(',').filter(Boolean) : [],
                 type: data.type || 'admission',
-                participant_type: data.participant_type || 'Primary Performer',
+
                 diagnosis_rank: data.diagnosis_rank || '1',
                 diagnosis_use: data.diagnosis_use || 'admission',
                 location_ids: data.location_ids || [],
                 physicianId: data.participant_individual_id,
                 participant_individual_id: data.participant_individual_id,
-                subject_id: data.subject_id
+                subject_id: data.subject_id,
+                created_at: data.created_at
             } as Admission;
         } catch (error) {
             console.error("Error updating admission", error);

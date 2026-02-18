@@ -21,6 +21,7 @@ export interface Invoice {
   total_net_value: string | number; // Decimal string from Django
   total_gross_value: string | number;
   line_items: InvoiceLineItem[];
+  processed_by?: string;
 }
 
 // Create an Axios instance

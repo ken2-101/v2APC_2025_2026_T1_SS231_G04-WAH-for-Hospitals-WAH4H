@@ -307,6 +307,9 @@ export const PatientBillingSummary: React.FC<BillingDashboardProps> = ({ subject
                                             <div>
                                                 <div className="font-semibold text-gray-900">{inv.identifier}</div>
                                                 <div className="text-sm text-gray-500">{new Date(inv.invoice_datetime).toLocaleDateString()}</div>
+                                                {inv.processed_by && (
+                                                    <div className="text-xs text-gray-400 mt-1">Billing Clerk: {inv.processed_by}</div>
+                                                )}
                                             </div>
                                         </div>
 
