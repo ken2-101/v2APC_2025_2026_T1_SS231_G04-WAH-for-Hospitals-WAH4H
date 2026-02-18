@@ -206,8 +206,12 @@ export interface Immunization {
   encounter_id?: number;
   occurrence_datetime?: string;
   lot_number?: string;
+  expiration_date?: string;
+  site_code?: string;
+  route_code?: string;
   dose_quantity_value?: string;
   dose_quantity_unit?: string;
+  performer_name?: string;
   note?: string;
   created_at?: string;
   updated_at?: string;

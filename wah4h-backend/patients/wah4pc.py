@@ -938,3 +938,416 @@ def fhir_to_dict(fhir):
     }
     # Strip None and empty strings so callers don't need to handle them
     return {k: v for k, v in result.items() if v is not None and v != ""}
+
+
+# ---------------------------------------------------------------------------
+# Immunization Maps
+# ---------------------------------------------------------------------------
+_VACCINE_CODE_MAP = {
+    "08":       "Hepatitis B",
+    "COVID-19": "COVID-19 mRNA",
+    "JC":       "Japanese Encephalitis",
+}
+_SITE_CODE_MAP  = {"LA": "Left Arm",  "RA": "Right Arm", "LL": "Left Leg"}
+_ROUTE_CODE_MAP = {"IM": "Intramuscular", "PO": "Oral", "IDINJ": "Intradermal"}
+
+
+def immunization_to_fhir(model):
+    """Convert a local Immunization model instance to a PH Core FHIR Immunization resource.
+
+    Follows the Manual Dict Construction pattern used by patient_to_fhir:
+    - All URIs use the urn://example.com/... scheme.
+    - Null / empty fields are omitted entirely.
+    - doseQuantity units are hardcoded to "ml" per the Working JSON spec.
+    - performer.function is hardcoded to Administering Provider (AP).
+    """
+    pk = getattr(model, "immunization_id", None) or getattr(model, "pk", None)
+    resource_id = (
+        str(uuid.uuid5(uuid.NAMESPACE_OID, f"immunization:{pk}"))
+        if pk is not None
+        else str(uuid.uuid4())
+    )
+
+    # Patient reference uses the same deterministic UUID strategy as patient_to_fhir
+    patient_pk = model.patient_id
+    patient_fhir_id = str(uuid.uuid5(uuid.NAMESPACE_OID, f"patient:{patient_pk}"))
+
+    # Patient display name (patient is select_related on the queryset)
+    patient_obj = model.patient if hasattr(model, '_state') else None
+    try:
+        patient_display = f"{model.patient.first_name or ''} {model.patient.last_name or ''}".strip()
+    except Exception:
+        patient_display = ""
+
+    vaccine_display = _VACCINE_CODE_MAP.get(
+        model.vaccine_code,
+        model.vaccine_display or model.vaccine_code or "",
+    )
+
+    fhir: dict = {
+        "resourceType": "Immunization",
+        "id": resource_id,
+        "meta": {
+            "lastUpdated": datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "profile": [f"{_URN_EXT}/ph-core-immunization"],
+        },
+        "status": model.status,
+        "vaccineCode": {
+            "text": vaccine_display,
+            "coding": [{
+                "system":  "http://hl7.org/fhir/sid/cvx",
+                "code":    model.vaccine_code,
+                "display": vaccine_display,
+            }]
+        },
+        "patient": {
+            "display": patient_display,
+            "reference": f"Patient/{patient_fhir_id}",
+        },
+    }
+
+    # Identifier — include the local DB PK so the frontend can resolve edits/deletes
+    if model.identifier or pk is not None:
+        fhir["identifier"] = [
+            *([ {"value": model.identifier} ] if model.identifier else []),
+            {"system": "local-db-pk", "value": str(pk)},
+        ]
+
+    # Occurrence — prefer datetime, fall back to string
+    if model.occurrence_datetime:
+        fhir["occurrenceDateTime"] = model.occurrence_datetime.strftime(
+            "%Y-%m-%dT%H:%M:%S.000Z"
+        )
+    elif model.occurrence_string:
+        fhir["occurrenceString"] = model.occurrence_string
+
+    # Recorded
+    if model.recorded_datetime:
+        fhir["recorded"] = model.recorded_datetime.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+    # Primary source
+    if model.primary_source is not None:
+        fhir["primarySource"] = model.primary_source
+
+    # Lot / expiration
+    if model.lot_number:
+        fhir["lotNumber"] = model.lot_number
+    if model.expiration_date:
+        fhir["expirationDate"] = str(model.expiration_date)
+
+    # Site
+    if model.site_code:
+        fhir["site"] = {
+            "coding": [{
+                "system":  "http://terminology.hl7.org/CodeSystem/v3-ActSite",
+                "code":    model.site_code,
+                "display": _SITE_CODE_MAP.get(
+                    model.site_code, model.site_display or model.site_code
+                ),
+            }]
+        }
+
+    # Route
+    if model.route_code:
+        fhir["route"] = {
+            "coding": [{
+                "system":  "http://terminology.hl7.org/CodeSystem/v3-RouteOfAdministration",
+                "code":    model.route_code,
+                "display": _ROUTE_CODE_MAP.get(
+                    model.route_code, model.route_display or model.route_code
+                ),
+            }]
+        }
+
+    # Dose quantity — hardcoded units per Working JSON spec
+    if model.dose_quantity_value is not None:
+        fhir["doseQuantity"] = {
+            "value":  float(model.dose_quantity_value),
+            "unit":   "ml",
+            "system": "http://unitsofmeasure.org",
+            "code":   "ml",
+        }
+
+    # Performer — function hardcoded to Administering Provider; actor display from performer_name
+    performer_name = getattr(model, "performer_name", None)
+    actor = {"display": performer_name or "Unknown"}
+    if model.actor_id and not performer_name:
+        actor["reference"] = f"Practitioner/{model.actor_id}"
+    fhir["performer"] = [{
+        "function": {
+            "coding": [{
+                "system":  "http://terminology.hl7.org/CodeSystem/v2-0443",
+                "code":    "AP",
+                "display": "Administering Provider",
+            }]
+        },
+        "actor": actor,
+    }]
+
+    # Note
+    if model.note:
+        fhir["note"] = [{"text": model.note}]
+
+    return {k: v for k, v in fhir.items() if v is not None}
+
+
+def immunizations_to_bundle(queryset):
+    """Wrap an iterable of Immunization model instances as a FHIR Bundle (collection).
+
+    Returns:
+        dict: { "resourceType": "Bundle", "type": "collection", "entry": [...] }
+    """
+    return {
+        "resourceType": "Bundle",
+        "type": "collection",
+        "entry": [{"resource": immunization_to_fhir(imm)} for imm in queryset],
+    }
+
+
+def import_immunization_from_fhir(fhir_data):
+    """Parse a FHIR Immunization resource and upsert into the local Immunization model.
+
+    Resolution order for the patient FK:
+    1. Try the reference value as a plain integer local PK.
+    2. Scan Patient rows matching the deterministic uuid5 used by immunization_to_fhir.
+
+    Upsert key priority:
+    1. identifier value (unique in DB) — if present.
+    2. (patient, vaccine_code, occurrence_datetime) composite — if deterministic enough.
+    3. Blind create with a fresh UUID identifier as a last resort.
+
+    Returns the upserted Immunization instance, or None if the patient cannot be resolved.
+    """
+    from patients.models import Patient, Immunization as ImmunizationModel
+
+    # ------------------------------------------------------------------
+    # 1. Resolve patient reference → local Patient instance
+    # ------------------------------------------------------------------
+    patient = None
+    patient_ref = (fhir_data.get("patient") or {}).get("reference", "")
+    if patient_ref.startswith("Patient/"):
+        ref_value = patient_ref.split("/", 1)[1]
+        try:
+            patient = Patient.objects.get(id=int(ref_value))
+        except (ValueError, Patient.DoesNotExist):
+            # Reverse the deterministic uuid5 by scanning (small table assumption)
+            for p in Patient.objects.all():
+                if str(uuid.uuid5(uuid.NAMESPACE_OID, f"patient:{p.id}")) == ref_value:
+                    patient = p
+                    break
+
+    if patient is None:
+        return None
+
+    # ------------------------------------------------------------------
+    # 2. Parse vaccine code
+    # ------------------------------------------------------------------
+    vc_codings = (fhir_data.get("vaccineCode") or {}).get("coding", [{}])
+    vc_coding  = vc_codings[0] if vc_codings else {}
+    vaccine_code    = vc_coding.get("code")
+    vaccine_display = vc_coding.get("display") or _VACCINE_CODE_MAP.get(vaccine_code, "")
+
+    # ------------------------------------------------------------------
+    # 3. Parse occurrence
+    # ------------------------------------------------------------------
+    occ_dt_str      = fhir_data.get("occurrenceDateTime")
+    occurrence_string = fhir_data.get("occurrenceString")
+    occurrence_datetime = None
+    if occ_dt_str:
+        try:
+            occurrence_datetime = datetime.fromisoformat(occ_dt_str.replace("Z", "+00:00"))
+        except ValueError:
+            pass
+
+    # ------------------------------------------------------------------
+    # 4. Identifier
+    # ------------------------------------------------------------------
+    raw_identifiers  = fhir_data.get("identifier", [])
+    identifier_value = raw_identifiers[0].get("value") if raw_identifiers else None
+
+    # ------------------------------------------------------------------
+    # 5. Status / site / route / dose
+    # ------------------------------------------------------------------
+    imm_status = fhir_data.get("status", "completed")
+
+    site_codings  = (fhir_data.get("site")  or {}).get("coding", [{}])
+    site_coding   = site_codings[0] if site_codings else {}
+    site_code     = site_coding.get("code")
+    site_display  = site_coding.get("display") or _SITE_CODE_MAP.get(site_code, "")
+
+    route_codings = (fhir_data.get("route") or {}).get("coding", [{}])
+    route_coding  = route_codings[0] if route_codings else {}
+    route_code    = route_coding.get("code")
+    route_display = route_coding.get("display") or _ROUTE_CODE_MAP.get(route_code, "")
+
+    dq                 = fhir_data.get("doseQuantity") or {}
+    dose_quantity_value = dq.get("value")
+    dose_quantity_unit  = dq.get("unit", "ml")
+
+    # ------------------------------------------------------------------
+    # 6. Performer actor reference
+    # ------------------------------------------------------------------
+    performers = fhir_data.get("performer", [])
+    actor_id   = None
+    if performers:
+        actor_ref_str = performers[0].get("actor", {}).get("reference", "")
+        if "/" in actor_ref_str:
+            try:
+                actor_id = int(actor_ref_str.split("/")[-1])
+            except ValueError:
+                pass
+
+    # ------------------------------------------------------------------
+    # 7. Recorded / lot / expiry / note
+    # ------------------------------------------------------------------
+    recorded_str      = fhir_data.get("recorded")
+    recorded_datetime = None
+    if recorded_str:
+        try:
+            recorded_datetime = datetime.fromisoformat(recorded_str.replace("Z", "+00:00"))
+        except ValueError:
+            pass
+
+    lot_number = fhir_data.get("lotNumber")
+
+    expiry_str      = fhir_data.get("expirationDate")
+    expiration_date = None
+    if expiry_str:
+        try:
+            from datetime import date as _date
+            expiration_date = _date.fromisoformat(expiry_str)
+        except ValueError:
+            pass
+
+    notes     = fhir_data.get("note", [])
+    note_text = notes[0].get("text") if notes else None
+
+    # ------------------------------------------------------------------
+    # 8. Build field dict (omit None to avoid overwriting valid data)
+    # ------------------------------------------------------------------
+    fields = {
+        "status":               imm_status,
+        "vaccine_code":         vaccine_code,
+        "vaccine_display":      vaccine_display,
+        "patient":              patient,
+        "occurrence_datetime":  occurrence_datetime,
+        "occurrence_string":    occurrence_string,
+        "recorded_datetime":    recorded_datetime,
+        "site_code":            site_code,
+        "site_display":         site_display,
+        "route_code":           route_code,
+        "route_display":        route_display,
+        "dose_quantity_value":  dose_quantity_value,
+        "dose_quantity_unit":   dose_quantity_unit,
+        "actor_id":             actor_id,
+        "lot_number":           lot_number,
+        "expiration_date":      expiration_date,
+        "note":                 note_text,
+        # encounter_id is required NOT NULL — default 0 when not in payload
+        "encounter_id":         0,
+    }
+    fields = {k: v for k, v in fields.items() if v is not None}
+
+    # ------------------------------------------------------------------
+    # 9. Upsert
+    # ------------------------------------------------------------------
+    if identifier_value:
+        obj, _ = ImmunizationModel.objects.update_or_create(
+            identifier=identifier_value,
+            defaults=fields,
+        )
+    elif vaccine_code and occurrence_datetime:
+        fields.setdefault("identifier", f"import-{uuid.uuid4()}")
+        lookup_keys = {"patient": patient, "vaccine_code": vaccine_code,
+                       "occurrence_datetime": occurrence_datetime}
+        obj, _ = ImmunizationModel.objects.update_or_create(
+            **lookup_keys,
+            defaults={k: v for k, v in fields.items() if k not in lookup_keys},
+        )
+    else:
+        fields.setdefault("identifier", f"import-{uuid.uuid4()}")
+        obj = ImmunizationModel.objects.create(**fields)
+
+    return obj
+
+
+def push_immunization(target_id, immunization_model, idempotency_key=None):
+    """Push immunization data to another provider via WAH4PC gateway.
+
+    Args:
+        target_id: Target provider UUID
+        immunization_model: Immunization model instance
+        idempotency_key: Optional idempotency key (generated if not provided)
+
+    Returns:
+        dict: Response with transaction data on success, or 'error' and 'status_code' on failure.
+              Retries up to _MAX_ATTEMPTS times on 409/429 before giving up.
+    """
+    api_key     = os.getenv("WAH4PC_API_KEY")
+    provider_id = os.getenv("WAH4PC_PROVIDER_ID")
+
+    if not idempotency_key:
+        idempotency_key = str(uuid.uuid4())
+
+    last_retryable_result = None
+
+    for attempt in range(_MAX_ATTEMPTS):
+        if attempt > 0:
+            time.sleep(_BACKOFF_SECONDS[min(attempt - 1, len(_BACKOFF_SECONDS) - 1)])
+
+        try:
+            response = requests.post(
+                f"{URL}/api/v1/fhir/push/Immunization",
+                headers={
+                    "X-API-Key":        api_key,
+                    "X-Provider-ID":    provider_id,
+                    "Idempotency-Key":  idempotency_key,
+                },
+                json={
+                    "senderId":     provider_id,
+                    "targetId":     target_id,
+                    "resourceType": "Immunization",
+                    "resource": {
+                        "resourceType": "Bundle",
+                        "type":         "collection",
+                        "entry":        [{"resource": immunization_to_fhir(immunization_model)}],
+                    },
+                },
+            )
+
+            if response.status_code in _RETRY_STATUSES:
+                last_retryable_result = {
+                    "error": (
+                        "Request already in progress — retrying"
+                        if response.status_code == 409
+                        else "Rate limit exceeded — retrying"
+                    ),
+                    "status_code": response.status_code,
+                    "idempotency_key": idempotency_key,
+                }
+                continue
+
+            if response.status_code >= 400:
+                error_msg = (
+                    response.json().get("error", "Unknown error")
+                    if response.text
+                    else "Unknown error"
+                )
+                return {
+                    "error": error_msg,
+                    "status_code": response.status_code,
+                    "idempotency_key": idempotency_key,
+                }
+
+            result = response.json()
+            result["idempotency_key"] = idempotency_key
+            return result
+
+        except requests.RequestException as e:
+            return {
+                "error": f"Network error: {str(e)}",
+                "status_code": 500,
+                "idempotency_key": idempotency_key,
+            }
+
+    return last_retryable_result

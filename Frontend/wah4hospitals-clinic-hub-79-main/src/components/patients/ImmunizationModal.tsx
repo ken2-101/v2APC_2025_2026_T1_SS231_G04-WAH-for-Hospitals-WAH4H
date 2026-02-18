@@ -60,8 +60,12 @@ export const ImmunizationModal: React.FC<ImmunizationModalProps> = ({
           occurrence_datetime: immunization.occurrence_datetime || '',
           recorded_datetime: immunization.created_at || '',
           lot_number: immunization.lot_number || '',
+          expiration_date: immunization.expiration_date || '',
+          site_code: immunization.site_code || '',
+          route_code: immunization.route_code || '',
           dose_quantity_value: immunization.dose_quantity_value || '',
           dose_quantity_unit: immunization.dose_quantity_unit || '',
+          performer_name: immunization.performer_name || '',
           note: immunization.note || '',
         }
       : {
@@ -136,7 +140,7 @@ export const ImmunizationModal: React.FC<ImmunizationModalProps> = ({
 
           {/* Vaccine Selection */}
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">Vaccine</label>
+            <label className="block text-sm font-medium text-gray-700">Vaccine Name</label>
             <select
               {...register('vaccine_code')}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -148,7 +152,7 @@ export const ImmunizationModal: React.FC<ImmunizationModalProps> = ({
                 </option>
               ))}
             </select>
-            <p className="text-xs text-gray-500">Or enter custom vaccine code below</p>
+            <p className="text-xs text-gray-500">Or enter a custom vaccine code/display below</p>
           </div>
 
           {/* Vaccine Display Name */}
@@ -175,20 +179,47 @@ export const ImmunizationModal: React.FC<ImmunizationModalProps> = ({
             />
           </div>
 
-          {/* Lot Number */}
-          <FormField
-            label="Lot Number"
-            error={errors.lot_number}
-            {...register('lot_number')}
-            placeholder="e.g., LOT-2024-ABC123"
-          />
+          {/* Lot Number & Expiration */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              label="Lot Number"
+              error={errors.lot_number}
+              {...register('lot_number')}
+              placeholder="e.g., LOT-2024-ABC123"
+            />
+            <FormField
+              label="Expiration Date"
+              type="date"
+              error={errors.expiration_date}
+              {...register('expiration_date')}
+            />
+          </div>
+
+          {/* Site & Route */}
+          <div className="border-t pt-4">
+            <h4 className="text-sm font-semibold mb-3">Administration</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <SelectField
+                label="Site"
+                error={errors.site_code}
+                {...register('site_code')}
+                options={[{ value: '', label: 'Select Site' }, ...VACCINE_SITE_OPTIONS]}
+              />
+              <SelectField
+                label="Route"
+                error={errors.route_code}
+                {...register('route_code')}
+                options={[{ value: '', label: 'Select Route' }, ...VACCINE_ROUTE_OPTIONS]}
+              />
+            </div>
+          </div>
 
           {/* Dose Information */}
           <div className="border-t pt-4">
             <h4 className="text-sm font-semibold mb-3">Dose Information</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
-                label="Dose Quantity Value"
+                label="Dose Quantity"
                 type="number"
                 step="0.01"
                 error={errors.dose_quantity_value}
@@ -196,7 +227,7 @@ export const ImmunizationModal: React.FC<ImmunizationModalProps> = ({
                 placeholder="e.g., 0.5"
               />
               <SelectField
-                label="Dose Quantity Unit"
+                label="Unit"
                 error={errors.dose_quantity_unit}
                 {...register('dose_quantity_unit')}
                 options={[{ value: '', label: 'Select Unit' }, ...DOSE_UNIT_OPTIONS]}
@@ -204,12 +235,23 @@ export const ImmunizationModal: React.FC<ImmunizationModalProps> = ({
             </div>
           </div>
 
+          {/* Administering Staff */}
+          <div className="border-t pt-4">
+            <h4 className="text-sm font-semibold mb-3">Administering Provider</h4>
+            <FormField
+              label="Staff / Doctor Name"
+              error={errors.performer_name}
+              {...register('performer_name')}
+              placeholder="e.g., Dr. Juan dela Cruz"
+            />
+          </div>
+
           {/* Note */}
-          <div className="space-y-1">
+          <div className="border-t pt-4 space-y-1">
             <label className="block text-sm font-medium text-gray-700">Clinical Notes</label>
             <textarea
               {...register('note')}
-              rows={4}
+              rows={3}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Additional notes about the immunization..."
             />

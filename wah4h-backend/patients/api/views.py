@@ -24,7 +24,10 @@ from rest_framework.filters import SearchFilter
 
 import requests as http_requests
 
-from patients.wah4pc import request_patient, fhir_to_dict, push_patient, patient_to_fhir, get_providers
+from patients.wah4pc import (
+    request_patient, fhir_to_dict, push_patient, patient_to_fhir, get_providers,
+    immunization_to_fhir, immunizations_to_bundle,
+)
 from patients.models import Patient, WAH4PCTransaction
 
 from patients.api.serializers import (
@@ -343,11 +346,16 @@ class PatientViewSet(viewsets.ViewSet):
     @action(detail=True, methods=['get'])
     def immunizations(self, request, pk=None):
         """
-        Get all immunizations for a patient.
+        Get all immunizations for a patient as a FHIR Bundle (collection).
 
         Example: GET /patients/{id}/immunizations/
 
-        Delegates to: PatientACL.get_patient_immunizations(id)
+        Returns:
+            {
+                "resourceType": "Bundle",
+                "type": "collection",
+                "entry": [ { "resource": <FHIR Immunization> }, ... ]
+            }
         """
         try:
             patient_id = int(pk)
@@ -357,9 +365,10 @@ class PatientViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Delegate to ACL
-        immunizations = patient_acl.get_patient_immunizations(patient_id)
-        return Response(immunizations, status=status.HTTP_200_OK)
+        qs = Immunization.objects.filter(
+            patient_id=patient_id
+        ).select_related('patient').order_by('-occurrence_datetime', '-created_at')
+        return Response(immunizations_to_bundle(qs), status=status.HTTP_200_OK)
 
     def destroy(self, request, pk=None):
         """
@@ -578,6 +587,20 @@ class ImmunizationViewSet(viewsets.ModelViewSet):
             return ImmunizationCreateSerializer
         return ImmunizationSerializer
 
+    def list(self, request, *args, **kwargs):
+        """
+        List immunizations as a FHIR Bundle (collection).
+
+        Returns:
+            {
+                "resourceType": "Bundle",
+                "type": "collection",
+                "entry": [ { "resource": <FHIR Immunization> }, ... ]
+            }
+        """
+        queryset = self.filter_queryset(self.get_queryset())
+        return Response(immunizations_to_bundle(queryset))
+
     def create(self, request, *args, **kwargs):
         """
         Create a new immunization via ClinicalDataService.
@@ -613,12 +636,20 @@ class ImmunizationViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Serialize output with read serializer
-        output_serializer = ImmunizationSerializer(immunization)
+        # Return raw FHIR resource (not wrapped in Bundle) for single-record operations
         return Response(
-            output_serializer.data,
+            immunization_to_fhir(immunization),
             status=status.HTTP_201_CREATED
         )
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Retrieve a single immunization as a raw FHIR Immunization resource.
+
+        Returns the standalone resource object directly — NOT wrapped in a Bundle.
+        """
+        instance = self.get_object()
+        return Response(immunization_to_fhir(instance))
 
 
 # ============================================================================
@@ -890,6 +921,13 @@ def webhook_process_query(request):
     identifiers = request.data.get('identifiers', [])
     return_url = request.data.get('gatewayReturnUrl')
     requester_id = request.data.get('requesterId')
+    # Detect which resource type was requested: explicit param wins, then infer from return URL.
+    requested_resource = request.data.get('resourceType', '')
+    if not requested_resource:
+        if return_url and 'Immunization' in return_url:
+            requested_resource = 'Immunization'
+        else:
+            requested_resource = 'Patient'
 
     if not txn_id or not return_url:
         return Response(
@@ -945,7 +983,23 @@ def webhook_process_query(request):
                 return
 
             # ----------------------------------------------------------------
-            # 3. Send the result back to the gateway (10 s hard timeout)
+            # 3. Build the response payload for the requested resource type
+            # ----------------------------------------------------------------
+            if not patient:
+                response_data = {'error': 'Patient not found'}
+                response_status = 'REJECTED'
+            elif requested_resource == 'Immunization':
+                imm_qs = Immunization.objects.filter(
+                    patient=patient
+                ).select_related('patient').order_by('-occurrence_datetime', '-created_at')
+                response_data = immunizations_to_bundle(imm_qs)
+                response_status = 'SUCCESS'
+            else:
+                response_data = patient_to_fhir(patient)
+                response_status = 'SUCCESS'
+
+            # ----------------------------------------------------------------
+            # 4. Send the result back to the gateway (10 s hard timeout)
             # ----------------------------------------------------------------
             http_requests.post(
                 return_url,
@@ -956,8 +1010,8 @@ def webhook_process_query(request):
                 },
                 json={
                     'transactionId': txn_id,
-                    'status': 'SUCCESS' if patient else 'REJECTED',
-                    'data': patient_to_fhir(patient) if patient else {'error': 'Patient not found'},
+                    'status': response_status,
+                    'data': response_data,
                 },
                 timeout=10,
             )
