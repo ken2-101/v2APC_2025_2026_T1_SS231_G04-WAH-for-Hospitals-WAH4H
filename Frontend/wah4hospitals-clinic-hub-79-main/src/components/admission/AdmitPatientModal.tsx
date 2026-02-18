@@ -65,7 +65,7 @@ const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({ isOpen, onClose, 
       Promise.all([
         admissionService.getLocations(),
         admissionService.getAll(),
-        admissionService.getPractitioners()
+        admissionService.getPractitioners('doctor')
       ]).then(([locData, admData, pracData]) => {
         if (locData && locData.buildings) setLocations(locData);
         if (admData) setAdmissions(admData);

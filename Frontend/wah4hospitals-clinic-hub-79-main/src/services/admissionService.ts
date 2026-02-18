@@ -6,10 +6,12 @@ export const admissionService = {
 
     /**
      * Get Practitioners (Physicians)
+     * @param role Optional role to filter by (e.g., 'doctor')
      */
-    async getPractitioners() {
+    async getPractitioners(role?: string) {
         try {
-            const response = await api.get('/api/accounts/practitioners/');
+            const url = role ? `/api/accounts/practitioners/?role=${role}` : '/api/accounts/practitioners/';
+            const response = await api.get(url);
             let data = response.data;
             if (data.results && Array.isArray(data.results)) {
                 data = data.results;

@@ -1,7 +1,7 @@
 import React, { useState, ChangeEvent, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Trash2, Calendar, User, Users, Briefcase, MapPin, Stethoscope, FileText, X, Save, AlertCircle, LogOut } from 'lucide-react';
+import { Edit, Trash2, Calendar, User, Users, Briefcase, MapPin, Stethoscope, FileText, X, Save, AlertCircle, LogOut, RotateCcw, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -85,7 +85,7 @@ export const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({
          // Fetch support data
          admissionService.getLocations().then(setLocations);
          admissionService.getAll().then(setAllAdmissions);
-         admissionService.getPractitioners().then(setPractitioners);
+         admissionService.getPractitioners('doctor').then(setPractitioners);
       } else {
          setEditData(null);
          setCurrentAdmission(null);
@@ -370,12 +370,32 @@ export const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({
 
    const renderEditMode = () => (
       <div className="p-8 space-y-8 bg-white min-h-[500px] text-left">
-         <div className="flex justify-between items-center pb-4 border-b border-slate-100 sticky top-0 bg-white z-10">
+         <div className="flex justify-between items-center pb-4 border-b border-slate-100 bg-white">
             <h3 className="text-xl font-bold text-slate-900">Edit Admission Details</h3>
-            <div className="flex gap-2">
-               <Button variant="outline" onClick={() => setMode('view')}>Cancel</Button>
-               <Button onClick={handleUpdate} disabled={isLoading} className="bg-blue-600 hover:bg-blue-700 shadow-md">
-                  {isLoading ? 'Saving...' : 'Save Changes'}
+            <div className="flex gap-3 flex-shrink-0">
+               <Button
+                  variant="outline"
+                  onClick={() => setMode('view')}
+                  className="border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 h-10 px-5 transition-all active:scale-95 flex items-center gap-2 flex-shrink-0"
+               >
+                  <RotateCcw className="w-4 h-4" /> Cancel
+               </Button>
+               <Button
+                  onClick={handleUpdate}
+                  disabled={isLoading}
+                  className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-500/20 h-10 px-8 transition-all active:scale-95 flex items-center gap-2 flex-shrink-0 whitespace-nowrap"
+               >
+                  {isLoading ? (
+                     <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Saving...</span>
+                     </>
+                  ) : (
+                     <>
+                        <Save className="w-4 h-4" />
+                        <span>Save Changes</span>
+                     </>
+                  )}
                </Button>
             </div>
          </div>
