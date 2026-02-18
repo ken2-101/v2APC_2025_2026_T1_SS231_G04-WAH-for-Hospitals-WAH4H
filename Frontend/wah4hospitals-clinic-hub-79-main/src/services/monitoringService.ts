@@ -186,7 +186,7 @@ class MonitoringService {
 
         return noteObs.map(obs => {
             // Parse stored JSON note or plain text
-            let content = { subjective: '', objective: '', assessment: '', plan: '' };
+            let content = { subjective: '', objective: '', assessment: '', plan: '', providerName: '' };
             try {
                 if (obs.note && obs.note.startsWith('{')) {
                     content = JSON.parse(obs.note);
@@ -204,7 +204,7 @@ class MonitoringService {
                 objective: content.objective,
                 assessment: content.assessment,
                 plan: content.plan,
-                providerName: 'Unknown'
+                providerName: content.providerName || 'Unknown Provider'
             };
         });
     }
@@ -217,7 +217,8 @@ class MonitoringService {
             subjective: note.subjective,
             objective: note.objective,
             assessment: note.assessment,
-            plan: note.plan
+            plan: note.plan,
+            providerName: note.providerName
         });
 
         // Generate unique identifier for this observation

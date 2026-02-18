@@ -289,14 +289,7 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
                                         View
                                     </button>
 
-                                    {request.results && request.results.length > 0 && (
-                                        <a href="/laboratory" target="_blank" rel="noopener noreferrer">
-                                            <Button size="sm" variant="ghost" className="text-gray-500 hover:text-blue-600">
-                                                <ExternalLink className="w-4 h-4 mr-1" />
-                                                Open Lab
-                                            </Button>
-                                        </a>
-                                    )}
+
 
                                     {/* Delete Action - Only for requested items */}
                                     {(currentRole === 'doctor' || currentRole === 'nurse') && request.lifecycleStatus === 'requested' && (

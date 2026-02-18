@@ -50,7 +50,6 @@ const Monitoring: React.FC = () => {
             patientName: adm.patientName || 'Unknown Patient',
             room: adm.location?.room || '—',
             doctorName: adm.physician || 'Unassigned',
-            nurseName: 'Unknown Nurse',
             status: adm.status === 'in-progress' ? 'Stable' : 'Observation',
             encounterType: adm.encounterType || 'IMP',
             admittingDiagnosis: adm.reasonForAdmission || 'N/A',
@@ -59,7 +58,6 @@ const Monitoring: React.FC = () => {
             modeOfArrival: adm.admitSource || 'Physician Referral',
             admissionDate: adm.admissionDate || '',
             attendingPhysician: adm.physician || 'Unassigned',
-            assignedNurse: 'Unknown',
             ward: adm.location?.ward || 'General Ward',
           }));
           setAdmissions(mapped);
@@ -464,10 +462,6 @@ const Monitoring: React.FC = () => {
                     <div className="col-span-2">
                       <p className="text-blue-200 text-xs">Attending Physician</p>
                       <p className="font-medium">{selectedAdmission.attendingPhysician}</p>
-                    </div>
-                    <div className="col-span-2">
-                      <p className="text-blue-200 text-xs">Assigned Nurse</p>
-                      <p className="font-medium">{selectedAdmission.nurseName}</p>
                     </div>
                   </div>
                 </div>
