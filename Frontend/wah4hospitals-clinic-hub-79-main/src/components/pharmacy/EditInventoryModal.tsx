@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Edit } from 'lucide-react';
 import { toast } from 'sonner';
-import axios from 'axios';
+import pharmacyService from '@/services/pharmacyService';
 import { InventoryItem } from '@/types/pharmacy';
 
 interface EditInventoryModalProps {
@@ -15,12 +15,6 @@ interface EditInventoryModalProps {
   item: InventoryItem;
   onUpdateSuccess: (updatedItem: InventoryItem) => void;
 }
-
-const API_BASE = (
-  import.meta.env.BACKEND_PHARMACY_8000 ||
-  import.meta.env.BACKEND_PHARMACY ||
-  'http://localhost:8000/api/pharmacy'
-).replace(/\/$/, '');
 
 export const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
   isOpen,
@@ -86,13 +80,10 @@ export const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
 
     setIsLoading(true);
     try {
-      const res = await axios.put<InventoryItem>(
-        `${API_BASE}/inventory/${item.id}/`,
-        formData
-      );
+      const updatedItem = await pharmacyService.updateInventoryItem(item.id, formData);
 
       toast.success('Inventory item updated successfully');
-      onUpdateSuccess(res.data);
+      onUpdateSuccess(updatedItem);
       onClose();
     } catch (err: any) {
       console.error(err);
