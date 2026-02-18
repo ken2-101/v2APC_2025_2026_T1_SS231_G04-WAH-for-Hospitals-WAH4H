@@ -328,8 +328,9 @@ export const PatientBillingSummary: React.FC<BillingDashboardProps> = ({ subject
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
-                                                    onClick={() => onPrintInvoice && onPrintInvoice(inv)}
+                                                    onClick={() => setViewInvoice(inv)}
                                                     className="text-gray-500 hover:text-gray-900"
+                                                    title="Print Invoice"
                                                 >
                                                     <Printer className="w-4 h-4" />
                                                 </Button>
@@ -358,12 +359,6 @@ export const PatientBillingSummary: React.FC<BillingDashboardProps> = ({ subject
                     invoice={viewInvoice}
                     isOpen={!!viewInvoice}
                     onClose={() => setViewInvoice(null)}
-                    onPrint={() => {
-                        if (onPrintInvoice && viewInvoice) {
-                            onPrintInvoice(viewInvoice);
-                            setViewInvoice(null);
-                        }
-                    }}
                 />
             )}
 
