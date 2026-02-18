@@ -45,7 +45,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
       {/* Greeting Section */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">
-          {getGreeting()}, {user?.first_name ? `Dr. ${user.last_name}` : 'Doctor'}!
+          {getGreeting()}, {user?.lastName || 'User'}!
         </h1>
         <div className="flex items-center mt-1 space-x-2">
            <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-medium border border-blue-200 uppercase tracking-wide">

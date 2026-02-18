@@ -39,7 +39,7 @@ class PharmacyService {
             manufacturer: item.manufacturer,
             is_active: item.status === 'active',
             // Derived status flags logic
-            is_expired: new Date(item.expiry_date) < new Date(),
+            is_expired: new Date(new Date().setHours(0,0,0,0)) > new Date(new Date(item.expiry_date).setHours(0,0,0,0)),
             is_expiring_soon: false, 
             is_low_stock: item.current_stock <= item.reorder_level,
             is_out_of_stock: item.current_stock === 0,

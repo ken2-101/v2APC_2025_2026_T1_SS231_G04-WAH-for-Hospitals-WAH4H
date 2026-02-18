@@ -59,13 +59,8 @@ export const filterMedicationRequests = (
   }
 
   const query = searchQuery.toLowerCase();
-  return requests.filter(
-    (req) =>
-      req.inventory_item_detail?.generic_name?.toLowerCase().includes(query) ||
-      req.inventory_item_detail?.brand_name?.toLowerCase().includes(query) ||
-      req.admission_info?.patient_name?.toLowerCase().includes(query) ||
-      req.notes?.toLowerCase().includes(query) ||
-      req.id.toString().includes(query)
+  return requests.filter((req) =>
+    req.inventory_item_detail?.generic_name?.toLowerCase().includes(query)
   );
 };
 

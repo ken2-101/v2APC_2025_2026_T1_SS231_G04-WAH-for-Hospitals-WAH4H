@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,26 +21,34 @@ const API_BASE = (
   'http://localhost:8000/api/pharmacy'
 ).replace(/\/$/, ''); // Remove trailing slash if present
 
+const INITIAL_STATE = {
+  generic_name: '',
+  item_code: '',
+  category: '',
+  form: 'Tablet',
+  brand_name: '',
+  description: '',
+  quantity: '',
+  minimum_stock_level: '10',
+  unit_of_measure: 'tablet',
+  unit_price: '',
+  batch_number: '',
+  expiry_date: '',
+  manufacturer: '',
+};
+
 export const RestockModal: React.FC<RestockModalProps> = ({
   isOpen,
   onClose,
   onInventoryUpdate,
 }) => {
-  const [itemData, setItemData] = useState({
-    generic_name: '',
-    item_code: '',
-    category: '',
-    form: 'Tablet',
-    brand_name: '',
-    description: '',
-    quantity: '',
-    minimum_stock_level: '10',
-    unit_of_measure: 'tablet',
-    unit_price: '0',
-    batch_number: '',
-    expiry_date: '',
-    manufacturer: '',
-  });
+  const [itemData, setItemData] = useState(INITIAL_STATE);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setItemData(INITIAL_STATE);
+    }
+  }, [isOpen]);
 
   const handleRestock = async () => {
     const quantity = Number(itemData.quantity);
@@ -82,21 +90,6 @@ export const RestockModal: React.FC<RestockModalProps> = ({
       onInventoryUpdate(newItem);
 
       toast.success('Stock added successfully');
-      setItemData({
-        generic_name: '',
-        item_code: '',
-        category: '',
-        form: 'Tablet',
-        brand_name: '',
-        description: '',
-        quantity: '',
-        minimum_stock_level: '10',
-        unit_of_measure: 'tablet',
-        unit_price: '0',
-        batch_number: '',
-        expiry_date: '',
-        manufacturer: '',
-      });
       onClose();
     } catch (err: any) {
       console.error(err);
@@ -257,6 +250,7 @@ export const RestockModal: React.FC<RestockModalProps> = ({
                 type="number"
                 min={0}
                 step="0.01"
+                placeholder="0.00"
                 value={itemData.unit_price}
                 onChange={(e) =>
                   setItemData((prev) => ({ ...prev, unit_price: e.target.value }))
