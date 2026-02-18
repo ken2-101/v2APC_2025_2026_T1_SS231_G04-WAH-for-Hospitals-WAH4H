@@ -26,11 +26,17 @@ from django.utils import timezone
 import uuid
 
 class InvoiceViewSet(viewsets.ModelViewSet):
-    queryset = Invoice.objects.all().prefetch_related(
-        'line_items',
-        'line_items__price_components'
-    )
     serializer_class = InvoiceSerializer
+
+    def get_queryset(self):
+        queryset = Invoice.objects.all().prefetch_related(
+            'line_items',
+            'line_items__price_components'
+        )
+        subject_id = self.request.query_params.get('subject_id')
+        if subject_id:
+            queryset = queryset.filter(subject_id=subject_id)
+        return queryset
 
     @action(detail=True, methods=['post'])
     def recalculate(self, request, pk=None):
