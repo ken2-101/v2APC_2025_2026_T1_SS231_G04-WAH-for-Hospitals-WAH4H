@@ -827,7 +827,16 @@ class PractitionerListAPIView(generics.ListAPIView):
     """
     GET /api/accounts/practitioners/
     List all active practitioners for dropdowns.
+    Supports ?role=doctor to filter by specific role.
     """
-    permission_classes = [AllowAny]  # Changed to AllowAny for testing
+    permission_classes = [AllowAny]
     serializer_class = PractitionerSerializer
-    queryset = Practitioner.objects.filter(active=True)
+    
+    def get_queryset(self):
+        queryset = Practitioner.objects.filter(active=True)
+        role = self.request.query_params.get('role', None)
+        if role:
+            # Filter by matching User role linked to this Practitioner
+            # In our model, User has a O2O to Practitioner with primary_key=True
+            queryset = queryset.filter(user__role__iexact=role)
+        return queryset
