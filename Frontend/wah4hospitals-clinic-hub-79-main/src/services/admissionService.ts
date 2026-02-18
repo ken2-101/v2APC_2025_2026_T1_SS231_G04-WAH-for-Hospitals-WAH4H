@@ -90,7 +90,8 @@ export const admissionService = {
                     physicianId: d.participant_individual_id,
                     participant_individual_id: d.participant_individual_id,
                     subject_id: d.subject_id,
-                    created_at: d.created_at
+                    created_at: d.created_at,
+                    dischargeDate: d.period_end ? d.period_end : null,
                 } as Admission;
             });
         } catch (error) {
@@ -189,7 +190,8 @@ export const admissionService = {
             physicianId: data.participant_individual_id,
             participant_individual_id: data.participant_individual_id,
             subject_id: data.subject_id,
-            created_at: data.created_at
+            created_at: data.created_at,
+            dischargeDate: data.period_end ? data.period_end : null,
         } as Admission;
     },
 
@@ -270,7 +272,8 @@ export const admissionService = {
                 physicianId: data.participant_individual_id,
                 participant_individual_id: data.participant_individual_id,
                 subject_id: data.subject_id,
-                created_at: data.created_at
+                created_at: data.created_at,
+                dischargeDate: data.period_end ? data.period_end : null,
             } as Admission;
         } catch (error) {
             console.error("Error updating admission", error);

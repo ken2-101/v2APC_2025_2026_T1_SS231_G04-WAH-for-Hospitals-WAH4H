@@ -183,13 +183,20 @@ export const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({
    };
 
    // Helper to calculate duration
-
-   // Helper to calculate duration
-   const getDuration = (start?: string) => {
+   const getDuration = () => {
+      const start = data.created_at || data.admissionDate || data.period_start;
       if (!start) return '0 days';
-      const diff = new Date().getTime() - new Date(start).getTime();
-      const days = Math.floor(diff / (1000 * 3600 * 24));
-      return `${days} days`;
+
+      const startDate = new Date(start);
+      // Use dischargeDate if available, otherwise use current time (if active)
+      const endDate = data.dischargeDate ? new Date(data.dischargeDate) : new Date();
+
+      const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      // If less than 24 hours, show "1 day" (or 0 if you prefer exact calculation)
+      // "the amount of days he in the admission state" -> usually counts partial days as 1
+      return `${Math.max(1, diffDays)} days`;
    };
 
 
@@ -215,7 +222,7 @@ export const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({
                   </div>
                   <div className="flex items-center gap-2">
                      <div className="w-4 h-4 rounded-full border border-white/40 flex items-center justify-center text-[10px]">D</div>
-                     Duration: {getDuration(data.admissionDate || data.period_start)}
+                     Duration: {getDuration()}
                   </div>
                </div>
             </div>
