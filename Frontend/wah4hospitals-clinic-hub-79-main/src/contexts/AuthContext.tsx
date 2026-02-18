@@ -150,15 +150,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           } catch (refreshError: any) {
             // Token refresh failed - clear stale tokens and logout
             console.error('Token refresh failed - clearing stale tokens:', refreshError);
-            
+
             // Clear all tokens (they might be stale/invalid)
             localStorage.removeItem('accessToken');
             localStorage.removeItem('refreshToken');
             localStorage.removeItem('currentUser');
             localStorage.removeItem('userRole');
-            
+
             setUser(null);
-            
+
             // Only show toast if not already on login page
             if (!window.location.pathname.includes('/login')) {
               toast({
@@ -167,7 +167,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 variant: 'destructive',
               });
             }
-            
+
             return Promise.reject(refreshError);
           }
         } else {
@@ -498,6 +498,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         password: data.password,
         confirm_password: data.confirmPassword,
         role: data.role,
+
+        // Address Information
+        address_line: data.addressLine || '',
+        address_city: data.addressCity || '',
+        address_district: data.addressDistrict || '',
+        address_state: data.addressState || '',
+        address_postal_code: data.addressPostalCode || '',
+        address_country: data.addressCountry || 'Philippines',
+
+        // Qualification Information
+        qualification_code: data.qualificationCode || '',
+        qualification_identifier: data.qualificationIdentifier || '',
+        qualification_issuer: data.qualificationIssuer && data.qualificationIssuer !== 'none' ? data.qualificationIssuer : null,
+        qualification_period_start: data.qualificationPeriodStart || null,
+        qualification_period_end: data.qualificationPeriodEnd || null,
+
+        // Hospital Assignment
+        organization: data.organization || null,
+        role_code: data.roleCode || '',
+        specialty_code: data.specialtyCode || '',
       });
 
       toast({
@@ -639,9 +659,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isAuthenticated = !!user;
 
   return (
-    <AuthContext.Provider 
-      value={{ 
-        user, 
+    <AuthContext.Provider
+      value={{
+        user,
         loginInitiate,
         loginVerify,
         passwordResetInitiate,
@@ -651,8 +671,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         changePasswordVerify,
         register,
         registerInitiate,
-        registerVerify, 
-        logout, 
+        registerVerify,
+        logout,
         isLoading,
         isAuthenticated,
       }}
