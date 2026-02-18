@@ -124,7 +124,6 @@ const roleAccessConfig: Record<UserRole, string[]> = {
     'dashboard',      // View billing summaries and pending claims
     'billing',        // Create and manage invoices
     'billing',        // Create and manage invoices
-    'erp',            // Financial reporting and integration
     'patients',       // Access patient information for billing
     'settings',       // Personal settings
   ],
