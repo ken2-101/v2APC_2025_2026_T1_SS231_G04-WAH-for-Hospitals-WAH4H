@@ -27,6 +27,7 @@ import requests as http_requests
 from patients.wah4pc import (
     request_patient, fhir_to_dict, push_patient, patient_to_fhir, get_providers,
     immunization_to_fhir, immunizations_to_bundle,
+    procedures_to_bundle, encounters_to_bundle,
 )
 from patients.models import Patient, WAH4PCTransaction
 
@@ -369,6 +370,84 @@ class PatientViewSet(viewsets.ViewSet):
             patient_id=patient_id
         ).select_related('patient').order_by('-occurrence_datetime', '-created_at')
         return Response(immunizations_to_bundle(qs), status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['get'], url_path='procedures')
+    def get_procedures(self, request, pk=None):
+        """
+        Get all procedures for a patient as a FHIR Bundle (collection).
+
+        Reads from the Admission module (source of truth) — read-only.
+        Admission models are imported locally to avoid circular dependencies.
+
+        Example: GET /patients/{id}/procedures/
+
+        Returns:
+            {
+                "resourceType": "Bundle",
+                "type": "collection",
+                "entry": [ { "resource": <FHIR Procedure> }, ... ]
+            }
+        """
+        try:
+            patient_id = int(pk)
+        except (ValueError, TypeError):
+            return Response(
+                {'error': 'Invalid patient ID'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not patient_acl.validate_patient_exists(patient_id):
+            return Response(
+                {'error': 'Patient not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Local import — avoids circular dependency; Admission is read-only here.
+        from admission.models import Procedure
+
+        qs = Procedure.objects.filter(
+            subject_id=patient_id
+        ).order_by('-performed_datetime', '-created_at')
+        return Response(procedures_to_bundle(qs), status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['get'], url_path='encounters')
+    def get_encounters(self, request, pk=None):
+        """
+        Get all encounters for a patient as a FHIR Bundle (collection).
+
+        Reads from the Admission module (source of truth) — read-only.
+        Admission models are imported locally to avoid circular dependencies.
+
+        Example: GET /patients/{id}/encounters/
+
+        Returns:
+            {
+                "resourceType": "Bundle",
+                "type": "collection",
+                "entry": [ { "resource": <FHIR Encounter> }, ... ]
+            }
+        """
+        try:
+            patient_id = int(pk)
+        except (ValueError, TypeError):
+            return Response(
+                {'error': 'Invalid patient ID'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not patient_acl.validate_patient_exists(patient_id):
+            return Response(
+                {'error': 'Patient not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Local import — avoids circular dependency; Admission is read-only here.
+        from admission.models import Encounter
+
+        qs = Encounter.objects.filter(
+            subject_id=patient_id
+        ).order_by('-period_start', '-created_at')
+        return Response(encounters_to_bundle(qs), status=status.HTTP_200_OK)
 
     def destroy(self, request, pk=None):
         """
@@ -924,7 +1003,11 @@ def webhook_process_query(request):
     # Detect which resource type was requested: explicit param wins, then infer from return URL.
     requested_resource = request.data.get('resourceType', '')
     if not requested_resource:
-        if return_url and 'Immunization' in return_url:
+        if return_url and 'Encounter' in return_url:
+            requested_resource = 'Encounter'
+        elif return_url and 'Procedure' in return_url:
+            requested_resource = 'Procedure'
+        elif return_url and 'Immunization' in return_url:
             requested_resource = 'Immunization'
         else:
             requested_resource = 'Patient'
@@ -988,6 +1071,20 @@ def webhook_process_query(request):
             if not patient:
                 response_data = {'error': 'Patient not found'}
                 response_status = 'REJECTED'
+            elif requested_resource == 'Encounter':
+                from admission.models import Encounter as EncounterModel
+                enc_qs = EncounterModel.objects.filter(
+                    subject_id=patient.id
+                ).order_by('-period_start', '-created_at')
+                response_data = encounters_to_bundle(enc_qs)
+                response_status = 'SUCCESS'
+            elif requested_resource == 'Procedure':
+                from admission.models import Procedure as ProcedureModel
+                proc_qs = ProcedureModel.objects.filter(
+                    subject_id=patient.id
+                ).order_by('-performed_datetime', '-created_at')
+                response_data = procedures_to_bundle(proc_qs)
+                response_status = 'SUCCESS'
             elif requested_resource == 'Immunization':
                 imm_qs = Immunization.objects.filter(
                     patient=patient

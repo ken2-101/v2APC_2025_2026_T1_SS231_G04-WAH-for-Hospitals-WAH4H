@@ -3,7 +3,7 @@ import re
 import time
 import uuid
 import zlib
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date, timedelta
 
 import requests
 
@@ -200,6 +200,27 @@ _OCCUPATION_CODE: dict[str, str] = {
     "Armed Forces Occupations":                             "0",
 }
 
+# ---------------------------------------------------------------------------
+# FHIR R4 Encounter class code → human-readable display name.
+# Source: HL7 v3 ActCode CodeSystem.
+# ---------------------------------------------------------------------------
+ENCOUNTER_CLASS_MAP: dict[str, str] = {
+    "AMB":    "ambulatory",
+    "EMER":   "emergency",
+    "FLD":    "field",
+    "HH":     "home health",
+    "IMP":    "inpatient encounter",
+    "ACUTE":  "inpatient acute",
+    "NONAC":  "inpatient non-acute",
+    "OBSENC": "observation encounter",
+    "PRENC":  "pre-admission",
+    "SS":     "short stay",
+    "VR":     "virtual",
+}
+
+# Philippine Standard Time — fixed UTC+08:00 offset used for FHIR date-times.
+_PHT = timezone(timedelta(hours=8))
+
 
 def _slug(text: str) -> str:
     """Normalise a display string to a lowercase slug (fallback code)."""
@@ -236,6 +257,44 @@ def _barangay_psgc_code(city_psgc_10: str | None, barangay_name: str | None) -> 
 def _clean(d: dict) -> dict:
     """Strip None and empty-string values from a flat dict."""
     return {k: v for k, v in d.items() if v is not None and v != ""}
+
+
+def _meta_last_updated(dt) -> str:
+    """Format a Django DateTimeField value as a FHIR meta.lastUpdated string.
+
+    Output format: "YYYY-MM-DDTHH:MM:SS.mmmZ"  (UTC, millisecond precision)
+    Falls back to the current UTC instant when dt is None.
+    """
+    if dt is None:
+        return datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    dt_utc = dt.astimezone(timezone.utc) if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    ms = dt_utc.microsecond // 1000
+    return dt_utc.strftime(f"%Y-%m-%dT%H:%M:%S.{ms:03d}Z")
+
+
+def format_fhir_datetime(value) -> str:
+    """Format a date or datetime to a FHIR datetime string in PHT (+08:00).
+
+    DateTimeField values (timezone-aware UTC) are converted to PHT and formatted
+    as "YYYY-MM-DDTHH:MM:SS+08:00".
+
+    DateField values (date-only) are padded with midnight PHT time, producing
+    "YYYY-MM-DDT00:00:00+08:00".  This is the known fidelity tradeoff for
+    Encounter.period_start / period_end which are stored as DateField.
+
+    Returns None for falsy input.
+    """
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        dt_pht = (
+            value.astimezone(_PHT)
+            if value.tzinfo
+            else value.replace(tzinfo=timezone.utc).astimezone(_PHT)
+        )
+        return dt_pht.strftime("%Y-%m-%dT%H:%M:%S+08:00")
+    # date-only (DateField) — pad with midnight PHT
+    return f"{value.isoformat()}T00:00:00+08:00"
 
 
 # ---------------------------------------------------------------------------
@@ -1101,6 +1160,282 @@ def immunizations_to_bundle(queryset):
         "resourceType": "Bundle",
         "type": "collection",
         "entry": [{"resource": immunization_to_fhir(imm)} for imm in queryset],
+    }
+
+
+# ---------------------------------------------------------------------------
+# FHIR Procedure conversion (reads from Admission module — source of truth)
+# ---------------------------------------------------------------------------
+
+def _practitioner_ref(practitioner_id):
+    """Look up a Practitioner by its integer PK and return a FHIR reference dict.
+
+    Returns None when the record does not exist.
+    """
+    if not practitioner_id:
+        return None
+    from accounts.models import Practitioner
+    try:
+        pract = Practitioner.objects.get(practitioner_id=practitioner_id)
+        full_name = " ".join(p for p in [pract.first_name, pract.middle_name, pract.last_name] if p)
+        return {
+            "display":   full_name,
+            "reference": f"Practitioner/{pract.identifier}",
+        }
+    except Practitioner.DoesNotExist:
+        return None
+
+
+def _patient_ref(subject_id):
+    """Look up a Patient by its integer PK and return (fhir_id, display_name).
+
+    Returns a pair of empty strings when the record does not exist.
+    """
+    if not subject_id:
+        return str(uuid.uuid4()), ""
+    from patients.models import Patient
+    try:
+        patient = Patient.objects.get(id=subject_id)
+        fhir_id = str(uuid.uuid5(uuid.NAMESPACE_OID, f"patient:{patient.id}"))
+        full_name = " ".join(
+            p for p in [patient.first_name, patient.middle_name, patient.last_name] if p
+        )
+        return fhir_id, full_name
+    except Patient.DoesNotExist:
+        return str(uuid.uuid4()), ""
+
+
+def procedure_to_fhir(model):
+    """Convert an Admission Procedure instance to a PH Core FHIR Procedure resource.
+
+    Reads from the Admission module as the source of truth (read-only).
+    Resolves Patient, Practitioner, and Location via Fortress Pattern IDs.
+
+    Notable spec rules applied:
+    - subject does NOT include a "type" field (FHIR Procedure spec).
+    - SNOMED system hardcoded for code and category.
+    - outcome / reasonCode emit only "text" (free-text from outcome_display /
+      reason_code_display) — no coding array required by this profile.
+    """
+    from accounts.models import Location
+
+    patient_fhir_id, patient_display = _patient_ref(model.subject_id)
+    recorder   = _practitioner_ref(model.recorder_id)
+    performer  = _practitioner_ref(model.performer_actor_id)
+
+    location_display = None
+    if model.location_id:
+        try:
+            loc = Location.objects.get(location_id=model.location_id)
+            location_display = loc.name
+        except Location.DoesNotExist:
+            pass
+
+    fhir: dict = {
+        "resourceType": "Procedure",
+        "id":           model.identifier,
+        "meta": {
+            "profile":     [f"{_URN_EXT}/ph-core-procedure"],
+            "lastUpdated": _meta_last_updated(model.updated_at),
+        },
+        "status": model.status,
+        "subject": {
+            "display":   patient_display,
+            "reference": f"Patient/{patient_fhir_id}",
+        },
+    }
+
+    # code (SNOMED)
+    if model.code_code or model.code_display:
+        fhir["code"] = {
+            "text": model.code_display or model.code_code,
+            "coding": [{
+                "code":    model.code_code   or "",
+                "system":  "http://snomed.info/sct",
+                "display": model.code_display or model.code_code or "",
+            }],
+        }
+
+    # category (SNOMED)
+    if model.category_code or model.category_display:
+        fhir["category"] = {
+            "text": model.category_display or model.category_code,
+            "coding": [{
+                "code":    model.category_code   or "",
+                "system":  "http://snomed.info/sct",
+                "display": model.category_display or model.category_code or "",
+            }],
+        }
+
+    # performedDateTime
+    if model.performed_datetime:
+        fhir["performedDateTime"] = format_fhir_datetime(model.performed_datetime)
+
+    # note
+    if model.note:
+        fhir["note"] = [{"text": model.note}]
+
+    # outcome — free text only (outcome_display preferred, falls back to code)
+    outcome_text = model.outcome_display or model.outcome_code
+    if outcome_text:
+        fhir["outcome"] = {"text": outcome_text}
+
+    # reasonCode — free text only
+    reason_text = model.reason_code_display or model.reason_code_code
+    if reason_text:
+        fhir["reasonCode"] = [{"text": reason_text}]
+
+    # location
+    if location_display:
+        fhir["location"] = {"display": location_display}
+
+    # recorder
+    if recorder:
+        fhir["recorder"] = recorder
+
+    # performer — FHIR Procedure.performer is an array of actor objects
+    if performer:
+        fhir["performer"] = [{"actor": performer}]
+
+    return fhir
+
+
+def procedures_to_bundle(queryset):
+    """Wrap an iterable of Admission Procedure instances as a FHIR Bundle (collection).
+
+    Returns:
+        dict: { "resourceType": "Bundle", "type": "collection", "entry": [...] }
+    """
+    return {
+        "resourceType": "Bundle",
+        "type":         "collection",
+        "entry":        [{"resource": procedure_to_fhir(proc)} for proc in queryset],
+    }
+
+
+# ---------------------------------------------------------------------------
+# FHIR Encounter conversion (reads from Admission module — source of truth)
+# ---------------------------------------------------------------------------
+
+def encounter_to_fhir(model):
+    """Convert an Admission Encounter instance to a PH Core FHIR Encounter resource.
+
+    Reads from the Admission module as the source of truth (read-only).
+    Resolves Patient, Practitioner, and Location via Fortress Pattern IDs.
+
+    Notable spec rules applied:
+    - subject DOES include "type": "Patient" (FHIR Encounter spec).
+    - class is a single Coding (not CodeableConcept) per FHIR R4.
+    - period uses format_fhir_datetime which handles the DateField→datetime gap
+      by padding date-only values with midnight PHT (T00:00:00+08:00).
+    - participant hardcoded to PPRF (primary performer) type.
+    """
+    from accounts.models import Location
+
+    patient_fhir_id, patient_display = _patient_ref(model.subject_id)
+
+    # Participant (practitioner)
+    participant_fhir = None
+    if model.participant_individual_id:
+        from accounts.models import Practitioner
+        try:
+            pract = Practitioner.objects.get(
+                practitioner_id=model.participant_individual_id
+            )
+            full_name = " ".join(
+                p for p in [pract.first_name, pract.middle_name, pract.last_name] if p
+            )
+            participant_fhir = {
+                "type": [{
+                    "coding": [{
+                        "code":    "PPRF",
+                        "system":  "http://terminology.hl7.org/CodeSystem/v3-ParticipationType",
+                        "display": "primary performer",
+                    }]
+                }],
+                "individual": {
+                    "type":      "Practitioner",
+                    "display":   full_name,
+                    "reference": f"Practitioner/{pract.identifier}",
+                },
+            }
+        except Practitioner.DoesNotExist:
+            pass
+
+    # Location
+    location_fhir = None
+    if model.location_id:
+        try:
+            loc = Location.objects.get(location_id=model.location_id)
+            location_fhir = [{"location": {"display": loc.name}}]
+        except Location.DoesNotExist:
+            pass
+
+    # class code → display via map
+    class_code    = model.class_field or ""
+    class_display = ENCOUNTER_CLASS_MAP.get(class_code, class_code.lower())
+
+    fhir: dict = {
+        "resourceType": "Encounter",
+        "id":           model.identifier,
+        "meta": {
+            "profile":     [f"{_URN_EXT}/ph-core-encounter"],
+            "lastUpdated": _meta_last_updated(model.updated_at),
+        },
+        "status": model.status,
+        "subject": {
+            "type":      "Patient",
+            "display":   patient_display,
+            "reference": f"Patient/{patient_fhir_id}",
+        },
+    }
+
+    # class — single Coding per FHIR R4 (not a CodeableConcept)
+    if class_code:
+        fhir["class"] = {
+            "code":    class_code,
+            "system":  "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+            "display": class_display,
+        }
+
+    # type
+    if model.type:
+        fhir["type"] = [{"text": model.type}]
+
+    # period — handles DateField (date-only) gap via format_fhir_datetime
+    period = {}
+    if model.period_start:
+        period["start"] = format_fhir_datetime(model.period_start)
+    if model.period_end:
+        period["end"] = format_fhir_datetime(model.period_end)
+    if period:
+        fhir["period"] = period
+
+    # reasonCode
+    if model.reason_code:
+        fhir["reasonCode"] = [{"text": model.reason_code}]
+
+    # location
+    if location_fhir:
+        fhir["location"] = location_fhir
+
+    # participant
+    if participant_fhir:
+        fhir["participant"] = [participant_fhir]
+
+    return fhir
+
+
+def encounters_to_bundle(queryset):
+    """Wrap an iterable of Admission Encounter instances as a FHIR Bundle (collection).
+
+    Returns:
+        dict: { "resourceType": "Bundle", "type": "collection", "entry": [...] }
+    """
+    return {
+        "resourceType": "Bundle",
+        "type":         "collection",
+        "entry":        [{"resource": encounter_to_fhir(enc)} for enc in queryset],
     }
 
 
