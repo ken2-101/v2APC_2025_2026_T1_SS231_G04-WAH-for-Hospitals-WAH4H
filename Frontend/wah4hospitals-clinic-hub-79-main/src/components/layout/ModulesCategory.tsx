@@ -76,8 +76,7 @@ const ModulesCategory = () => {
     {
       name: "Administration",
       modules: [
-        { id: 'statistics', name: 'Statistics', icon: <BarChart3 className="w-4 h-4" />, description: "Hospital performance" },
-        { id: 'erp', name: 'ERP', icon: <Building2 className="w-4 h-4" />, description: "Resource planning" }
+        { id: 'statistics', name: 'Statistics', icon: <BarChart3 className="w-4 h-4" />, description: "Hospital performance" }
       ]
     },
     {
