@@ -26,6 +26,42 @@ interface PatientSummary {
 import { useRef } from 'react';
 import { InvoiceDetailModal } from './InvoiceDetailModal';
 
+
+interface SummaryCardProps {
+    title: string;
+    icon: React.ElementType;
+    amount: number;
+    subtitle: string;
+    className?: string;
+    iconClassName?: string;
+    textClassName?: string;
+    subtitleClassName?: string;
+}
+
+const SummaryCard: React.FC<SummaryCardProps> = ({
+    title,
+    icon: Icon,
+    amount,
+    subtitle,
+    className,
+    iconClassName = "text-muted-foreground",
+    textClassName,
+    subtitleClassName = "text-muted-foreground"
+}) => (
+    <Card className={className}>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className={`text-sm font-medium ${textClassName || ''}`}>{title}</CardTitle>
+            <Icon className={`h-4 w-4 ${iconClassName}`} />
+        </CardHeader>
+        <CardContent>
+            <div className={`text-2xl font-bold ${textClassName || ''}`}>
+                ₱{amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </div>
+            <p className={`text-xs ${subtitleClassName}`}>{subtitle}</p>
+        </CardContent>
+    </Card>
+);
+
 export const PatientBillingSummary: React.FC<BillingDashboardProps> = ({ subjectId, patientName, onInvoiceGenerated, onPrintInvoice }) => {
     const [summary, setSummary] = useState<PatientSummary | null>(null);
     const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -97,8 +133,9 @@ export const PatientBillingSummary: React.FC<BillingDashboardProps> = ({ subject
             await billingService.recordPayment(selectedInvoice.invoice_id, paymentData);
             setSuccessMsg("Payment processed successfully.");
             setSelectedInvoice(null);
+            // Refresh data to update summary cards and invoice list
             if (subjectId) {
-                fetchData(subjectId);
+                await fetchData(subjectId);
             }
         } catch (err) {
             console.error("Payment recording failed:", err);
@@ -168,8 +205,14 @@ export const PatientBillingSummary: React.FC<BillingDashboardProps> = ({ subject
 
     if (!summary) return null;
 
+    const totalPaid = invoices
+        .filter(inv => inv.status === 'balanced')
+        .reduce((sum, inv) => sum + Number(inv.total_net_value), 0);
+
+    const remainingBalance = summary.grand_total - totalPaid;
+
     return (
-        <div className="space-y-6 animate-in fade-in zoom-in duration-300">
+        <div className="space-y-6">
             {error && (
                 <Alert variant="destructive">
                     <AlertTitle>Error</AlertTitle>
@@ -186,54 +229,26 @@ export const PatientBillingSummary: React.FC<BillingDashboardProps> = ({ subject
             )}
 
             {/* STATUS CARDS */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                {/* Total Billed */}
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Total Billed</CardTitle>
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">₱{summary.billed_total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                        <p className="text-xs text-muted-foreground">Finalized Invoices</p>
-                    </CardContent>
-                </Card>
+            <div className="grid gap-4 md:grid-cols-2">
+                {/* Payment Completed */}
+                <SummaryCard
+                    title="Payment Completed"
+                    icon={FileText}
+                    amount={totalPaid}
+                    subtitle="Total Paid"
+                />
 
-                {/* Unbilled Lab */}
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Unbilled Lab</CardTitle>
-                        <FlaskConical className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">₱{summary.unbilled_lab_total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                        <p className="text-xs text-muted-foreground">Pending Results</p>
-                    </CardContent>
-                </Card>
-
-                {/* Unbilled Pharmacy */}
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Unbilled Pharmacy</CardTitle>
-                        <Pill className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">₱{summary.unbilled_pharmacy_total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                        <p className="text-xs text-muted-foreground">Dispensed Meds</p>
-                    </CardContent>
-                </Card>
-
-                {/* Grand Total */}
-                <Card className="bg-primary/5 border-primary/20">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-primary">Grand Total Liability</CardTitle>
-                        <DollarSign className="h-4 w-4 text-primary" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-primary">₱{summary.grand_total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                        <p className="text-xs text-primary/80">Total to be paid</p>
-                    </CardContent>
-                </Card>
+                {/* Remaining Balance */}
+                <SummaryCard
+                    title="To Pay"
+                    icon={DollarSign}
+                    amount={remainingBalance}
+                    subtitle="Total Outstanding"
+                    className="bg-primary/5 border-primary/20"
+                    textClassName="text-primary"
+                    iconClassName="text-primary"
+                    subtitleClassName="text-primary/80"
+                />
             </div>
 
             {/* GENERATE BUTTON */}
@@ -337,15 +352,7 @@ export const PatientBillingSummary: React.FC<BillingDashboardProps> = ({ subject
                                                     </Button>
                                                 )}
 
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => setViewInvoice(inv)}
-                                                    className="text-gray-500 hover:text-gray-900"
-                                                    title="Print Invoice"
-                                                >
-                                                    <Printer className="w-4 h-4" />
-                                                </Button>
+
 
                                                 <Button
                                                     variant="ghost"
@@ -396,6 +403,8 @@ export const PatientBillingSummary: React.FC<BillingDashboardProps> = ({ subject
                     }}
                 />
             )}
+
+
         </div>
     );
 };
