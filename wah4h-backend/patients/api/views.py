@@ -756,19 +756,35 @@ def fetch_wah4pc(request):
             status=result.get('status_code', 500)
         )
 
-    txn_id = result.get('data', {}).get('id') if 'data' in result else result.get('id')
+    # Gateway may return the transaction ID as 'transactionId' or 'id' (flat or nested under 'data')
+    _data = result.get('data') or {}
+    txn_id = (
+        result.get('transactionId') or
+        result.get('id') or
+        _data.get('transactionId') or
+        _data.get('id')
+    )
     idempotency_key = result.get('idempotency_key')
 
     if txn_id:
-        WAH4PCTransaction.objects.create(
+        WAH4PCTransaction.objects.get_or_create(
             transaction_id=txn_id,
-            type='fetch',
-            status='PENDING',
-            target_provider_id=target_id,
-            idempotency_key=idempotency_key,
+            defaults={
+                'type': 'fetch',
+                'status': 'PENDING',
+                'target_provider_id': target_id,
+                'idempotency_key': idempotency_key,
+            },
+        )
+    else:
+        return Response(
+            {'error': 'Gateway did not return a transaction ID. Check gateway credentials or try again.'},
+            status=status.HTTP_502_BAD_GATEWAY,
         )
 
-    return Response(result, status=status.HTTP_202_ACCEPTED)
+    # Guarantee transactionId is always top-level so the frontend can find it
+    # regardless of whether the gateway wraps it under a 'data' key.
+    return Response({**result, 'transactionId': txn_id}, status=status.HTTP_202_ACCEPTED)
 
 
 @api_view(['POST'])
@@ -815,11 +831,56 @@ def webhook_receive(request):
     if request.data.get('status') == 'SUCCESS':
         txn.raw_payload = raw_payload
         txn.status = 'COMPLETED'
+
+        # Auto-register the patient so they appear in the dashboard immediately.
+        # Mirrors the logic in webhook_receive_push.
+        fhir_data = request.data.get('data')
+        if fhir_data and isinstance(fhir_data, dict):
+            # Gateway wraps the Patient resource inside a FHIR Bundle — unwrap it.
+            if fhir_data.get('resourceType') == 'Bundle':
+                entries = fhir_data.get('entry', [])
+                fhir_data = next(
+                    (e['resource'] for e in entries
+                     if isinstance(e.get('resource'), dict)
+                     and e['resource'].get('resourceType') == 'Patient'),
+                    None,
+                )
+        if fhir_data and isinstance(fhir_data, dict):
+            try:
+                patient_dict = fhir_to_dict(fhir_data)
+                try:
+                    patient = PatientRegistrationService.register_patient(patient_dict)
+                except DjangoValidationError:
+                    # Patient already exists — find by philhealth_id or name+birthdate
+                    philhealth_id = patient_dict.get('philhealth_id')
+                    patient = None
+                    if philhealth_id:
+                        patient = Patient.objects.filter(philhealth_id=philhealth_id).first()
+                    if not patient:
+                        patient = Patient.objects.filter(
+                            first_name__iexact=patient_dict.get('first_name', ''),
+                            last_name__iexact=patient_dict.get('last_name', ''),
+                            birthdate=patient_dict.get('birthdate'),
+                        ).first()
+                if patient:
+                    txn.related_patient = patient
+                    txn.patient_id = patient.id
+            except Exception as exc:
+                logger.warning(
+                    '[WAH4PC] Could not auto-register patient from fetch webhook (txn=%s): %s',
+                    txn_id, exc,
+                )
+
         txn.save()
     else:
         txn.raw_payload = raw_payload
         txn.status = 'FAILED'
-        txn.error_message = request.data.get('data', {}).get('error', 'Unknown')
+        error_data = request.data.get('data')
+        txn.error_message = (
+            error_data.get('error', 'Unknown')
+            if isinstance(error_data, dict)
+            else 'Unknown'
+        )
         txn.save()
 
     return Response({'status': 'received'}, status=status.HTTP_200_OK)
@@ -850,18 +911,26 @@ def send_to_wah4pc(request):
             status=result.get('status_code', 500)
         )
 
-    txn_id = result.get('id')
+    _data_send = result.get('data') or {}
+    txn_id = (
+        result.get('transactionId') or
+        result.get('id') or
+        _data_send.get('transactionId') or
+        _data_send.get('id')
+    )
     idempotency_key = result.get('idempotency_key')
 
     if txn_id:
-        WAH4PCTransaction.objects.create(
+        WAH4PCTransaction.objects.get_or_create(
             transaction_id=txn_id,
-            type='send',
-            status=result.get('status', 'PENDING'),
-            patient_id=patient.id,
-            related_patient=patient,
-            target_provider_id=target_id,
-            idempotency_key=idempotency_key,
+            defaults={
+                'type': 'send',
+                'status': result.get('status', 'PENDING'),
+                'patient_id': patient.id,
+                'related_patient': patient,
+                'target_provider_id': target_id,
+                'idempotency_key': idempotency_key,
+            },
         )
 
     return Response(result, status=status.HTTP_202_ACCEPTED)

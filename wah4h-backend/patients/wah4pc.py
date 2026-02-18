@@ -350,6 +350,7 @@ def request_patient(target_id, philhealth_id, idempotency_key=None):
                         {"system": "http://philhealth.gov.ph", "value": philhealth_id}
                     ],
                 },
+                timeout=30,
             )
 
             if response.status_code in _RETRY_STATUSES:
@@ -733,6 +734,7 @@ def push_patient(target_id, patient, idempotency_key=None):
                     "resourceType": "Patient",
                     "data": patient_to_fhir(patient),
                 },
+                timeout=30,
             )
 
             if response.status_code in _RETRY_STATUSES:
@@ -932,11 +934,12 @@ def fhir_to_dict(fhir):
     indigenous_val    = _get_extension(extensions, f"{_EXT_BASE}/indigenous-people")
     indigenous_grp    = _get_extension(extensions, f"{_EXT_BASE}/indigenous-group")
     nationality_ext   = _get_extension(extensions, "http://hl7.org/fhir/StructureDefinition/patient-nationality")
-    religion_val      = _get_extension(extensions, "http://hl7.org/fhir/StructureDefinition/patient-religion")
+    race_val          = _get_extension(extensions, f"{_EXT_BASE}/race")
+    religion_val      = _get_extension(extensions, f"{_EXT_BASE}/religion")
     occupation_val    = _get_extension(extensions, f"{_EXT_BASE}/occupation")
     education_val     = _get_extension(extensions, f"{_EXT_BASE}/educational-attainment")
 
-    # Nested nationality extension
+    # Nested nationality extension (HL7 standard fallback)
     nationality = None
     if isinstance(nationality_ext, list):
         for sub in nationality_ext:
@@ -944,6 +947,11 @@ def fhir_to_dict(fhir):
                 concept = sub.get("valueCodeableConcept", {})
                 codings = concept.get("coding", [{}])
                 nationality = codings[0].get("display") or codings[0].get("code")
+    # PH Core stores nationality as a flat race/valueCodeableConcept extension
+    if not nationality and isinstance(race_val, dict):
+        race_codings = race_val.get("coding", [{}])
+        if race_codings:
+            nationality = race_codings[0].get("display") or race_codings[0].get("code")
 
     def _display(val):
         if isinstance(val, dict):
@@ -965,8 +973,8 @@ def fhir_to_dict(fhir):
     contact_rel = contact_rels[0] if contact_rels else {}
 
     result = {
-        "first_name":            given[0] if given else "",
-        "middle_name":           given[1] if len(given) > 1 else "",
+        "first_name":            given[0].strip() if given else "",
+        "middle_name":           given[1].strip() if len(given) > 1 else "",
         "last_name":             name.get("family", ""),
         "gender":                fhir.get("gender", "").lower() or None,
         "birthdate":             fhir.get("birthDate"),

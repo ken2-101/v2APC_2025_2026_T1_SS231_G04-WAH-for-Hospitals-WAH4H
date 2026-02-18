@@ -80,27 +80,32 @@ function fhirToPatientForm(fhir: Record<string, unknown>): Partial<PatientFormDa
   const philHealthId = ids.find((i) => i.system?.includes('philhealth'))?.value;
   const phone = telecoms.find((t) => t.system === 'phone')?.value;
 
-  // Nationality nested extension
-  const nationalityExt = findExt('http://hl7.org/fhir/StructureDefinition/patient-nationality');
-  let nationality: string | undefined;
-  if (Array.isArray(nationalityExt?.extension)) {
-    const codeExt = nationalityExt.extension.find((e: any) => e.url === 'code');
-    const codings: any[] = codeExt?.valueCodeableConcept?.coding ?? [];
-    nationality = codings[0]?.display ?? codings[0]?.code;
-  }
+  // Nationality: PH Core uses a flat race/valueCodeableConcept extension
+  const raceExt = findExt('urn://example.com/ph-core/fhir/StructureDefinition/race');
+  const nationality = display(raceExt?.valueCodeableConcept);
+
+  // Civil status: HL7 single-letter code in maritalStatus.coding[0].code
+  const civilStatusCode = (fhir.maritalStatus as any)?.coding?.[0]?.code as PatientFormData['civil_status'] | undefined;
+
+  // Indigenous: boolean from indigenous-people, optional group from indigenous-group
+  const indigenousExt = findExt('urn://example.com/ph-core/fhir/StructureDefinition/indigenous-people');
+  const indigenousGroupExt = findExt('urn://example.com/ph-core/fhir/StructureDefinition/indigenous-group');
 
   return {
-    first_name: given[0] ?? '',
-    middle_name: given[1] ?? '',
+    first_name: (given[0] ?? '').trim(),
+    middle_name: (given[1] ?? '').trim(),
     last_name: name.family ?? '',
     gender: (fhir.gender as string)?.toLowerCase() as PatientFormData['gender'],
     birthdate: fhir.birthDate as string | undefined,
+    civil_status: civilStatusCode,
     philhealth_id: philHealthId,
     mobile_number: phone,
     nationality,
-    religion: display(findExt('http://hl7.org/fhir/StructureDefinition/patient-religion')?.valueCodeableConcept),
+    religion: display(findExt('urn://example.com/ph-core/fhir/StructureDefinition/religion')?.valueCodeableConcept),
     occupation: display(findExt('urn://example.com/ph-core/fhir/StructureDefinition/occupation')?.valueCodeableConcept),
     education: display(findExt('urn://example.com/ph-core/fhir/StructureDefinition/educational-attainment')?.valueCodeableConcept),
+    indigenous_flag: indigenousExt !== undefined ? (indigenousExt as any).valueBoolean as boolean : undefined,
+    indigenous_group: display(indigenousGroupExt?.valueCodeableConcept),
     address_line: (addr.line as string[] | undefined)?.[0],
     address_city: addr.city,
     address_district: addr.district,
@@ -232,11 +237,23 @@ export const NetworkSearchModal: React.FC<NetworkSearchModalProps> = ({
           setPolling(false);
           onSearchComplete?.();
 
-          // Extract and map the FHIR Patient from rawPayload
+          // Extract and map the FHIR Patient from rawPayload.
+          // The gateway wraps the Patient inside a FHIR Bundle:
+          //   rawPayload.data = { resourceType: "Bundle", entry: [{ resource: { ...Patient } }] }
           const raw = res.data.rawPayload;
-          const fhirPatient = raw?.data ?? raw; // data key when status='SUCCESS'
-          if (fhirPatient && typeof fhirPatient === 'object') {
-            const mapped = fhirToPatientForm(fhirPatient as Record<string, unknown>);
+          const bundle = raw?.data ?? raw;
+          let fhirPatient: Record<string, unknown> | null = null;
+          if (bundle && typeof bundle === 'object') {
+            if ((bundle as any).resourceType === 'Bundle') {
+              const entries: any[] = (bundle as any).entry ?? [];
+              fhirPatient =
+                entries.find((e: any) => e?.resource?.resourceType === 'Patient')?.resource ?? null;
+            } else if ((bundle as any).resourceType === 'Patient') {
+              fhirPatient = bundle as Record<string, unknown>;
+            }
+          }
+          if (fhirPatient) {
+            const mapped = fhirToPatientForm(fhirPatient);
             onPatientFound(mapped);
             handleClose();
           } else {
@@ -278,6 +295,7 @@ export const NetworkSearchModal: React.FC<NetworkSearchModalProps> = ({
       const msg =
         err.response?.data?.error ??
         err.response?.data?.detail ??
+        err.message ??
         'Failed to reach the WAH4PC gateway.';
       setErrorMsg(msg);
     }
