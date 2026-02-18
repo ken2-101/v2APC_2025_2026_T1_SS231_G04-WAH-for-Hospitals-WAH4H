@@ -78,8 +78,9 @@ export const laboratoryService = {
 
     if (filters?.status) {
       if (filters.status === 'active' || (filters.status as string) === 'pending') {
-        // Consolidated 'Active' tab: everything from requested to in-progress
-        params.append('status__in', 'requested,draft,registered,verified,partial,preliminary,in-progress,received');
+        // Consolidated 'Active' tab: everything from verified to preliminary
+        // 'requested' is now excluded because it's waiting for Nurse approval in Monitoring
+        params.append('status__in', 'verified,registered,preliminary,partial,in-progress');
       } else if (filters.status === 'completed' || filters.status === 'final') {
         params.append('status__in', 'completed,final,amended,corrected');
       } else {
@@ -229,12 +230,7 @@ export const laboratoryService = {
     return response.data;
   },
 
-  startProcessing: async (id: number): Promise<LabRequest> => {
-    await api.patch(`${LABORATORY_BASE_URL}/reports/${id}/update_status/`, {
-      status: 'preliminary'
-    });
-    return laboratoryService.getLabRequest(id);
-  },
+  // startProcessing removed: workflow now skips manual 'Receive' step
 
   verifyLabRequest: async (id: number | string): Promise<LabRequest> => {
     await api.patch(`${LABORATORY_BASE_URL}/reports/${id}/update_status/`, {

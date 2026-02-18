@@ -238,7 +238,9 @@ class DiagnosticReportViewSet(viewsets.ModelViewSet):
         
         # Efficient aggregation query instead of fetching all objects
         stats = DiagnosticReport.objects.aggregate(
+            # Pending: Requested in Monitoring but not yet verified/approved by Nurse
             pending=Count('diagnostic_report_id', filter=Q(status__in=['requested', 'draft'])),
+            # In-Progress (Active Queue): Verified by Nurse and ready for encoding or partially encoded
             in_progress=Count('diagnostic_report_id', filter=Q(status__in=['verified', 'registered', 'preliminary', 'partial'])),
             # To Release: Completed but NOT yet issued (released)
             to_release=Count('diagnostic_report_id', filter=Q(

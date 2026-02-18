@@ -43,8 +43,7 @@ export default function LaboratoryDashboard() {
   const [showEncodeModal, setShowEncodeModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
 
-  // Confirmation State
-  const [specimenToReceive, setSpecimenToReceive] = useState<number | null>(null);
+  // Confirmation State REMOVED (Receive step is now skipped)
 
   // Load Data
   useEffect(() => {
@@ -117,32 +116,7 @@ export default function LaboratoryDashboard() {
 
   // ==================== HANDLERS ====================
 
-  const handleReceiveSpecimenClick = (request: LabRequest) => {
-    setSpecimenToReceive(request.id);
-  };
-
-  const confirmReceiveSpecimen = async () => {
-    if (!specimenToReceive) return;
-
-    try {
-      await laboratoryService.startProcessing(specimenToReceive);
-      toast({
-        title: "Specimen Received",
-        description: "Specimen received and moved to In-Progress queue",
-      });
-      fetchData();
-      setActiveTab('active');
-    } catch (error) {
-      console.error('Error receiving specimen:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: laboratoryService.parseApiError(error),
-      });
-    } finally {
-      setSpecimenToReceive(null);
-    }
-  };
+  // handleReceiveSpecimenClick and confirmReceiveSpecimen REMOVED
 
   const handleStartEncoding = (request: LabRequest) => {
     setSelectedRequest(request);
@@ -230,8 +204,8 @@ export default function LaboratoryDashboard() {
                     <Activity className="text-blue-600" size={16} />
                     <p className="text-sm text-blue-800 font-medium">Active Requests</p>
                   </div>
-                  <p className="text-3xl font-bold text-blue-900">{stats.pending + stats.in_progress}</p>
-                  <p className="text-xs text-blue-600 mt-1">Pending & In-Progress</p>
+                  <p className="text-3xl font-bold text-blue-900">{stats.in_progress}</p>
+                  <p className="text-xs text-blue-600 mt-1">Verified & In-Progress</p>
                 </div>
                 <div className="w-12 h-12 bg-blue-200 rounded-lg flex items-center justify-center">
                   <Microscope className="text-blue-700" size={24} />
@@ -286,10 +260,10 @@ export default function LaboratoryDashboard() {
                 <div className="flex items-center gap-2">
                   <Activity size={18} />
                   <span>Active Queue</span>
-                  {(stats.pending + stats.in_progress) > 0 && (
+                  {stats.in_progress > 0 && (
                     <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-semibold ${activeTab === 'active' ? 'bg-blue-700 text-white' : 'bg-blue-100 text-blue-700'
                       }`}>
-                      {stats.pending + stats.in_progress}
+                      {stats.in_progress}
                     </span>
                   )}
                 </div>
@@ -451,17 +425,7 @@ export default function LaboratoryDashboard() {
                           </p>
                         </td>
                         <td className="px-6 py-4">
-                          {(request.status === 'requested' || request.status === 'verified') && (
-                            <button
-                              onClick={() => handleReceiveSpecimenClick(request)}
-                              className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2 font-medium text-sm shadow-sm"
-                            >
-                              <FlaskConical size={16} />
-                              Receive
-                            </button>
-                          )}
-
-                          {(request.status === 'registered' || request.status === 'preliminary' || request.status === 'partial') && (
+                          {(request.status === 'verified' || request.status === 'registered' || request.status === 'preliminary' || request.status === 'partial') && (
                             <button
                               onClick={() => handleStartEncoding(request)}
                               className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2 font-medium text-sm shadow-sm"
@@ -517,23 +481,7 @@ export default function LaboratoryDashboard() {
         request={selectedRequest}
       />
 
-      {/* Confirmation Dialog */}
-      <AlertDialog open={specimenToReceive !== null} onOpenChange={(open) => !open && setSpecimenToReceive(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Specimen Receipt</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to receive this specimen? This will move the request to the In-Progress queue.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setSpecimenToReceive(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmReceiveSpecimen} className="bg-orange-500 hover:bg-orange-600">
-              Confirm Receipt
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Receive Confirmation Dialog REMOVED */}
     </div>
   );
 }
