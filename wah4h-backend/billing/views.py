@@ -112,6 +112,74 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             "grand_total": billed_total + unbilled_totals['grand_total']
         })
 
+    @action(detail=False, methods=['get'])
+    def dashboard_summary(self, request):
+        """
+        Aggregates data for the Billing Clerk Dashboard.
+        1. Revenue Today (Total Gross of Invoices issued today)
+        2. Pending Claims Count
+        3. Outstanding Balance (Total Net of 'issued' invoices)
+        4. Insured Patients % (Patients with Claims / Patients with Invoices)
+        5. Weekly Revenue (Last 7 days)
+        """
+        today = timezone.now().date()
+        
+        # 1. Revenue Today
+        revenue_today_agg = Invoice.objects.filter(
+            invoice_datetime__date=today
+        ).aggregate(total=Sum('total_gross_value'))
+        revenue_today = revenue_today_agg['total'] or 0
+
+        # 2. Pending Claims
+        pending_claims_count = Claim.objects.filter(
+            status__in=['pending', 'review']
+        ).count()
+
+        # 3. Outstanding Balance (Issued but not balanced)
+        # Assuming 'issued' status implies outstanding. 'balanced' implies paid.
+        outstanding_agg = Invoice.objects.filter(
+            status='issued'
+        ).aggregate(total=Sum('total_net_value'))
+        outstanding_balance = outstanding_agg['total'] or 0
+
+        # 4. Insured Patients Percentage
+        # Patients with at least one Claim vs Patients with at least one Invoice
+        patients_with_claims = Claim.objects.values('subject_id').distinct().count()
+        patients_with_invoices = Invoice.objects.values('subject_id').distinct().count()
+        
+        insured_percentage = 0
+        if patients_with_invoices > 0:
+            insured_percentage = round((patients_with_claims / patients_with_invoices) * 100)
+
+        # 5. Weekly Revenue (Last 7 days)
+        # We need to return a list of { day, amount } for the last 7 days including today
+        days_map = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        weekly_revenue = []
+        
+        # Loop backwards from today for 7 days
+        for i in range(6, -1, -1):
+            date = today - timezone.timedelta(days=i)
+            day_label = days_map[date.weekday()]
+            
+            daily_rev = Invoice.objects.filter(
+                invoice_datetime__date=date
+            ).aggregate(total=Sum('total_gross_value'))['total'] or 0
+            
+            weekly_revenue.append({
+                'day': day_label,
+                'amount': daily_rev
+            })
+
+        return Response({
+            "revenue_today": revenue_today,
+            "revenue_change": 0, # Placeholder for now, could implement yesterday comparison
+            "pending_claims": pending_claims_count,
+            "pending_claims_change": 0, # Placeholder
+            "outstanding_balance": outstanding_balance,
+            "insured_patients_percentage": insured_percentage,
+            "weekly_revenue": weekly_revenue
+        })
+
 
     @action(detail=True, methods=['post'])
     def add_item(self, request, pk=None):

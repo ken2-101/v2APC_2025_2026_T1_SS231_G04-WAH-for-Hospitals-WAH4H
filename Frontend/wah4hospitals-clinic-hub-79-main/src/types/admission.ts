@@ -23,6 +23,7 @@ export interface Admission {
     admissionDate: string;
     admissionTime?: string;
     dischargeDate?: string | null;
+    updated_at?: string;
 
     // UI Aligned Fields
     encounterType: 'IMP' | 'EMER' | 'AMB' | 'HH';

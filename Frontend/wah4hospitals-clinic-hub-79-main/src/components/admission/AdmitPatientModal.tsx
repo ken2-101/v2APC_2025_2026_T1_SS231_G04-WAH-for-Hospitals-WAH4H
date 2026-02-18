@@ -373,7 +373,7 @@ const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({ isOpen, onClose, 
             <div className="max-w-2xl mx-auto space-y-8 animate-in slide-in-from-right-8 duration-300">
 
               <div className="space-y-4">
-                <h3 className="font-bold text-slate-800 text-lg border-b border-slate-100 pb-2 flex items-center gap-2"><User className="w-5 h-5 text-blue-500" /> Attending Physician & Staff</h3>
+                <h3 className="font-bold text-slate-800 text-lg border-b border-slate-100 pb-2 flex items-center gap-2"><User className="w-5 h-5 text-blue-500" /> Attending Physician</h3>
 
                 <div className="space-y-2 relative">
                   <label className="text-sm font-semibold text-slate-700">Attending Physician <span className="text-red-500">*</span></label>
@@ -403,9 +403,7 @@ const AdmitPatientModal: React.FC<AdmitPatientModalProps> = ({ isOpen, onClose, 
 
 
 
-                <button className="w-full py-2 border-2 border-dashed border-slate-300 rounded-lg text-slate-500 hover:border-blue-400 hover:text-blue-500 transition-all text-sm font-bold flex items-center justify-center gap-2">
-                  + Add Additional Staff Member
-                </button>
+
               </div>
 
               <div className="space-y-4">

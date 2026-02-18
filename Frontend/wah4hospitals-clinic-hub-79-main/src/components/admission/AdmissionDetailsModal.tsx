@@ -188,14 +188,28 @@ export const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({
       if (!start) return '0 days';
 
       const startDate = new Date(start);
-      // Use dischargeDate if available, otherwise use current time (if active)
-      const endDate = data.dischargeDate ? new Date(data.dischargeDate) : new Date();
+      let endDate = new Date(); // Default to now for active patients
+
+      if (data.status === 'finished') {
+         // If finished, use updated_at (actual discharge timestamp) if available
+         // Fallback to dischargeDate (which is just YYYY-MM-DD, so we might want to set to end of day)
+         if (data.updated_at) {
+            endDate = new Date(data.updated_at);
+         } else if (data.dischargeDate) {
+            endDate = new Date(data.dischargeDate);
+            // If only date is available, maybe assume end of day or just use date diff
+            endDate.setHours(23, 59, 59);
+         }
+      }
 
       const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+
+      // Calculate total days (rounded up to count partial days as 1)
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-      // If less than 24 hours, show "1 day" (or 0 if you prefer exact calculation)
-      // "the amount of days he in the admission state" -> usually counts partial days as 1
+      // Calculate hours for more precision if needed, but "days" is the request
+      // "the duration of the patients stay as admitted until discharge"
+
       return `${Math.max(1, diffDays)} days`;
    };
 

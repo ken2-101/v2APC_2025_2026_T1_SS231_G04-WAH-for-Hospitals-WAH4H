@@ -91,6 +91,7 @@ export const admissionService = {
                     participant_individual_id: d.participant_individual_id,
                     subject_id: d.subject_id,
                     created_at: d.created_at,
+                    updated_at: d.updated_at,
                     dischargeDate: d.period_end ? d.period_end : null,
                 } as Admission;
             });
@@ -191,6 +192,7 @@ export const admissionService = {
             participant_individual_id: data.participant_individual_id,
             subject_id: data.subject_id,
             created_at: data.created_at,
+            updated_at: data.updated_at,
             dischargeDate: data.period_end ? data.period_end : null,
         } as Admission;
     },
@@ -273,6 +275,7 @@ export const admissionService = {
                 participant_individual_id: data.participant_individual_id,
                 subject_id: data.subject_id,
                 created_at: data.created_at,
+                updated_at: data.updated_at,
                 dischargeDate: data.period_end ? data.period_end : null,
             } as Admission;
         } catch (error) {

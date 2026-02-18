@@ -24,6 +24,16 @@ export interface Invoice {
   processed_by?: string;
 }
 
+export interface DashboardSummary {
+  revenue_today: number;
+  revenue_change: number;
+  pending_claims: number;
+  pending_claims_change: number;
+  outstanding_balance: number;
+  insured_patients_percentage: number;
+  weekly_revenue: { day: string; amount: number }[];
+}
+
 // Create an Axios instance
 const api: AxiosInstance = axios.create({
   baseURL:
@@ -85,6 +95,11 @@ export const billingService = {
 
   deleteInvoice: async (invoiceId: number): Promise<void> => {
     await api.delete(`/api/billing/invoices/${invoiceId}/`);
+  },
+
+  getDashboardSummary: async (): Promise<DashboardSummary> => {
+    const response = await api.get('/api/billing/invoices/dashboard_summary/');
+    return response.data;
   },
 };
 

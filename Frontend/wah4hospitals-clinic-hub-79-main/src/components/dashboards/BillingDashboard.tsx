@@ -12,7 +12,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import StatusBadge from '@/components/ui/StatusBadge';
-import { billingService, Invoice } from '@/services/billingService';
+import { billingService, Invoice, DashboardSummary } from '@/services/billingService';
 
 interface BillingDashboardProps {
   visibleWidgets: Record<string, boolean>;
@@ -22,6 +22,7 @@ const BillingDashboard: React.FC<BillingDashboardProps> = ({ visibleWidgets }) =
   const [revenueToday, setRevenueToday] = useState<number>(0);
   const [pendingClaimsCount, setPendingClaimsCount] = useState<number>(0);
   const [outstandingBalance, setOutstandingBalance] = useState<number>(0);
+  const [insuredPatientsPercentage, setInsuredPatientsPercentage] = useState<number>(0);
   const [recentClaims, setRecentClaims] = useState<any[]>([]);
   const [revenueData, setRevenueData] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -30,26 +31,18 @@ const BillingDashboard: React.FC<BillingDashboardProps> = ({ visibleWidgets }) =
     const fetchBillingData = async () => {
       setIsLoading(true);
       try {
-        const invoicesResponse = await billingService.getAllInvoices();
-        const invoices: Invoice[] = Array.isArray(invoicesResponse) ? invoicesResponse : (invoicesResponse.results || []);
+        const summary = await billingService.getDashboardSummary();
 
-        // Calculate Revenue Today (Simplified:issued/balanced today)
-        const todayStr = new Date().toISOString().split('T')[0];
-        const todayRevenue = invoices
-          .filter(inv => inv.invoice_datetime && inv.invoice_datetime.startsWith(todayStr))
-          .reduce((acc, inv) => acc + parseFloat(inv.total_gross_value as string || '0'), 0);
-        setRevenueToday(todayRevenue);
+        setRevenueToday(summary.revenue_today);
+        setPendingClaimsCount(summary.pending_claims);
+        setOutstandingBalance(summary.outstanding_balance);
+        setRevenueData(summary.weekly_revenue);
+        // We can add a state for insuredPercentage if we want to display it, 
+        // effectively replacing the hardcoded 85%
 
-        // Calculate Outstanding Balance (issued but not balanced)
-        const balance = invoices
-          .filter(inv => inv.status === 'issued')
-          .reduce((acc, inv) => acc + parseFloat(inv.total_net_value as string || '0'), 0);
-        setOutstandingBalance(balance);
-
-        // Fetch Claims
+        // Fetch Claims for the list
         const claimsResponse = await billingService.getClaims();
         const claims = Array.isArray(claimsResponse) ? claimsResponse : (claimsResponse.results || []);
-        setPendingClaimsCount(claims.filter((c: any) => c.status === 'pending' || c.status === 'review').length);
 
         setRecentClaims(claims.slice(0, 3).map((c: any) => ({
           id: c.identifier || `CLM-${c.claim_id}`,
@@ -57,36 +50,6 @@ const BillingDashboard: React.FC<BillingDashboardProps> = ({ visibleWidgets }) =
           amount: `₱${parseFloat(c.total_amount_value || '0').toLocaleString()}`,
           status: c.status
         })));
-
-        // Aggregate Weekly Revenue
-        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        const weeklyRev: Record<string, number> = {
-          'Mon': 0, 'Tue': 0, 'Wed': 0, 'Thu': 0, 'Fri': 0, 'Sat': 0, 'Sun': 0
-        };
-
-        // Filter for last 7 days
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-        invoices.forEach(inv => {
-          if (inv.invoice_datetime) {
-            const date = new Date(inv.invoice_datetime);
-            if (date >= sevenDaysAgo) {
-              const dayName = days[date.getDay()];
-              weeklyRev[dayName] += parseFloat(inv.total_gross_value as string || '0');
-            }
-          }
-        });
-
-        setRevenueData([
-          { day: 'Mon', amount: weeklyRev['Mon'] },
-          { day: 'Tue', amount: weeklyRev['Tue'] },
-          { day: 'Wed', amount: weeklyRev['Wed'] },
-          { day: 'Thu', amount: weeklyRev['Thu'] },
-          { day: 'Fri', amount: weeklyRev['Fri'] },
-          { day: 'Sat', amount: weeklyRev['Sat'] },
-          { day: 'Sun', amount: weeklyRev['Sun'] },
-        ]);
 
       } catch (error) {
         console.error("Failed to fetch billing dashboard data", error);
@@ -127,7 +90,7 @@ const BillingDashboard: React.FC<BillingDashboardProps> = ({ visibleWidgets }) =
           />
           <MetricCard
             title="Insured Patients"
-            value="85%"
+            value={`${insuredPatientsPercentage}%`}
             change={0}
             changeType="increase"
             icon={<Briefcase className="w-5 h-5" />}
