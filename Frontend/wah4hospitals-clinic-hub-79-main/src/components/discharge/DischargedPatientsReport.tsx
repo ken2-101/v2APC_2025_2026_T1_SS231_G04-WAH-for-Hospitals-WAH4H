@@ -72,24 +72,13 @@ export const DischargedPatientsReport: React.FC<DischargedPatientsReportProps> =
           <div id="printable-content" className="space-y-4">
             <div className="print-header no-print">
               <h2 className="text-xl font-semibold mb-4">Discharged Patients Summary</h2>
-              <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="grid grid-cols-2 gap-4 mb-6">
                 <div className="bg-green-50 p-4 rounded-lg">
                   <div className="flex items-center gap-2">
                     <FileText className="w-5 h-5 text-green-600" />
                     <div>
                       <p className="text-sm text-green-600 font-medium">Total Discharged</p>
                       <p className="text-2xl font-bold text-green-800">{dischargedPatients.length}</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-5 h-5 text-blue-600" />
-                    <div>
-                      <p className="text-sm text-blue-600 font-medium">Today's Discharges</p>
-                      <p className="text-2xl font-bold text-blue-800">
-                        {dischargedPatients.filter(p => p.discharge_date === new Date().toISOString().split('T')[0]).length}
-                      </p>
                     </div>
                   </div>
                 </div>
