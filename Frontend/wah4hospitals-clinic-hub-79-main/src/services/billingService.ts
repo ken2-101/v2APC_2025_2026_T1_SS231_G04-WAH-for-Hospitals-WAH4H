@@ -81,6 +81,10 @@ export const billingService = {
     const response = await api.post(`/api/billing/invoices/${invoiceId}/add_item/`, itemData);
     return response.data;
   },
+
+  deleteInvoice: async (invoiceId: number): Promise<void> => {
+    await api.delete(`/api/billing/invoices/${invoiceId}/`);
+  },
 };
 
 export default billingService;

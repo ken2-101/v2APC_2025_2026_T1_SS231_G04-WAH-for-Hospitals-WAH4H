@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, DollarSign, FileText, FlaskConical, Pill, Printer, PlusCircle } from 'lucide-react';
+import { Loader2, DollarSign, FileText, FlaskConical, Pill, Printer, PlusCircle, Trash2 } from 'lucide-react';
 import { PaymentModal } from './PaymentModal';
 import { ManualFeeModal } from './ManualFeeModal';
 import billingService, { Invoice } from '@/services/billingService';
@@ -76,6 +76,18 @@ export const PatientBillingSummary: React.FC<BillingDashboardProps> = ({ subject
 
     const handleAddFee = (invoice: Invoice) => {
         setFeeInvoice(invoice);
+    };
+
+    const handleDeleteInvoice = async (invoice: Invoice) => {
+        if (!window.confirm(`Delete invoice ${invoice.identifier}? This cannot be undone.`)) return;
+        try {
+            await billingService.deleteInvoice(invoice.invoice_id);
+            setSuccessMsg(`Invoice ${invoice.identifier} deleted.`);
+            if (subjectId) fetchData(subjectId);
+        } catch (err) {
+            console.error(err);
+            setError('Failed to delete invoice. Please try again.');
+        }
     };
 
     const handlePaymentSuccess = async (paymentData: any) => {
@@ -328,10 +340,21 @@ export const PatientBillingSummary: React.FC<BillingDashboardProps> = ({ subject
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
-                                                    onClick={() => onPrintInvoice && onPrintInvoice(inv)}
+                                                    onClick={() => setViewInvoice(inv)}
                                                     className="text-gray-500 hover:text-gray-900"
+                                                    title="Print Invoice"
                                                 >
                                                     <Printer className="w-4 h-4" />
+                                                </Button>
+
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => handleDeleteInvoice(inv)}
+                                                    className="text-red-400 hover:text-red-600 hover:bg-red-50"
+                                                    title="Delete Invoice"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
                                                 </Button>
                                             </div>
                                         </div>
@@ -358,12 +381,6 @@ export const PatientBillingSummary: React.FC<BillingDashboardProps> = ({ subject
                     invoice={viewInvoice}
                     isOpen={!!viewInvoice}
                     onClose={() => setViewInvoice(null)}
-                    onPrint={() => {
-                        if (onPrintInvoice && viewInvoice) {
-                            onPrintInvoice(viewInvoice);
-                            setViewInvoice(null);
-                        }
-                    }}
                 />
             )}
 
