@@ -18,8 +18,7 @@ export const LabParameterField: React.FC<LabParameterFieldProps> = ({
     onChange,
     getInterpretation
 }) => {
-    // We keep getInterpretation in props signature to avoid breaking parent checks, 
-    // but we don't use it for valid UI display anymore as per user request.
+    const interpretation = getInterpretation(value, parameter.refLow, parameter.refHigh);
 
     return (
         <div>
@@ -28,12 +27,18 @@ export const LabParameterField: React.FC<LabParameterFieldProps> = ({
             </label>
             <div className="flex items-center gap-2">
                 <input
-                    type="text"
+                    type={parameter.refLow !== 0 || parameter.refHigh !== 0 ? "number" : "text"}
+                    step={parameter.step || "any"}
                     value={value || ''}
                     onChange={(e) => onChange(e.target.value)}
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     placeholder={`e.g., ${parameter.placeholder}`}
                 />
+                {interpretation.status && (
+                    <span className={`px-2 py-1 rounded text-xs font-bold border whitespace-nowrap ${interpretation.color}`}>
+                        {interpretation.status}
+                    </span>
+                )}
             </div>
             <p className="text-xs text-gray-500 mt-1.5">
                 Ref: {parameter.refLow}-{parameter.refHigh} {parameter.unit}

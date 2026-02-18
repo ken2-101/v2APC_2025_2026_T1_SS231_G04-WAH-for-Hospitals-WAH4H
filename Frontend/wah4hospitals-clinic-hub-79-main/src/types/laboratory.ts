@@ -8,7 +8,7 @@ export type LabTestType =
   | 'fbs' | 'rbs' | 'glucose_panel';
 export type LabPriority = 'routine' | 'urgent' | 'stat';
 export type LabStatus =
-  | 'requested' | 'verified' | 'completed'
+  | 'active' | 'requested' | 'verified' | 'completed'
   | 'registered' | 'preliminary' | 'partial' | 'final' | 'amended' | 'corrected' | 'cancelled';
 export type LabInterpretation = 'normal' | 'high' | 'low';
 

@@ -38,13 +38,33 @@ export const LabResultEncodingModal: React.FC<LabResultEncodingModalProps> = ({ 
     };
 
 
-    // Load predefined parameters when modal opens or request changes
+    // Load predefined parameters and local draft when modal opens
     useEffect(() => {
         if (isOpen && request) {
-            // Reset Form Data
-            setFormData({});
+            const draft = localStorage.getItem(`lab_draft_${request.id}`);
+            if (draft) {
+                try {
+                    const parsed = JSON.parse(draft);
+                    setFormData(parsed.formData || {});
+                    setMedTech(parsed.medTech || '');
+                    setPrcNumber(parsed.prcNumber || '');
+                    setOverallRemarks(parsed.overallRemarks || '');
+                } catch (e) {
+                    setFormData({});
+                }
+            } else {
+                setFormData({});
+            }
         }
     }, [isOpen, request]);
+
+    // Save draft automatically as user types
+    useEffect(() => {
+        if (isOpen && request) {
+            const draft = { formData, medTech, prcNumber, overallRemarks };
+            localStorage.setItem(`lab_draft_${request.id}`, JSON.stringify(draft));
+        }
+    }, [formData, medTech, prcNumber, overallRemarks, isOpen, request]);
 
     if (!isOpen || !request) return null;
 
@@ -106,6 +126,9 @@ export const LabResultEncodingModal: React.FC<LabResultEncodingModalProps> = ({ 
         };
 
         onSubmit(request.id, resultData);
+
+        // Clear Draft
+        localStorage.removeItem(`lab_draft_${request.id}`);
 
         // Reset
         setMedTech('');

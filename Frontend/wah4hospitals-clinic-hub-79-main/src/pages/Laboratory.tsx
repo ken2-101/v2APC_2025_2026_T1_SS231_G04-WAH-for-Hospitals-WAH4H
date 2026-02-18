@@ -8,7 +8,8 @@ import { laboratoryService } from '../services/laboratoryService';
 import {
   LabRequest,
   LabRequestFilters,
-  LabDashboardStats
+  LabDashboardStats,
+  LabStatus
 } from '../types/laboratory';
 import { LabResultEncodingModal } from '../components/laboratory/LabResultEncodingModal';
 import { LabResultViewModal } from '../components/laboratory/LabResultViewModal';
@@ -30,7 +31,7 @@ export default function LaboratoryDashboard() {
   const { toast } = useToast();
 
   // State Management
-  const [activeTab, setActiveTab] = useState<'pending' | 'in-progress' | 'completed' | 'released'>('pending');
+  const [activeTab, setActiveTab] = useState<'active' | 'completed' | 'released'>('active');
   const [labRequests, setLabRequests] = useState<LabRequest[]>([]);
   const [stats, setStats] = useState<LabDashboardStats>({ pending: 0, in_progress: 0, to_release: 0, released_today: 0 });
   const [loading, setLoading] = useState(true);
@@ -59,8 +60,14 @@ export default function LaboratoryDashboard() {
 
     return () => clearInterval(intervalId);
   }, [activeTab, priorityFilter]);
-  // Removed searchTerm from dependency to avoid debouncing conflict, 
-  // search is handled by its own effect effectively or should be.
+
+  // Search debouncing effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchData();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
   // Actually, for this structure, we can keep it simple.
 
   const fetchData = async (isPolling = false) => {
@@ -71,12 +78,10 @@ export default function LaboratoryDashboard() {
       setStats(statsData);
 
       // Map activeTab to backend status filters
-      let statusFilter: 'verified' | 'completed' | 'requested' | 'registered' | 'partial' | undefined;
+      let statusFilter: LabStatus | undefined;
 
-      if (activeTab === 'pending') {
-        statusFilter = 'requested'; // Covers requested, draft, registered
-      } else if (activeTab === 'in-progress') {
-        statusFilter = 'partial'; // Maps to partial, preliminary, in-progress in service
+      if (activeTab === 'active') {
+        statusFilter = 'active';
       } else if (activeTab === 'completed' || activeTab === 'released') {
         statusFilter = 'completed';
       }
@@ -100,7 +105,7 @@ export default function LaboratoryDashboard() {
       if (!isPolling) {
         toast({
           title: "Error",
-          description: "Failed to load laboratory data.",
+          description: laboratoryService.parseApiError(error),
           variant: "destructive",
         });
       }
@@ -126,13 +131,13 @@ export default function LaboratoryDashboard() {
         description: "Specimen received and moved to In-Progress queue",
       });
       fetchData();
-      setActiveTab('in-progress');
+      setActiveTab('active');
     } catch (error) {
       console.error('Error receiving specimen:', error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to receive specimen",
+        description: laboratoryService.parseApiError(error),
       });
     } finally {
       setSpecimenToReceive(null);
@@ -160,7 +165,7 @@ export default function LaboratoryDashboard() {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to save results. Please try again later.",
+        description: laboratoryService.parseApiError(error),
       });
     }
   };
@@ -179,7 +184,7 @@ export default function LaboratoryDashboard() {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to load result details for viewing.",
+        description: laboratoryService.parseApiError(error),
       });
     }
   };
@@ -198,7 +203,7 @@ export default function LaboratoryDashboard() {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to release results.",
+        description: laboratoryService.parseApiError(error),
       });
     }
   };
@@ -217,32 +222,16 @@ export default function LaboratoryDashboard() {
           </div>
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
-            <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg border border-orange-200 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <Clock className="text-orange-600" size={16} />
-                    <p className="text-sm text-orange-800 font-medium">Pending</p>
-                  </div>
-                  <p className="text-3xl font-bold text-orange-900">{stats.pending}</p>
-                  <p className="text-xs text-orange-600 mt-1">Awaiting processing</p>
-                </div>
-                <div className="w-12 h-12 bg-orange-200 rounded-lg flex items-center justify-center">
-                  <AlertCircle className="text-orange-700" size={24} />
-                </div>
-              </div>
-            </div>
-
+          <div className="grid grid-cols-3 gap-4 mb-6">
             <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200 p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <Activity className="text-blue-600" size={16} />
-                    <p className="text-sm text-blue-800 font-medium">In-Progress</p>
+                    <p className="text-sm text-blue-800 font-medium">Active Requests</p>
                   </div>
-                  <p className="text-3xl font-bold text-blue-900">{stats.in_progress}</p>
-                  <p className="text-xs text-blue-600 mt-1">Being analyzed</p>
+                  <p className="text-3xl font-bold text-blue-900">{stats.pending + stats.in_progress}</p>
+                  <p className="text-xs text-blue-600 mt-1">Pending & In-Progress</p>
                 </div>
                 <div className="w-12 h-12 bg-blue-200 rounded-lg flex items-center justify-center">
                   <Microscope className="text-blue-700" size={24} />
@@ -283,41 +272,24 @@ export default function LaboratoryDashboard() {
             </div>
           </div>
 
+
           {/* Tab Navigation */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <button
-                onClick={() => setActiveTab('pending')}
-                className={`px-6 py-2.5 rounded-lg font-medium transition-all ${activeTab === 'pending'
-                  ? 'bg-orange-500 text-white shadow-md'
-                  : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
-                  }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Clock size={18} />
-                  <span>Pending</span>
-                  {stats.pending > 0 && (
-                    <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-semibold ${activeTab === 'pending' ? 'bg-orange-600 text-white' : 'bg-orange-100 text-orange-700'
-                      }`}>
-                      {stats.pending}
-                    </span>
-                  )}
-                </div>
-              </button>
-              <button
-                onClick={() => setActiveTab('in-progress')}
-                className={`px-6 py-2.5 rounded-lg font-medium transition-all ${activeTab === 'in-progress'
-                  ? 'bg-blue-500 text-white shadow-md'
+                onClick={() => setActiveTab('active')}
+                className={`px-6 py-2.5 rounded-lg font-medium transition-all ${activeTab === 'active'
+                  ? 'bg-blue-600 text-white shadow-md'
                   : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
                   }`}
               >
                 <div className="flex items-center gap-2">
                   <Activity size={18} />
-                  <span>In-Progress</span>
-                  {stats.in_progress > 0 && (
-                    <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-semibold ${activeTab === 'in-progress' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700'
+                  <span>Active Queue</span>
+                  {(stats.pending + stats.in_progress) > 0 && (
+                    <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-semibold ${activeTab === 'active' ? 'bg-blue-700 text-white' : 'bg-blue-100 text-blue-700'
                       }`}>
-                      {stats.in_progress}
+                      {stats.pending + stats.in_progress}
                     </span>
                   )}
                 </div>
@@ -397,8 +369,7 @@ export default function LaboratoryDashboard() {
                   <FlaskConical size={64} className="mb-4 opacity-50" />
                   <p className="text-lg font-medium">No requests found</p>
                   <p className="text-sm mt-1">
-                    {activeTab === 'pending' && 'There are no pending laboratory requests.'}
-                    {activeTab === 'in-progress' && 'No tests are currently being processed.'}
+                    {activeTab === 'active' && 'No active laboratory requests found.'}
                     {activeTab === 'completed' && 'No completed tests awaiting release.'}
                     {activeTab === 'released' && 'No released results available.'}
                   </p>
@@ -480,7 +451,7 @@ export default function LaboratoryDashboard() {
                           </p>
                         </td>
                         <td className="px-6 py-4">
-                          {activeTab === 'pending' && (
+                          {(request.status === 'requested' || request.status === 'verified') && (
                             <button
                               onClick={() => handleReceiveSpecimenClick(request)}
                               className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2 font-medium text-sm shadow-sm"
@@ -490,7 +461,7 @@ export default function LaboratoryDashboard() {
                             </button>
                           )}
 
-                          {activeTab === 'in-progress' && (
+                          {(request.status === 'registered' || request.status === 'preliminary' || request.status === 'partial') && (
                             <button
                               onClick={() => handleStartEncoding(request)}
                               className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2 font-medium text-sm shadow-sm"
