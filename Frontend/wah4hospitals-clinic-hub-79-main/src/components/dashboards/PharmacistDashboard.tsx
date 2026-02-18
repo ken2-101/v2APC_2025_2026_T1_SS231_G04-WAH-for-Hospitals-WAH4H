@@ -1,7 +1,7 @@
-import React from 'react';
-import { 
-  FileText, 
-  Activity, 
+import React, { useEffect, useState } from 'react';
+import {
+  FileText,
+  Activity,
   AlertTriangle,
   Pill,
   Package
@@ -10,42 +10,78 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import MetricCard from '@/components/ui/MetricCard';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import pharmacyService from '@/services/pharmacyService';
 
 interface PharmacistDashboardProps {
   visibleWidgets: Record<string, boolean>;
 }
 
 const PharmacistDashboard: React.FC<PharmacistDashboardProps> = ({ visibleWidgets }) => {
-  const tasks = [
-    { id: 1, title: 'Prescription Verification', count: 8, urgent: true, icon: <FileText className="w-4 h-4" /> },
-    { id: 2, title: 'Low Stock Alerts', count: 15, urgent: true, icon: <AlertTriangle className="w-4 h-4" /> },
-    { id: 3, title: 'Dispensing Queue', count: 12, urgent: false, icon: <Activity className="w-4 h-4" /> },
-  ];
+  const [pendingCount, setPendingCount] = useState<number>(0);
+  const [activeCount, setActiveCount] = useState<number>(0);
+  const [lowStockCount, setLowStockCount] = useState<number>(0);
+  const [recentTasks, setRecentTasks] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    const fetchPharmacyData = async () => {
+      setIsLoading(true);
+      try {
+        const prescribed = await pharmacyService.getRequests('prescribed');
+        const active = await pharmacyService.getRequests('active');
+
+        setPendingCount(prescribed.length);
+        setActiveCount(active.length);
+
+        // Fetch Inventory for Low Stock count
+        const inventory = await pharmacyService.getInventory();
+        const lowStock = inventory.filter(item => item.is_low_stock).length;
+        setLowStockCount(lowStock);
+
+        // Combine for a task list
+        const combined = [...prescribed, ...active].slice(0, 3).map((req, idx) => ({
+          id: req.id || idx,
+          title: req.inventory_item_detail?.generic_name || 'Medication Request',
+          count: 1,
+          urgent: req.status === 'prescribed',
+          icon: req.status === 'prescribed' ? <FileText className="w-4 h-4" /> : <Activity className="w-4 h-4" />
+        }));
+
+        setRecentTasks(combined);
+
+      } catch (error) {
+        console.error("Failed to fetch pharmacy dashboard data", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchPharmacyData();
+  }, []);
 
   return (
     <div className="space-y-6">
       {visibleWidgets.metrics && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-           <MetricCard
+          <MetricCard
             title="Prescriptions Pending"
-            value="24"
-            change={8}
+            value={pendingCount.toString()}
+            change={pendingCount > 5 ? 2 : 0}
             changeType="increase"
             icon={<FileText className="w-5 h-5" />}
             color="blue"
           />
           <MetricCard
             title="Dispensing Queue"
-            value="12"
-            change={2}
+            value={activeCount.toString()}
+            change={0}
             changeType="decrease"
             icon={<Pill className="w-5 h-5" />}
             color="orange"
           />
-           <MetricCard
+          <MetricCard
             title="Low Stock Items"
-            value="15"
-            change={5}
+            value={lowStockCount.toString()}
+            change={lowStockCount > 0 ? 1 : 0}
             changeType="increase"
             icon={<Package className="w-5 h-5" />}
             color="red"
@@ -63,30 +99,37 @@ const PharmacistDashboard: React.FC<PharmacistDashboardProps> = ({ visibleWidget
             <CardDescription>Items ready for dispensing or verification</CardDescription>
           </CardHeader>
           <CardContent>
-             <div className="space-y-4">
-                {tasks.map((task, index) => (
-                    <div key={index} className="flex items-center space-x-4 p-3 border border-border/40 rounded-lg hover:border-primary/30 hover:bg-accent/5 transition-all group cursor-pointer">
-                      <div className={cn("p-2 rounded-md", task.urgent ? "bg-red-50 text-red-600" : "bg-blue-50 text-blue-600")}>
-                        {task.icon}
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-foreground">{task.title}</p>
-                        <p className="text-xs text-muted-foreground group-hover:text-primary transition-colors">
-                          {task.urgent ? 'High Priority' : 'Routine'}
-                        </p>
-                      </div>
-                      <div className={cn(
-                        "flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold",
-                        task.urgent ? "bg-red-100 text-red-600" : "bg-blue-100 text-blue-600"
-                      )}>
-                        {task.count}
-                      </div>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                         <div className="w-4 h-4" >→</div>
-                      </Button>
+            {recentTasks.length > 0 ? (
+              <div className="space-y-4">
+                {recentTasks.map((task, index) => (
+                  <div key={index} className="flex items-center space-x-4 p-3 border border-border/40 rounded-lg hover:border-primary/30 hover:bg-accent/5 transition-all group cursor-pointer">
+                    <div className={cn("p-2 rounded-md", task.urgent ? "bg-red-50 text-red-600" : "bg-blue-50 text-blue-600")}>
+                      {task.icon}
                     </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-foreground">{task.title}</p>
+                      <p className="text-xs text-muted-foreground group-hover:text-primary transition-colors">
+                        {task.urgent ? 'High Priority' : 'Routine'}
+                      </p>
+                    </div>
+                    <div className={cn(
+                      "flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold",
+                      task.urgent ? "bg-red-100 text-red-600" : "bg-blue-100 text-blue-600"
+                    )}>
+                      {task.count}
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="w-4 h-4" >→</div>
+                    </Button>
+                  </div>
                 ))}
               </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <Pill className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                <p>No active pharmacy requests.</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

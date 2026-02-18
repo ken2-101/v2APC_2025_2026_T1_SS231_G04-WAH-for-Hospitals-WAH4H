@@ -1,9 +1,10 @@
-import React from 'react';
-import { 
-  FileText, 
-  DollarSign, 
+import React, { useEffect, useState } from 'react';
+import {
+  FileText,
+  DollarSign,
   CreditCard,
-  Briefcase
+  Briefcase,
+  History
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import MetricCard from '@/components/ui/MetricCard';
@@ -11,35 +12,98 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import StatusBadge from '@/components/ui/StatusBadge';
+import { billingService, Invoice } from '@/services/billingService';
 
 interface BillingDashboardProps {
   visibleWidgets: Record<string, boolean>;
 }
 
 const BillingDashboard: React.FC<BillingDashboardProps> = ({ visibleWidgets }) => {
-  const revenueData = [
-    { day: 'Mon', amount: 45000 },
-    { day: 'Tue', amount: 52000 },
-    { day: 'Wed', amount: 48000 },
-    { day: 'Thu', amount: 61000 },
-    { day: 'Fri', amount: 55000 },
-    { day: 'Sat', amount: 32000 },
-    { day: 'Sun', amount: 28000 },
-  ];
+  const [revenueToday, setRevenueToday] = useState<number>(0);
+  const [pendingClaimsCount, setPendingClaimsCount] = useState<number>(0);
+  const [outstandingBalance, setOutstandingBalance] = useState<number>(0);
+  const [recentClaims, setRecentClaims] = useState<any[]>([]);
+  const [revenueData, setRevenueData] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  const pendingClaims = [
-      { id: 'CLM-001', patient: 'Juan Dela Cruz', amount: '₱15,000', status: 'pending' },
-      { id: 'CLM-002', patient: 'Maria Santos', amount: '₱8,500', status: 'review' },
-      { id: 'CLM-003', patient: 'Pedro Reyes', amount: '₱22,000', status: 'pending' },
-  ];
+  useEffect(() => {
+    const fetchBillingData = async () => {
+      setIsLoading(true);
+      try {
+        const invoicesResponse = await billingService.getAllInvoices();
+        const invoices: Invoice[] = Array.isArray(invoicesResponse) ? invoicesResponse : (invoicesResponse.results || []);
+
+        // Calculate Revenue Today (Simplified:issued/balanced today)
+        const todayStr = new Date().toISOString().split('T')[0];
+        const todayRevenue = invoices
+          .filter(inv => inv.invoice_datetime && inv.invoice_datetime.startsWith(todayStr))
+          .reduce((acc, inv) => acc + parseFloat(inv.total_gross_value as string || '0'), 0);
+        setRevenueToday(todayRevenue);
+
+        // Calculate Outstanding Balance (issued but not balanced)
+        const balance = invoices
+          .filter(inv => inv.status === 'issued')
+          .reduce((acc, inv) => acc + parseFloat(inv.total_net_value as string || '0'), 0);
+        setOutstandingBalance(balance);
+
+        // Fetch Claims
+        const claimsResponse = await billingService.getClaims();
+        const claims = Array.isArray(claimsResponse) ? claimsResponse : (claimsResponse.results || []);
+        setPendingClaimsCount(claims.filter((c: any) => c.status === 'pending' || c.status === 'review').length);
+
+        setRecentClaims(claims.slice(0, 3).map((c: any) => ({
+          id: c.identifier || `CLM-${c.claim_id}`,
+          patient: `Patient #${c.subject_id}`,
+          amount: `₱${parseFloat(c.total_amount_value || '0').toLocaleString()}`,
+          status: c.status
+        })));
+
+        // Aggregate Weekly Revenue
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const weeklyRev: Record<string, number> = {
+          'Mon': 0, 'Tue': 0, 'Wed': 0, 'Thu': 0, 'Fri': 0, 'Sat': 0, 'Sun': 0
+        };
+
+        // Filter for last 7 days
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+        invoices.forEach(inv => {
+          if (inv.invoice_datetime) {
+            const date = new Date(inv.invoice_datetime);
+            if (date >= sevenDaysAgo) {
+              const dayName = days[date.getDay()];
+              weeklyRev[dayName] += parseFloat(inv.total_gross_value as string || '0');
+            }
+          }
+        });
+
+        setRevenueData([
+          { day: 'Mon', amount: weeklyRev['Mon'] },
+          { day: 'Tue', amount: weeklyRev['Tue'] },
+          { day: 'Wed', amount: weeklyRev['Wed'] },
+          { day: 'Thu', amount: weeklyRev['Thu'] },
+          { day: 'Fri', amount: weeklyRev['Fri'] },
+          { day: 'Sat', amount: weeklyRev['Sat'] },
+          { day: 'Sun', amount: weeklyRev['Sun'] },
+        ]);
+
+      } catch (error) {
+        console.error("Failed to fetch billing dashboard data", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchBillingData();
+  }, []);
 
   return (
     <div className="space-y-6">
       {visibleWidgets.metrics && (
         <div className="dashboard-grid">
-           <MetricCard
+          <MetricCard
             title="Revenue Today"
-            value="₱55,000"
+            value={`₱${revenueToday.toLocaleString()}`}
             change={8}
             changeType="increase"
             icon={<DollarSign className="w-5 h-5" />}
@@ -47,24 +111,24 @@ const BillingDashboard: React.FC<BillingDashboardProps> = ({ visibleWidgets }) =
           />
           <MetricCard
             title="Pending Claims"
-            value="15"
-            change={2}
+            value={pendingClaimsCount.toString()}
+            change={pendingClaimsCount > 10 ? 2 : 0}
             changeType="increase"
             icon={<FileText className="w-5 h-5" />}
             color="orange"
           />
-           <MetricCard
+          <MetricCard
             title="Outstanding Balance"
-            value="₱125k"
-            change={5}
+            value={`₱${(outstandingBalance / 1000).toFixed(1)}k`}
+            change={0}
             changeType="decrease"
             icon={<CreditCard className="w-5 h-5" />}
             color="red"
           />
-           <MetricCard
+          <MetricCard
             title="Insured Patients"
             value="85%"
-            change={3}
+            change={0}
             changeType="increase"
             icon={<Briefcase className="w-5 h-5" />}
             color="blue"
@@ -74,65 +138,72 @@ const BillingDashboard: React.FC<BillingDashboardProps> = ({ visibleWidgets }) =
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {visibleWidgets.admissions && (
-             <Card className="shadow-md hover:shadow-lg transition-shadow duration-300 border-border/50">
-             <CardHeader>
-               <CardTitle className="chart-title text-primary">Revenue Overview</CardTitle>
-               <CardDescription>Daily revenue for the current week</CardDescription>
-             </CardHeader>
-             <CardContent>
-               <ResponsiveContainer width="100%" height={300}>
-                 <BarChart data={revenueData}>
-                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-                   <XAxis dataKey="day" stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} />
-                   <YAxis stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} />
-                   <Tooltip 
-                     contentStyle={{ 
-                       backgroundColor: 'rgba(255, 255, 255, 0.95)', 
-                       border: 'none',
-                       borderRadius: '8px',
-                       boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
-                     }} 
-                   />
-                   <Bar dataKey="amount" fill="#10b981" radius={[4, 4, 0, 0]} />
-                 </BarChart>
-               </ResponsiveContainer>
-             </CardContent>
-           </Card>
+          <Card className="shadow-md hover:shadow-lg transition-shadow duration-300 border-border/50">
+            <CardHeader>
+              <CardTitle className="chart-title text-primary">Revenue Overview</CardTitle>
+              <CardDescription>Daily revenue for the current week</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={revenueData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+                  <XAxis dataKey="day" stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                      border: 'none',
+                      borderRadius: '8px',
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
+                    }}
+                  />
+                  <Bar dataKey="amount" fill="#10b981" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
         )}
 
         {visibleWidgets.appointments && (
-           <Card className="shadow-md hover:shadow-lg transition-shadow duration-300 border-border/50">
-           <CardHeader>
-             <CardTitle className="flex items-center text-primary">
-               <FileText className="w-5 h-5 mr-2" />
-               Claims Processing
-             </CardTitle>
-             <CardDescription>Recent insurance claims and status</CardDescription>
-           </CardHeader>
-           <CardContent>
-              <div className="space-y-4">
-                 {pendingClaims.map((claim, index) => (
-                     <div key={index} className="flex items-center space-x-4 p-3 border border-border/40 rounded-lg hover:border-primary/30 hover:bg-accent/5 transition-all group cursor-pointer">
-                       <div className="p-2 rounded-md bg-green-50 text-green-600">
-                         <DollarSign className="w-4 h-4" />
-                       </div>
-                       <div className="flex-1">
-                         <p className="font-medium text-foreground">{claim.id}</p>
-                         <p className="text-xs text-muted-foreground group-hover:text-primary transition-colors">
-                           {claim.patient} • {claim.amount}
-                         </p>
-                       </div>
-                       <StatusBadge status={claim.status === 'review' ? 'warning' : 'info'} size="sm">
-                         {claim.status}
-                       </StatusBadge>
-                       <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                          <div className="w-4 h-4" >→</div>
-                       </Button>
-                     </div>
-                 ))}
-             </div>
-           </CardContent>
-         </Card>
+          <Card className="shadow-md hover:shadow-lg transition-shadow duration-300 border-border/50">
+            <CardHeader>
+              <CardTitle className="flex items-center text-primary">
+                <FileText className="w-5 h-5 mr-2" />
+                Claims Processing
+              </CardTitle>
+              <CardDescription>Recent insurance claims and status</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {recentClaims.length > 0 ? (
+                <div className="space-y-4">
+                  {recentClaims.map((claim, index) => (
+                    <div key={index} className="flex items-center space-x-4 p-3 border border-border/40 rounded-lg hover:border-primary/30 hover:bg-accent/5 transition-all group cursor-pointer">
+                      <div className="p-2 rounded-md bg-green-50 text-green-600">
+                        <DollarSign className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-foreground">{claim.id}</p>
+                        <p className="text-xs text-muted-foreground group-hover:text-primary transition-colors">
+                          {claim.patient} • {claim.amount}
+                        </p>
+                      </div>
+                      <StatusBadge status={claim.status === 'review' || claim.status === 'active' ? 'warning' : 'info'} size="sm">
+                        {claim.status}
+                      </StatusBadge>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="w-4 h-4" >→</div>
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <History className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                  <p>No recent claims found.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>
