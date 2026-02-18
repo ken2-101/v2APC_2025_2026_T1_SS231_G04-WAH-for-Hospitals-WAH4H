@@ -74,8 +74,11 @@ class MonitoringService {
                         id: obs.observation_id?.toString(),
                         admissionId: encounterId.toString(),
                         dateTime: time,
-                        staffName: 'Unknown' // Performer ID resolution not implemented yet
+                        staffName: obs.note || 'Unknown' 
                     };
+                } else if (obs.note && grouped[time].staffName === 'Unknown') {
+                    // Update staff name if we found a record with it
+                    grouped[time].staffName = obs.note;
                 }
 
                 const entry = grouped[time];
@@ -114,7 +117,8 @@ class MonitoringService {
             status: 'final',
             category: 'vital-signs',
             effective_datetime: vital.dateTime,
-            issued: new Date().toISOString()
+            issued: new Date().toISOString(),
+            note: vital.staffName || 'Unknown Staff'
         };
 
         const promises = [];
