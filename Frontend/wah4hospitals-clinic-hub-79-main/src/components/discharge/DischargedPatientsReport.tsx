@@ -4,17 +4,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PrintButton } from '@/components/ui/PrintButton';
 import { DischargeStatusBadge } from './DischargeStatusBadge';
-import { Search, Calendar, FileText, User } from 'lucide-react';
+import { Search, Calendar, FileText, User, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 
 import { DischargedPatient } from '@/types/discharge';
 
 interface DischargedPatientsReportProps {
   dischargedPatients: DischargedPatient[];
+  onDelete?: (id: number) => void;
 }
 
 export const DischargedPatientsReport: React.FC<DischargedPatientsReportProps> = ({
-  dischargedPatients
+  dischargedPatients,
+  onDelete
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPatient, setSelectedPatient] = useState<DischargedPatient | null>(null);
@@ -133,10 +135,22 @@ export const DischargedPatientsReport: React.FC<DischargedPatientsReportProps> =
                         <span className="font-medium text-foreground">Admitted:</span> {patient.admission_date}
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">Discharged:</span> {patient.discharge_date}
+                        <span className="font-medium text-foreground">Discharged:</span> {patient.discharge_date ? format(new Date(patient.discharge_date), 'PPpp') : 'N/A'}
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">Age:</span> {patient.age}
+                        <span className="font-medium text-foreground">Age:</span> 
+                        {(() => {
+                          let displayAge: string | number = patient.age;
+                          if (patient.birthdate) {
+                            displayAge = Math.floor((new Date().getTime() - new Date(patient.birthdate).getTime()) / 31557600000);
+                          }
+                          // If age is 0 and we don't have a birthdate, treat as N/A (missing data)
+                          // If we DO have a birthdate, 0 is a valid age (newborn)
+                          if ((displayAge === 0 || displayAge === "0") && !patient.birthdate) {
+                            return "N/A";
+                          }
+                          return displayAge;
+                        })()}
                       </div>
                       <div>
                         <span className="font-medium text-foreground">Follow-up:</span>
@@ -146,7 +160,7 @@ export const DischargedPatientsReport: React.FC<DischargedPatientsReportProps> =
                       </div>
                     </div>
                   </div>
-                  <div className="ml-4 no-print">
+                  <div className="ml-4 no-print flex items-center gap-2">
                     <PrintButton
                       onPrint={() => handlePrintPatientPacket(patient)}
                       className="bg-primary hover:bg-primary/90"
@@ -155,6 +169,19 @@ export const DischargedPatientsReport: React.FC<DischargedPatientsReportProps> =
                     >
                       Print Discharge Packet
                     </PrintButton>
+                    {onDelete && (
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        onClick={() => {
+                          if (confirm('Are you sure you want to delete this discharge record?')) {
+                            onDelete(patient.id);
+                          }
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}

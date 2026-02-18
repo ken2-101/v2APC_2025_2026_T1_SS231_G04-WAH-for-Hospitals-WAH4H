@@ -96,7 +96,7 @@ export const generateDischargePacketHtml = (patient: any) => {
           <div class="info-grid">
             <div class="info-item">
               <span class="info-label">Patient Name:</span>
-              <span class="info-value">${patient.patientName}</span>
+              <span class="info-value">${patient.patient_name}</span>
             </div>
             <div class="info-item">
               <span class="info-label">Age:</span>
@@ -112,7 +112,7 @@ export const generateDischargePacketHtml = (patient: any) => {
             </div>
             <div class="info-item">
               <span class="info-label">Attending Physician:</span>
-              <span class="info-value">${patient.physician}</span>
+              <span class="info-value">${patient.physician_name}</span>
             </div>
             <div class="info-item">
               <span class="info-label">Discharge Condition:</span>
@@ -126,11 +126,11 @@ export const generateDischargePacketHtml = (patient: any) => {
           <div class="info-grid">
             <div class="info-item">
               <span class="info-label">Admission Date:</span>
-              <span class="info-value">${patient.admissionDate}</span>
+              <span class="info-value">${patient.admission_date}</span>
             </div>
             <div class="info-item">
               <span class="info-label">Discharge Date:</span>
-              <span class="info-value">${patient.dischargeDate}</span>
+              <span class="info-value">${patient.discharge_date}</span>
             </div>
           </div>
         </div>
@@ -139,24 +139,24 @@ export const generateDischargePacketHtml = (patient: any) => {
           <div class="section-title">Final Diagnosis</div>
           <div class="summary-box">
             <p><strong>Primary Diagnosis:</strong></p>
-            <p>${patient.finalDiagnosis || 'Final diagnosis to be documented by attending physician.'}</p>
+            <p>${patient.final_diagnosis || 'Final diagnosis to be documented by attending physician.'}</p>
           </div>
         </div>
 
         <div class="section">
           <div class="section-title">Summary of Hospital Stay</div>
           <div class="summary-box">
-            <p>${patient.dischargeSummary || 'The patient was admitted and received appropriate medical care during their hospital stay. Treatment was provided according to medical protocols and the patient responded well to therapy. Discharge planning was coordinated with the healthcare team to ensure continuity of care.'}</p>
+            <p>${patient.discharge_summary || 'The patient was admitted and received appropriate medical care during their hospital stay. Treatment was provided according to medical protocols and the patient responded well to therapy. Discharge planning was coordinated with the healthcare team to ensure continuity of care.'}</p>
           </div>
         </div>
 
          <div class="section">
            <div class="section-title">Follow-Up Plan</div>
            <div class="followup-box">
-             ${patient.followUpPlan ?
-            `<p><strong>${patient.followUpRequired ? '⚠️ FOLLOW-UP REQUIRED' : '✅ FOLLOW-UP INSTRUCTIONS'}</strong></p>
-                <div style="margin-top: 15px; white-space: pre-line;">${patient.followUpPlan}</div>` :
-            (patient.followUpRequired ?
+             ${patient.follow_up_plan ?
+            `<p><strong>${patient.follow_up_required ? '⚠️ FOLLOW-UP REQUIRED' : '✅ FOLLOW-UP INSTRUCTIONS'}</strong></p>
+                <div style="margin-top: 15px; white-space: pre-line;">${patient.follow_up_plan}</div>` :
+            (patient.follow_up_required ?
                 `<p><strong>⚠️ FOLLOW-UP REQUIRED</strong></p>
                   <p>• Schedule follow-up appointment within 1-2 weeks</p>
                   <p>• Continue prescribed medications as directed</p>

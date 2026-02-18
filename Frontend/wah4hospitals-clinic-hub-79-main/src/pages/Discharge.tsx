@@ -304,6 +304,24 @@ const Discharge = () => {
     return matchesSearch && matchesStatus && matchesDepartment && matchesCondition;
   });
 
+  const handleDeleteDischarge = async (id: number) => {
+    try {
+      await dischargeService.delete(id);
+      
+      // Reload data
+      const pendingData = await dischargeService.getPending();
+      setPendingDischarges(pendingData as any);
+      
+      const dischargedData = await dischargeService.getDischarged();
+      setDischargedPatients(dischargedData as any);
+      
+      alert('Discharge record deleted successfully.');
+    } catch (error) {
+      console.error('Error deleting discharge record:', error);
+      alert('Failed to delete discharge record. Please try again.');
+    }
+  };
+
   const hasActiveFilters = Object.values(activeFilters).some(filter => filter.length > 0);
 
   return (
@@ -314,6 +332,14 @@ const Discharge = () => {
           <p className="text-muted-foreground">Manage patient discharge procedures with comprehensive status tracking</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <Button
+            onClick={handleLoadBillingPatients}
+            variant="outline"
+            className="flex-1 sm:flex-none"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add from Billing
+          </Button>
           <Button
             onClick={handleSyncFromAdmissions}
             className="bg-blue-600 hover:bg-blue-700 flex-1 sm:flex-none"
@@ -492,7 +518,15 @@ const Discharge = () => {
                             <span className="font-medium text-foreground">Physician:</span> {patient.physician_name}
                           </div>
                         </div>
-                        <div className="flex justify-end">
+                        <div className="flex justify-end gap-2">
+                          <Button 
+                            variant="destructive" size="sm" 
+                            onClick={() => {
+                              if(confirm('Delete this discharge record?')) handleDeleteDischarge(patient.id);
+                            }}
+                          >
+                           Remove
+                          </Button>
                           <Button
                             size="sm"
                             onClick={() => handleProcessDischarge(patient)}
@@ -555,7 +589,7 @@ const Discharge = () => {
         </TabsContent>
 
         <TabsContent value="discharged" className="space-y-6">
-          <DischargedPatientsReport dischargedPatients={dischargedPatients} />
+          <DischargedPatientsReport dischargedPatients={dischargedPatients} onDelete={handleDeleteDischarge} />
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-6">

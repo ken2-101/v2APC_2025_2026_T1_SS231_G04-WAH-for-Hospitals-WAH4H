@@ -2,7 +2,7 @@ from rest_framework import serializers
 from .models import Discharge
 from patients.models import Patient
 from admission.models import Encounter
-from accounts.models import Practitioner
+from accounts.models import Practitioner, Location
 from datetime import date, datetime
 
 class DischargeSerializer(serializers.ModelSerializer):
@@ -21,6 +21,7 @@ class DischargeSerializer(serializers.ModelSerializer):
     patientName = serializers.SerializerMethodField()
     room = serializers.SerializerMethodField()
     age = serializers.SerializerMethodField()
+    birthdate = serializers.SerializerMethodField()
     condition = serializers.SerializerMethodField()
     department = serializers.SerializerMethodField()
     admissionDate = serializers.SerializerMethodField()
@@ -42,7 +43,7 @@ class DischargeSerializer(serializers.ModelSerializer):
             'discharge_datetime', 'notice_datetime', 'billing_cleared_datetime',
             'status', 'workflow_status', 'created_by', 'summary_of_stay',
             'discharge_instructions', 'pending_items', 'follow_up_plan', 'followUpPlan',
-            'patientName', 'room', 'age', 'department', 'condition', 
+            'patientName', 'room', 'age', 'birthdate', 'department', 'condition', 
             'admissionDate', 'dischargeDate', 'estimatedDischarge',
             'physician', 'finalDiagnosis', 'dischargeSummary', 
             'followUpRequired', 'requirements',
@@ -57,15 +58,38 @@ class DischargeSerializer(serializers.ModelSerializer):
 
     def get_room(self, obj):
         if hasattr(obj, 'encounter_obj') and obj.encounter_obj:
+            # First try structured location_obj
             if hasattr(obj.encounter_obj, 'location_obj') and obj.encounter_obj.location_obj:
                 return obj.encounter_obj.location_obj.name
+            
+            # Then try Parsing location_status (Ward|Room|Bed) from Admission backend
+            if hasattr(obj.encounter_obj, 'location_status') and obj.encounter_obj.location_status:
+                parts = obj.encounter_obj.location_status.split('|')
+                if len(parts) >= 2 and parts[1] and parts[1].strip():
+                    room_code = parts[1].strip()
+                    # Try to resolve code to name
+                    try:
+                        loc = Location.objects.filter(identifier=room_code).first()
+                        if loc: return loc.name
+                        # Fallback: Check if it matches a location name directly? 
+                        # Or return code if no lookup found
+                    except:
+                        pass
+                    return room_code
+            
             return f"Room {obj.encounter_obj.location_id}" if obj.encounter_obj.location_id else "Unassigned"
         return "Unassigned"
 
     def get_age(self, obj):
         if hasattr(obj, 'patient_obj') and obj.patient_obj:
-            return obj.patient_obj.age
-        return 0
+            age = obj.patient_obj.age
+            return age if age is not None else "N/A"
+        return "N/A"
+
+    def get_birthdate(self, obj):
+        if hasattr(obj, 'patient_obj') and obj.patient_obj and obj.patient_obj.birthdate:
+            return obj.patient_obj.birthdate.isoformat()
+        return None
 
     def get_condition(self, obj):
         if hasattr(obj, 'encounter_obj') and obj.encounter_obj:

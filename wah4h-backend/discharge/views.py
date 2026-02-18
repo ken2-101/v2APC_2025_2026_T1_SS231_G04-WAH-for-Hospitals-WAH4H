@@ -138,7 +138,7 @@ class DischargeViewSet(viewsets.ModelViewSet):
                     encounter = Encounter.objects.get(encounter_id=instance.encounter_id)
                     encounter.status = 'finished'
                     encounter.period_end = timezone.now().date()
-                    encounter.location_status = 'discharged'
+                    # encounter.location_status = 'discharged'  <-- REMOVED to preserve last location for reports
                     encounter.save()
                 except Encounter.DoesNotExist:
                     logger.warning(f"Encounter {instance.encounter_id} not found during discharge processing.")
@@ -218,12 +218,29 @@ class DischargeViewSet(viewsets.ModelViewSet):
                 # Get latest encounter for metadata
                 enc = Encounter.objects.filter(subject_id=pat.id).order_by('-encounter_id').first()
                 
+                # Logic to extract Room from Admission location_status
+                room_display = "N/A"
+                if enc:
+                    if enc.location_status:
+                        parts = enc.location_status.split('|')
+                        if len(parts) >= 2 and parts[1]:
+                            room_code = parts[1].strip()
+                            # Try to resolve code to name
+                            try:
+                                loc = Location.objects.filter(identifier=room_code).first()
+                                if loc: room_display = loc.name
+                                else: room_display = room_code
+                            except:
+                                room_display = room_code
+                    elif enc.location_id:
+                        room_display = f"Room {enc.location_id}"
+
                 results.append({
                     "billing_id": inv.invoice_id,
                     "patient_name": f"{pat.first_name} {pat.last_name}",
                     "hospital_id": pat.patient_id,
-                    "room": "N/A" if not enc or not enc.location_id else f"Room {enc.location_id}",
-                    "age": pat.age,
+                    "room": room_display,
+                    "age": pat.age if pat.age is not None else "N/A",
                     "department": enc.service_type if enc else "General",
                     "admission_date": inv.invoice_datetime.strftime("%Y-%m-%d") if inv.invoice_datetime else "N/A",
                 })

@@ -22,7 +22,8 @@ export interface DischargeRecord {
   status: 'pending' | 'ready' | 'discharged';
   physician_name: string;
   department: string;
-  age: number;
+  age: number | string;
+  birthdate?: string;
   estimated_discharge?: string;
   requirements: DischargeRequirements;
   final_diagnosis?: string;
@@ -42,7 +43,8 @@ export interface PendingPatient {
   status: 'pending' | 'ready' | 'discharged';
   physician_name: string;
   department: string;
-  age: number;
+  age: number | string;
+  birthdate?: string;
   estimated_discharge?: string;
   requirements: DischargeRequirements;
 }
@@ -56,7 +58,8 @@ export interface DischargedPatient {
   condition: string;
   physician_name: string;
   department: string;
-  age: number;
+  age: number | string;
+  birthdate?: string;
   final_diagnosis?: string;
   discharge_summary?: string;
   follow_up_required?: boolean;
