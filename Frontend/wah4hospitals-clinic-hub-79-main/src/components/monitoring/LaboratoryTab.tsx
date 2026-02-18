@@ -11,9 +11,13 @@ import { Plus, FileText, AlertCircle, CheckCircle, Clock, RefreshCw, ExternalLin
 import { LabRequest, LabResult } from '../../types/monitoring';
 import { LabTestType, LabPriority } from '../../types/laboratory';
 import { useRole } from '@/contexts/RoleContext';
+import { LabResultViewModal } from '../laboratory/LabResultViewModal';
 
 interface LaboratoryTabProps {
     labRequests: LabRequest[];
+    currentUserName?: string;
+    patientName?: string;
+    patientId?: string;
     onAddRequest?: (request: Omit<LabRequest, 'id'>) => void;
     onUpdateResult?: (requestId: string, result: LabResult) => void;
     onVerifyRequest?: (requestId: number | string) => void;
@@ -35,6 +39,9 @@ const COMMON_LAB_TESTS: { code: LabTestType; name: string }[] = [
 
 export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
     labRequests,
+    currentUserName,
+    patientName = 'Unknown Patient',
+    patientId = '',
     onAddRequest,
     onUpdateResult,
     onVerifyRequest,
@@ -94,8 +101,10 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
             priority: orderForm.priority,
             notes: orderForm.notes,
             lifecycleStatus: 'requested', // Default to requested (Active/Registered)
-            orderedBy: currentRole,
+            orderedBy: currentUserName || currentRole,
             orderedAt: new Date().toISOString(),
+            patient_name: patientName,
+            patient_id: patientId,
         };
 
         onAddRequest?.(newRequest);
@@ -190,7 +199,7 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
                             className="bg-blue-600 hover:bg-blue-700 text-white"
                         >
                             <Plus className="w-4 h-4 mr-2" />
-                            Request Lab Test
+                            {currentRole === 'doctor' ? 'Order Lab Test' : 'Request Lab Test'}
                         </Button>
                     )}
                 </div>
@@ -250,9 +259,7 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
                                             <div className="mt-3 p-3 bg-green-50 rounded border border-green-200">
                                                 <p className="font-medium text-green-900 mb-1">✓ Results Available</p>
                                                 <p className="text-sm text-green-800">
-                                                    {request.results[0]?.interpretation
-                                                        ? `Interpretation: ${request.results[0].interpretation}`
-                                                        : 'View details to see full results'}
+                                                    View details to see full results
                                                 </p>
                                             </div>
                                         )}
@@ -266,18 +273,25 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
                                             className="bg-purple-600 hover:bg-purple-700 text-white"
                                             onClick={() => handleVerifyClick(request)}
                                         >
-                                            Verify Request
+                                            Request Lab Test
                                         </Button>
                                     )}
 
-                                    {request.results && request.results.length > 0 && (
-                                        <a href="/laboratory" target="_blank" rel="noopener noreferrer">
-                                            <Button size="sm" variant="outline">
-                                                <ExternalLink className="w-4 h-4 mr-1" />
-                                                View in Laboratory
-                                            </Button>
-                                        </a>
-                                    )}
+                                    <button
+                                        onClick={() => {
+                                            setSelectedRequest(request);
+                                            setIsResultModalOpen(true);
+                                        }}
+                                        className="px-3 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors flex items-center gap-2 font-medium text-sm border border-purple-200"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="lucide lucide-eye">
+                                            <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"></path>
+                                            <circle cx="12" cy="12" r="3"></circle>
+                                        </svg>
+                                        View
+                                    </button>
+
+
 
                                     {/* Delete Action - Only for requested items */}
                                     {(currentRole === 'doctor' || currentRole === 'nurse') && request.lifecycleStatus === 'requested' && (
@@ -362,11 +376,18 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
                             Cancel
                         </Button>
                         <Button onClick={handleOrderSubmit} className="bg-blue-600 hover:bg-blue-700 text-white">
-                            Request Test
+                            {currentRole === 'doctor' ? 'Order Lab Test' : 'Request Lab Test'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* View Lab Result Modal */}
+            <LabResultViewModal
+                isOpen={isResultModalOpen}
+                onClose={() => setIsResultModalOpen(false)}
+                request={selectedRequest as any}
+            />
         </div>
     );
 };

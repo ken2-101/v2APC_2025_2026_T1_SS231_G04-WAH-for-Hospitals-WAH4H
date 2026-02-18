@@ -76,6 +76,8 @@ export interface LabRequest {
     status_display?: string; // Backend raw status (e.g. 'draft', 'registered')
     orderedBy: string;
     orderedAt: string;
+    patient_name: string;
+    patient_id: string;
     requestedBy?: string;
     requestedAt?: string;
     completedAt?: string;
@@ -141,7 +143,6 @@ export interface MonitoringAdmission {
     patientName: string;
     room: string;
     doctorName: string;
-    nurseName: string;
     status: PatientStatus;
     encounterType: string;
     admittingDiagnosis: string;
@@ -150,7 +151,6 @@ export interface MonitoringAdmission {
     modeOfArrival: string;
     admissionDate: string;
     attendingPhysician: string;
-    assignedNurse?: string;
     ward: string;
 
     // Derived / related data

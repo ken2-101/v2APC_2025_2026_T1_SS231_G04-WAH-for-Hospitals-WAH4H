@@ -8,7 +8,7 @@ export type LabTestType =
   | 'fbs' | 'rbs' | 'glucose_panel';
 export type LabPriority = 'routine' | 'urgent' | 'stat';
 export type LabStatus =
-  | 'requested' | 'verified' | 'completed'
+  | 'active' | 'requested' | 'verified' | 'completed'
   | 'registered' | 'preliminary' | 'partial' | 'final' | 'amended' | 'corrected' | 'cancelled';
 export type LabInterpretation = 'normal' | 'high' | 'low';
 
@@ -116,6 +116,7 @@ export interface LabRequestFormData {
   test_type: LabTestType;
   priority: LabPriority;
   clinical_reason?: string;
+  requester_name?: string; // Optional - allow frontend to specify requester name directly
 }
 
 // Dashboard Stats
@@ -141,6 +142,7 @@ export interface LabResultListResponse extends PaginatedResponse<LabResult> { }
 // Filter/Search Params
 export interface LabRequestFilters {
   status?: LabStatus;
+  is_released?: boolean;
   priority?: LabPriority;
   test_type?: LabTestType;
   requesting_doctor?: number;

@@ -55,6 +55,8 @@ class EncounterSerializer(serializers.ModelSerializer):
         read_only_fields = ['encounter_id', 'identifier', 'status', 'created_at', 'updated_at']
         extra_kwargs = {
             'subject_id': {'required': False},
+            'type': {'required': True, 'allow_blank': False, 'error_messages': {'required': 'Encounter type is required', 'blank': 'Encounter type cannot be empty'}},
+            'class_field': {'required': True, 'allow_blank': False, 'error_messages': {'required': 'Encounter class is required', 'blank': 'Encounter class cannot be empty'}},
         }
 
     def get_patient_summary(self, obj):
@@ -112,23 +114,42 @@ class EncounterSerializer(serializers.ModelSerializer):
         Direct ORM validation - no ACL layer.
         Handles both patient_id string lookup and subject_id integer validation.
         """
-        # Resolve patient_id string to subject_id if provided
         patient_id_str = data.get('patient_id')
-        if patient_id_str and not data.get('subject_id'):
+        # Validate subject_id or patient_id is provided
+        subject_id = data.get('subject_id')
+        if not subject_id and not patient_id_str:
+            raise serializers.ValidationError({
+                "patient_id": "Patient selection is required to proceed with admission"
+            })
+
+        # Resolve patient_id string to subject_id if provided
+        if patient_id_str and not subject_id:
             try:
                 patient = Patient.objects.get(patient_id=patient_id_str)
                 data['subject_id'] = patient.id
+                subject_id = patient.id
             except Patient.DoesNotExist:
                 raise serializers.ValidationError({
                     "patient_id": f"Patient with identifier {patient_id_str} does not exist"
                 })
 
         # Validate subject_id exists using direct ORM query
-        subject_id = data.get('subject_id')
         if subject_id:
             if not Patient.objects.filter(id=subject_id).exists():
                 raise serializers.ValidationError({
                     "subject_id": f"Patient with ID {subject_id} does not exist"
+                })
+            
+            # BLOCK DUPLICATE ACTIVE ADMISSIONS
+            # Check if patient already has an 'in-progress' encounter
+            active_encounter = Encounter.objects.filter(
+                subject_id=subject_id, 
+                status='in-progress'
+            ).exists()
+            
+            if active_encounter:
+                raise serializers.ValidationError({
+                    "non_field_errors": ["Patient is already admitted with an active encounter. Please discharge or finish the existing encounter before starting a new one."]
                 })
 
         # Validate practitioner using direct ORM query
@@ -147,9 +168,12 @@ class EncounterSerializer(serializers.ModelSerializer):
                     "location_id": f"Location with ID {location_id} does not exist"
                 })
 
-        # Handle period_start date parsing
+        # Handle period_start date parsing and auto-defaulting
         period_start = data.get('period_start')
-        if period_start and isinstance(period_start, str):
+        if not period_start:
+            # Auto-default to current date
+            data['period_start'] = timezone.now().date()
+        elif isinstance(period_start, str):
             # Handle ISO timestamp format (YYYY-MM-DDTHH:mm:ss)
             if 'T' in period_start:
                 period_start = period_start.split('T')[0]

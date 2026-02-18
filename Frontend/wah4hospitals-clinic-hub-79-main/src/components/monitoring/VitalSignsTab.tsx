@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Plus, Printer, AlertTriangle } from 'lucide-react';
+import { Plus, AlertTriangle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { VitalSign } from '../../types/monitoring';
 import { useAuth } from '@/contexts/AuthContext';
@@ -23,6 +23,7 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
     const { currentRole } = useRole();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [viewMode, setViewMode] = useState<'table' | 'graph'>('graph');
+    const [showErrors, setShowErrors] = useState(false);
 
     const [bpSys, setBpSys] = useState('');
     const [bpDia, setBpDia] = useState('');
@@ -33,11 +34,16 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
 
     // Vitals are already properly formatted from the service, just filter by patient
     const mappedVitals: VitalSign[] = useMemo(() => {
-        return vitals.filter(v => v.admissionId === patientId);
+        return vitals
+            .filter(v => v.admissionId === patientId)
+            .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
     }, [vitals, patientId]);
 
     const handleSave = () => {
-        if (!bpSys || !bpDia || !hr || !rr || !temp || !o2) return;
+        if (!bpSys || !bpDia || !hr || !rr || !temp || !o2) {
+            setShowErrors(true);
+            return;
+        }
 
         const staffName = user ? `${user.firstName} ${user.lastName}` : 'Unknown Staff';
 
@@ -59,6 +65,7 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
 
     const resetForm = () => {
         setBpSys(''); setBpDia(''); setHr(''); setRr(''); setTemp(''); setO2('');
+        setShowErrors(false);
     };
 
     const checkAlerts = (v: VitalSign) => {
@@ -101,10 +108,7 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
                     </Button>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => window.print()}>
-                        <Printer className="w-4 h-4 mr-2" />
-                        Print
-                    </Button>
+
                     {(currentRole === 'nurse' || currentRole === 'doctor') && (
                         <Button onClick={() => setIsModalOpen(true)} className="bg-green-600 hover:bg-green-700">
                             <Plus className="w-4 h-4 mr-2" />
@@ -129,7 +133,7 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
             {mappedVitals.length > 0 && checkAlerts(mappedVitals[mappedVitals.length - 1]).length > 0 && (
                 <Alert variant="destructive" className="border-l-4 border-l-red-600">
                     <AlertTriangle className="h-5 w-5 animate-pulse" />
-                    <AlertTitle className="font-bold text-lg">⚠️ Critical Vital Signs Alert</AlertTitle>
+                    <AlertTitle className="font-bold text-lg">Critical Vital Signs Alert</AlertTitle>
                     <AlertDescription className="text-base">
                         Latest vitals indicate: <strong>{checkAlerts(mappedVitals[mappedVitals.length - 1]).join(', ')}</strong>. 
                         Immediate attention required.
@@ -269,7 +273,7 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {mappedVitals.map(v => {
+                                    {[...mappedVitals].reverse().map(v => {
                                         const alerts = checkAlerts(v);
                                         return (
                                             <TableRow key={v.id} className={alerts.length > 0 ? 'bg-red-50' : ''}>
@@ -311,8 +315,9 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
                                 value={bpSys} 
                                 onChange={e => setBpSys(e.target.value)}
                                 placeholder="120"
-                                className="text-lg"
+                                className={`text-lg ${showErrors && !bpSys ? 'border-red-500' : ''}`}
                             />
+                            {showErrors && !bpSys && <p className="text-red-500 text-xs mt-1">Required field</p>}
                         </div>
                         <div className="space-y-2">
                             <Label className="text-sm font-semibold text-gray-700">Diastolic BP (mmHg)</Label>
@@ -321,8 +326,9 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
                                 value={bpDia} 
                                 onChange={e => setBpDia(e.target.value)}
                                 placeholder="80"
-                                className="text-lg"
+                                className={`text-lg ${showErrors && !bpDia ? 'border-red-500' : ''}`}
                             />
+                            {showErrors && !bpDia && <p className="text-red-500 text-xs mt-1">Required field</p>}
                         </div>
                         <div className="space-y-2">
                             <Label className="text-sm font-semibold text-gray-700">Heart Rate (bpm)</Label>
@@ -331,8 +337,9 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
                                 value={hr} 
                                 onChange={e => setHr(e.target.value)}
                                 placeholder="72"
-                                className="text-lg"
+                                className={`text-lg ${showErrors && !hr ? 'border-red-500' : ''}`}
                             />
+                            {showErrors && !hr && <p className="text-red-500 text-xs mt-1">Required field</p>}
                         </div>
                         <div className="space-y-2">
                             <Label className="text-sm font-semibold text-gray-700">Respiratory Rate</Label>
@@ -341,8 +348,9 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
                                 value={rr} 
                                 onChange={e => setRr(e.target.value)}
                                 placeholder="16"
-                                className="text-lg"
+                                className={`text-lg ${showErrors && !rr ? 'border-red-500' : ''}`}
                             />
+                            {showErrors && !rr && <p className="text-red-500 text-xs mt-1">Required field</p>}
                         </div>
                         <div className="space-y-2">
                             <Label className="text-sm font-semibold text-gray-700">Temperature (°C)</Label>
@@ -352,8 +360,9 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
                                 value={temp} 
                                 onChange={e => setTemp(e.target.value)}
                                 placeholder="36.5"
-                                className="text-lg"
+                                className={`text-lg ${showErrors && !temp ? 'border-red-500' : ''}`}
                             />
+                            {showErrors && !temp && <p className="text-red-500 text-xs mt-1">Required field</p>}
                         </div>
                         <div className="space-y-2">
                             <Label className="text-sm font-semibold text-gray-700">O₂ Saturation (%)</Label>
@@ -362,8 +371,9 @@ export const VitalSignsTab: React.FC<VitalSignsTabProps> = ({ vitals, onAddVital
                                 value={o2} 
                                 onChange={e => setO2(e.target.value)}
                                 placeholder="98"
-                                className="text-lg"
+                                className={`text-lg ${showErrors && !o2 ? 'border-red-500' : ''}`}
                             />
+                            {showErrors && !o2 && <p className="text-red-500 text-xs mt-1">Required field</p>}
                         </div>
                     </div>
                     <DialogFooter className="gap-2">

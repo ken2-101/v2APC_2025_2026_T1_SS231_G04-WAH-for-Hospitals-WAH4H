@@ -5,22 +5,16 @@ interface LabParameterFieldProps {
     parameter: LabParameterConfig;
     value: string;
     onChange: (value: string) => void;
-    getInterpretation: (value: string, low: number, high: number) => { status: string; color: string };
 }
 
 /**
  * Reusable component for rendering a single lab parameter input field
- * with automatic LOW/NORMAL/HIGH interpretation indicator
  */
 export const LabParameterField: React.FC<LabParameterFieldProps> = ({
     parameter,
     value,
     onChange,
-    getInterpretation
 }) => {
-    // We keep getInterpretation in props signature to avoid breaking parent checks, 
-    // but we don't use it for valid UI display anymore as per user request.
-
     return (
         <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -28,7 +22,8 @@ export const LabParameterField: React.FC<LabParameterFieldProps> = ({
             </label>
             <div className="flex items-center gap-2">
                 <input
-                    type="text"
+                    type={parameter.refLow !== 0 || parameter.refHigh !== 0 ? "number" : "text"}
+                    step={parameter.step || "any"}
                     value={value || ''}
                     onChange={(e) => onChange(e.target.value)}
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -49,7 +44,6 @@ interface LabPanelFormProps {
     parameters: LabParameterConfig[];
     formData: any;
     onFieldChange: (fieldKey: string, value: string) => void;
-    getInterpretation: (value: string, low: number, high: number) => { status: string; color: string };
 }
 
 /**
@@ -62,7 +56,6 @@ export const LabPanelForm: React.FC<LabPanelFormProps> = ({
     parameters,
     formData,
     onFieldChange,
-    getInterpretation
 }) => {
     const bgColor = `bg-${color}-50`;
     const borderColor = `border-${color}-200`;
@@ -78,7 +71,6 @@ export const LabPanelForm: React.FC<LabPanelFormProps> = ({
                         parameter={param}
                         value={formData[param.formKey]}
                         onChange={(value) => onFieldChange(param.formKey, value)}
-                        getInterpretation={getInterpretation}
                     />
                 ))}
             </div>

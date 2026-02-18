@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Search, Activity, Users, AlertTriangle, Heart, User, ChevronRight, ArrowLeft, Clock } from 'lucide-react';
@@ -26,6 +27,7 @@ import laboratoryService from '@/services/laboratoryService';  // For lab reques
 
 const Monitoring: React.FC = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [admissions, setAdmissions] = useState<MonitoringAdmission[]>([]);
   const [selectedAdmission, setSelectedAdmission] = useState<MonitoringAdmission | null>(null);
 
@@ -50,7 +52,6 @@ const Monitoring: React.FC = () => {
             patientName: adm.patientName || 'Unknown Patient',
             room: adm.location?.room || '—',
             doctorName: adm.physician || 'Unassigned',
-            nurseName: 'Unknown Nurse',
             status: adm.status === 'in-progress' ? 'Stable' : 'Observation',
             encounterType: adm.encounterType || 'IMP',
             admittingDiagnosis: adm.reasonForAdmission || 'N/A',
@@ -59,7 +60,6 @@ const Monitoring: React.FC = () => {
             modeOfArrival: adm.admitSource || 'Physician Referral',
             admissionDate: adm.admissionDate || '',
             attendingPhysician: adm.physician || 'Unassigned',
-            assignedNurse: 'Unknown',
             ward: adm.location?.ward || 'General Ward',
           }));
           setAdmissions(mapped);
@@ -116,6 +116,8 @@ const Monitoring: React.FC = () => {
           })(),
           orderedBy: report.doctor_name || report.orderedBy || 'Unknown',
           orderedAt: report.created_at,
+          patient_name: report.patient_name || report.subject_display || 'Unknown Patient',
+          patient_id: report.patient_id || report.subject_patient_id || '',
           completedAt: report.updated_at,
 
           results: report.results ? report.results.map((r: any) => ({
@@ -175,6 +177,19 @@ const Monitoring: React.FC = () => {
       setNotes(updatedNotes);
     } catch (err) {
       console.error(err);
+      throw err; // Propagate error for UI feedback
+    }
+  };
+
+  const handleDeleteNote = async (noteId: string) => {
+    if (!selectedAdmission) return;
+    try {
+      await monitoringService.deleteNote(noteId);
+      const updatedNotes = await monitoringService.getNotes(selectedAdmission.id);
+      setNotes(updatedNotes);
+    } catch (err) {
+      console.error('Error deleting note:', err);
+      throw err;
     }
   };
 
@@ -196,10 +211,11 @@ const Monitoring: React.FC = () => {
       const labRequestPayload = {
         subject_id: selectedAdmission.patientId,
         admission: selectedAdmission.id,  // Backend expects 'admission', not 'encounter_id'
-        requesting_doctor: null,  // Will be set by backend based on current user
+        requesting_doctor: user ? parseInt(user.id) : null,  // Use current user ID to override token if backend supports it
         test_type: request.testCode as any,  // Type assertion for cross-module integration
         priority: request.priority as any,  // Type assertion for cross-module integration
-        clinical_reason: request.notes
+        clinical_reason: request.notes,
+        requester_name: request.orderedBy // Pass frontend user name to service
       };
 
       console.log('Creating lab request with payload:', labRequestPayload);
@@ -232,6 +248,8 @@ const Monitoring: React.FC = () => {
         })(),
         orderedBy: report.doctor_name || report.orderedBy || 'Unknown',
         orderedAt: report.created_at,
+        patient_name: report.patient_name || report.subject_display || 'Unknown Patient',
+        patient_id: report.patient_id || report.subject_patient_id || '',
         completedAt: report.updated_at,
         results: report.results ? report.results.map((r: any) => ({
           parameter: r.parameter,
@@ -448,10 +466,6 @@ const Monitoring: React.FC = () => {
                       <p className="text-blue-200 text-xs">Attending Physician</p>
                       <p className="font-medium">{selectedAdmission.attendingPhysician}</p>
                     </div>
-                    <div className="col-span-2">
-                      <p className="text-blue-200 text-xs">Assigned Nurse</p>
-                      <p className="font-medium">{selectedAdmission.nurseName}</p>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -540,6 +554,7 @@ const Monitoring: React.FC = () => {
                     patientId={selectedAdmission.patientId}
                     notes={notes}
                     onAddNote={handleAddNote}
+                    onDeleteNote={handleDeleteNote}
                   />
                 </TabsContent>
 
@@ -548,6 +563,13 @@ const Monitoring: React.FC = () => {
                 <TabsContent value="laboratory">
                   <LaboratoryTab
                     labRequests={labRequests}
+                    currentUserName={(() => {
+                        if (!user) return '';
+                        const fName = ((user as any)?.firstName || (user as any)?.first_name || '').trim();
+                        const lName = ((user as any)?.lastName || (user as any)?.last_name || '').trim();
+                        const fullName = fName && lName ? `${fName} ${lName}` : (fName || lName || '');
+                        return ((user as any).role === 'doctor' && fullName) ? `Dr. ${fullName}` : fullName;
+                    })()}
                     onAddRequest={handleAddLabRequest}
                     onUpdateResult={handleUpdateLabResult}
                     onVerifyRequest={handleVerifyLabRequest}

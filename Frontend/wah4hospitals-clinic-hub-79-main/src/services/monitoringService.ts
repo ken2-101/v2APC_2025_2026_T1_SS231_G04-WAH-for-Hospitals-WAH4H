@@ -74,8 +74,11 @@ class MonitoringService {
                         id: obs.observation_id?.toString(),
                         admissionId: encounterId.toString(),
                         dateTime: time,
-                        staffName: 'Unknown' // Performer ID resolution not implemented yet
+                        staffName: obs.note || 'Unknown' 
                     };
+                } else if (obs.note && grouped[time].staffName === 'Unknown') {
+                    // Update staff name if we found a record with it
+                    grouped[time].staffName = obs.note;
                 }
 
                 const entry = grouped[time];
@@ -114,7 +117,8 @@ class MonitoringService {
             status: 'final',
             category: 'vital-signs',
             effective_datetime: vital.dateTime,
-            issued: new Date().toISOString()
+            issued: new Date().toISOString(),
+            note: vital.staffName || 'Unknown Staff'
         };
 
         const promises = [];
@@ -182,7 +186,7 @@ class MonitoringService {
 
         return noteObs.map(obs => {
             // Parse stored JSON note or plain text
-            let content = { subjective: '', objective: '', assessment: '', plan: '' };
+            let content = { subjective: '', objective: '', assessment: '', plan: '', providerName: '' };
             try {
                 if (obs.note && obs.note.startsWith('{')) {
                     content = JSON.parse(obs.note);
@@ -200,7 +204,7 @@ class MonitoringService {
                 objective: content.objective,
                 assessment: content.assessment,
                 plan: content.plan,
-                providerName: 'Unknown'
+                providerName: content.providerName || 'Unknown Provider'
             };
         });
     }
@@ -213,7 +217,8 @@ class MonitoringService {
             subjective: note.subjective,
             objective: note.objective,
             assessment: note.assessment,
-            plan: note.plan
+            plan: note.plan,
+            providerName: note.providerName
         });
 
         // Generate unique identifier for this observation
@@ -240,6 +245,18 @@ class MonitoringService {
             console.error('Error response:', error.response?.data);
             console.error('Error status:', error.response?.status);
             throw new Error(JSON.stringify(error.response?.data) || 'Failed to add clinical note');
+        }
+    }
+
+    /**
+     * Delete Note
+     */
+    async deleteNote(id: string): Promise<void> {
+        try {
+            await api.delete(`${MONITORING_BASE_URL}/observations/${id}/`);
+        } catch (error: any) {
+            console.error('Error deleting clinical note:', error);
+            throw new Error(JSON.stringify(error.response?.data) || 'Failed to delete clinical note');
         }
     }
 

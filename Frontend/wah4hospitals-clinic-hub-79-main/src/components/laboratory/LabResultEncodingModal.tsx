@@ -26,25 +26,36 @@ export const LabResultEncodingModal: React.FC<LabResultEncodingModalProps> = ({ 
     // Matches ResultFormState structure (flat dictionary)
     const [formData, setFormData] = useState<Record<string, string>>({});
 
-    // Helper: Get interpretation (compatible with LabParameterField)
-    const getInterpretation = (value: string, low: number, high: number): { status: string; color: string } => {
-        if (!value || value === '') return { status: '', color: '' };
-        const numValue = parseFloat(value);
-        if (isNaN(numValue)) return { status: '', color: '' };
-
-        if (numValue < low) return { status: 'LOW', color: 'text-red-600 bg-red-50 border-red-200' };
-        if (numValue > high) return { status: 'HIGH', color: 'text-orange-600 bg-orange-50 border-orange-200' };
-        return { status: 'NORMAL', color: 'text-green-600 bg-green-50 border-green-200' };
-    };
+    // Interpretation logic removed as per requirements (no automatic flagging)
 
 
-    // Load predefined parameters when modal opens or request changes
+    // Load predefined parameters and local draft when modal opens
     useEffect(() => {
         if (isOpen && request) {
-            // Reset Form Data
-            setFormData({});
+            const draft = localStorage.getItem(`lab_draft_${request.id}`);
+            if (draft) {
+                try {
+                    const parsed = JSON.parse(draft);
+                    setFormData(parsed.formData || {});
+                    setMedTech(parsed.medTech || '');
+                    setPrcNumber(parsed.prcNumber || '');
+                    setOverallRemarks(parsed.overallRemarks || '');
+                } catch (e) {
+                    setFormData({});
+                }
+            } else {
+                setFormData({});
+            }
         }
     }, [isOpen, request]);
+
+    // Save draft automatically as user types
+    useEffect(() => {
+        if (isOpen && request) {
+            const draft = { formData, medTech, prcNumber, overallRemarks };
+            localStorage.setItem(`lab_draft_${request.id}`, JSON.stringify(draft));
+        }
+    }, [formData, medTech, prcNumber, overallRemarks, isOpen, request]);
 
     if (!isOpen || !request) return null;
 
@@ -58,17 +69,8 @@ export const LabResultEncodingModal: React.FC<LabResultEncodingModalProps> = ({ 
                 const value = formData[param.formKey];
                 if (value && value.trim() !== '') {
                     // Only include filled fields
-                    // Safe interpretation check: only calculate if it looks like a number
-                    let apiInterp: LabInterpretation | '' = '';
-                    const numValue = parseFloat(value);
-
-                    if (!isNaN(numValue)) {
-                        const interp = getInterpretation(value, param.refLow, param.refHigh);
-                        if (interp.status === 'LOW') apiInterp = 'low';
-                        if (interp.status === 'HIGH') apiInterp = 'high';
-                        if (interp.status === 'NORMAL') apiInterp = 'normal';
-                    }
-                    // If not a number (e.g. "Reactive"), apiInterp remains '' which is correct.
+                    // Interpretation is now explicitly empty to disable automatic flagging
+                    const apiInterp: LabInterpretation | '' = '';
 
                     // Hide reference range if both low and high are 0 (e.g. Qualitative tests)
                     const refRange = (param.refLow === 0 && param.refHigh === 0) ? '' : `${param.refLow}-${param.refHigh}`;
@@ -106,6 +108,9 @@ export const LabResultEncodingModal: React.FC<LabResultEncodingModalProps> = ({ 
         };
 
         onSubmit(request.id, resultData);
+
+        // Clear Draft
+        localStorage.removeItem(`lab_draft_${request.id}`);
 
         // Reset
         setMedTech('');
@@ -203,7 +208,6 @@ export const LabResultEncodingModal: React.FC<LabResultEncodingModalProps> = ({ 
                                         parameters={panel.parameters}
                                         formData={formData}
                                         onFieldChange={(fieldKey, value) => setFormData(prev => ({ ...prev, [fieldKey]: value }))}
-                                        getInterpretation={getInterpretation}
                                     />
                                 ));
                             })()}

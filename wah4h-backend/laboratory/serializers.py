@@ -64,18 +64,8 @@ class DiagnosticReportResultSerializer(serializers.Serializer):
                 elif obs.reference_range_text:
                     ref_range = obs.reference_range_text
                 
-                # Determine flag based on interpretation or value comparison
+                # Automatic flagging/interpretation logic removed as per requirements
                 flag = None
-                if obs.interpretation:
-                    interp_lower = obs.interpretation.lower()
-                    if 'high' in interp_lower or 'increased' in interp_lower:
-                        flag = 'HIGH'
-                    elif 'low' in interp_lower or 'decreased' in interp_lower:
-                        flag = 'LOW'
-                    elif 'critical' in interp_lower:
-                        flag = 'CRITICAL'
-                    else:
-                        flag = 'NORMAL'
                 
                 return {
                     'parameter': obs.code or 'Unknown',
@@ -111,6 +101,7 @@ class DiagnosticReportListSerializer(serializers.ModelSerializer):
     priority = serializers.SerializerMethodField()
     orderedBy = serializers.SerializerMethodField()
     orderedAt = serializers.SerializerMethodField()
+    results = serializers.SerializerMethodField()
 
     class Meta:
         model = DiagnosticReport
@@ -127,6 +118,7 @@ class DiagnosticReportListSerializer(serializers.ModelSerializer):
             'subject_patient_id',
             'orderedBy',
             'orderedAt',
+            'results',
             'conclusion',
             'created_at',
             'updated_at'
@@ -177,6 +169,18 @@ class DiagnosticReportListSerializer(serializers.ModelSerializer):
     def get_orderedAt(self, obj):
         if obj.effective_datetime: return obj.effective_datetime.isoformat()
         return obj.created_at.isoformat() if hasattr(obj, 'created_at') else None
+
+    def get_results(self, obj):
+        """
+        Prioritize 'result_data' (JSON) if it exists.
+        Lazy-loads results to support both modern JSON and legacy table formats.
+        """
+        if obj.result_data:
+            val = obj.result_data
+            if isinstance(val, dict) and 'results' in val:
+                return val['results']
+            return val
+        return DiagnosticReportResultSerializer(instance=obj.results.all(), many=True).data
 class DiagnosticReportSerializer(serializers.ModelSerializer):
     """
     Enhanced serializer that fetches Patient data and formats DiagnosticReport

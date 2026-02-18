@@ -52,6 +52,16 @@ export const billingService = {
     return response.data;
   },
 
+  getAllInvoices: async () => {
+    const response = await api.get('/api/billing/invoices/');
+    return response.data;
+  },
+
+  getClaims: async () => {
+    const response = await api.get('/api/billing/claims/');
+    return response.data;
+  },
+
   generateInvoice: async (subjectId: number) => {
     const response = await api.post('/api/billing/invoices/generate/', { subject_id: subjectId });
     return response.data;

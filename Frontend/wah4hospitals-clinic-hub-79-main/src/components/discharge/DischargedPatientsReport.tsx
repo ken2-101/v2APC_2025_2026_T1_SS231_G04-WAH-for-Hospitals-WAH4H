@@ -7,21 +7,7 @@ import { DischargeStatusBadge } from './DischargeStatusBadge';
 import { Search, Calendar, FileText, User } from 'lucide-react';
 import { format } from 'date-fns';
 
-interface DischargedPatient {
-  id: number;
-  patientName: string;
-  room: string;
-  admissionDate: string;
-  dischargeDate: string;
-  condition: string;
-  physician: string;
-  department: string;
-  age: number;
-  finalDiagnosis: string;
-  dischargeSummary: string;
-  followUpRequired: boolean;
-  followUpPlan?: string;
-}
+import { DischargedPatient } from '@/types/discharge';
 
 interface DischargedPatientsReportProps {
   dischargedPatients: DischargedPatient[];
@@ -38,15 +24,15 @@ export const DischargedPatientsReport: React.FC<DischargedPatientsReportProps> =
   };
 
   const handlePrintPatientPacket = (patient: DischargedPatient) => {
-    console.log(`Printing discharge packet for ${patient.patientName}...`);
+    console.log(`Printing discharge packet for ${patient.patient_name}...`);
   };
 
   const filteredPatients = dischargedPatients.filter(patient =>
-    patient.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.room.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.condition.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.physician.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.department.toLowerCase().includes(searchTerm.toLowerCase())
+    (patient.patient_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (patient.room || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (patient.condition || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (patient.physician_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (patient.department || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -100,7 +86,7 @@ export const DischargedPatientsReport: React.FC<DischargedPatientsReportProps> =
                     <div>
                       <p className="text-sm text-blue-600 font-medium">Today's Discharges</p>
                       <p className="text-2xl font-bold text-blue-800">
-                        {dischargedPatients.filter(p => p.dischargeDate === new Date().toISOString().split('T')[0]).length}
+                        {dischargedPatients.filter(p => p.discharge_date === new Date().toISOString().split('T')[0]).length}
                       </p>
                     </div>
                   </div>
@@ -111,7 +97,7 @@ export const DischargedPatientsReport: React.FC<DischargedPatientsReportProps> =
                     <div>
                       <p className="text-sm text-yellow-600 font-medium">Follow-up Required</p>
                       <p className="text-2xl font-bold text-yellow-800">
-                        {dischargedPatients.filter(p => p.followUpRequired).length}
+                        {dischargedPatients.filter(p => p.follow_up_required).length}
                       </p>
                     </div>
                   </div>
@@ -127,7 +113,7 @@ export const DischargedPatientsReport: React.FC<DischargedPatientsReportProps> =
                 >
                   <div className="flex-1">
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-semibold text-lg">{patient.patientName}</h3>
+                      <h3 className="font-semibold text-lg">{patient.patient_name}</h3>
                       <DischargeStatusBadge status="discharged" />
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground">
@@ -141,21 +127,21 @@ export const DischargedPatientsReport: React.FC<DischargedPatientsReportProps> =
                         <span className="font-medium text-foreground">Department:</span> {patient.department}
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">Physician:</span> {patient.physician}
+                        <span className="font-medium text-foreground">Physician:</span> {patient.physician_name}
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">Admitted:</span> {patient.admissionDate}
+                        <span className="font-medium text-foreground">Admitted:</span> {patient.admission_date}
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">Discharged:</span> {patient.dischargeDate}
+                        <span className="font-medium text-foreground">Discharged:</span> {patient.discharge_date}
                       </div>
                       <div>
                         <span className="font-medium text-foreground">Age:</span> {patient.age}
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">Follow-up:</span> 
-                        <span className={patient.followUpRequired ? 'text-yellow-600' : 'text-green-600'}>
-                          {patient.followUpRequired ? ' Required' : ' Not Required'}
+                        <span className="font-medium text-foreground">Follow-up:</span>
+                        <span className={patient.follow_up_required ? 'text-yellow-600' : 'text-green-600'}>
+                          {patient.follow_up_required ? ' Required' : ' Not Required'}
                         </span>
                       </div>
                     </div>
@@ -176,7 +162,7 @@ export const DischargedPatientsReport: React.FC<DischargedPatientsReportProps> =
 
             {filteredPatients.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">
-                {searchTerm ? 
+                {searchTerm ?
                   'No discharged patients found matching your search.' :
                   'No patients have been discharged yet.'
                 }

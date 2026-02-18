@@ -35,7 +35,7 @@ const Pharmacy: React.FC = () => {
   const [filteredInventory, setFilteredInventory] = useState<InventoryItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showExpired, setShowExpired] = useState(false);
-  const [showInactive, setShowInactive] = useState(false);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [loadingInventory, setLoadingInventory] = useState(true);
 
   // Medication Requests State
@@ -43,7 +43,7 @@ const Pharmacy: React.FC = () => {
   const [filteredRequests, setFilteredRequests] = useState<MedicationRequest[]>([]);
   const [requestSearchQuery, setRequestSearchQuery] = useState('');
   const [requestSortBy, setRequestSortBy] = useState<RequestSortOption>('filo');
-  const [requestStatusFilter, setRequestStatusFilter] = useState('all');
+  // const [requestStatusFilter, setRequestStatusFilter] = useState('all');
   const [loadingRequests, setLoadingRequests] = useState(true);
 
   // Modal State
@@ -56,12 +56,9 @@ const Pharmacy: React.FC = () => {
   const fetchInventory = async () => {
     try {
       setLoadingInventory(true);
-      const data = await pharmacyService.getInventory({ 
-          show_expired: showExpired, 
-          show_inactive: showInactive 
-      });
+      const data = await pharmacyService.getInventory();
       setInventory(data);
-      setFilteredInventory(data);
+      // Logic for filtering and sorting will be handled by useEffect
     } catch (err) {
       console.error(err);
       toast.error('Failed to load inventory');
@@ -90,14 +87,11 @@ const Pharmacy: React.FC = () => {
   useEffect(() => {
     fetchInventory();
     fetchRequests();
-  }, [showExpired, showInactive]);
+  }, []);
 
   // ==================== Filter and Sort Requests ====================
   useEffect(() => {
     let result = [...requests];
-    
-    // Apply status filter
-    result = filterByStatus(result, requestStatusFilter);
     
     // Apply search filter
     result = filterMedicationRequests(result, requestSearchQuery);
@@ -106,44 +100,57 @@ const Pharmacy: React.FC = () => {
     result = sortMedicationRequests(result, requestSortBy);
     
     setFilteredRequests(result);
-  }, [requests, requestSearchQuery, requestSortBy, requestStatusFilter]);
+  }, [requests, requestSearchQuery, requestSortBy]);
 
-  // ==================== Search Filter ====================
+  // ==================== Filter and Sort Inventory ====================
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredInventory(inventory);
-      return;
+    let result = [...inventory];
+
+    // Show/Hide Expired
+    if (showExpired) {
+        // If filter is ON, show ONLY expired items
+        result = result.filter(item => item.is_expired);
+    } else {
+        // If filter is OFF, show ONLY active (non-expired) items
+        result = result.filter(item => !item.is_expired);
     }
 
-    const query = searchQuery.toLowerCase();
-    const filtered = inventory.filter(
-      (item) =>
-        item.generic_name.toLowerCase().includes(query) ||
-        item.brand_name?.toLowerCase().includes(query) ||
-        item.batch_number.toLowerCase().includes(query) ||
-        (item.manufacturer && item.manufacturer.toLowerCase().includes(query))
-    );
-    setFilteredInventory(filtered);
-  }, [searchQuery, inventory]);
+    // Search Filter (Name only)
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter((item) =>
+        item.generic_name.toLowerCase().includes(query)
+      );
+    }
+
+    // Sort
+    result.sort((a, b) => {
+      const nameA = a.generic_name.toLowerCase();
+      const nameB = b.generic_name.toLowerCase();
+      if (sortOrder === 'asc') {
+        return nameA.localeCompare(nameB);
+      } else {
+        return nameB.localeCompare(nameA);
+      }
+    });
+
+    setFilteredInventory(result);
+  }, [searchQuery, inventory, sortOrder, showExpired]);
 
   // ==================== Handlers ====================
   const handleInventoryAdd = (item: InventoryItem) => {
     setInventory((prev) => [item, ...prev]);
-    // Also update filtered list if it matches
-    setFilteredInventory((prev) => [item, ...prev]);
   };
 
   const handleInventoryUpdate = (updatedItem: InventoryItem) => {
     const updateList = (list: InventoryItem[]) => 
         list.map((item) => (item.id === updatedItem.id ? updatedItem : item));
     setInventory(updateList);
-    setFilteredInventory(updateList);
   };
 
   const handleInventoryDelete = (itemId: number) => {
     const filterList = (list: InventoryItem[]) => list.filter((item) => item.id !== itemId);
     setInventory(filterList);
-    setFilteredInventory(filterList);
   };
 
   const handleDispenseSuccess = () => {
@@ -161,7 +168,7 @@ const Pharmacy: React.FC = () => {
   const renderStatusBadges = (item: InventoryItem) => {
     return (
       <div className="flex flex-wrap gap-1 mt-1">
-        {item.status_indicators?.map((indicator, idx) => (
+        {item.status_indicators?.filter(i => i.type !== 'expiring_soon').map((indicator, idx) => (
           <span
             key={idx}
             className={`text-xs px-2 py-1 rounded-full font-medium ${
@@ -184,7 +191,6 @@ const Pharmacy: React.FC = () => {
     total: inventory.length,
     lowStock: inventory.filter((i) => i.is_low_stock).length,
     expired: inventory.filter((i) => i.is_expired).length,
-    expiringSoon: inventory.filter((i) => i.is_expiring_soon && !i.is_expired).length,
   };
 
   return (
@@ -195,7 +201,7 @@ const Pharmacy: React.FC = () => {
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
           <div className="text-sm text-gray-600">Total Items</div>
           <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
@@ -206,13 +212,6 @@ const Pharmacy: React.FC = () => {
             Low Stock
           </div>
           <div className="text-2xl font-bold text-yellow-900">{stats.lowStock}</div>
-        </div>
-        <div className="bg-orange-50 p-4 rounded-lg shadow border border-orange-200">
-          <div className="text-sm text-orange-700 flex items-center gap-1">
-            <AlertTriangle className="w-4 h-4" />
-            Expiring Soon
-          </div>
-          <div className="text-2xl font-bold text-orange-900">{stats.expiringSoon}</div>
         </div>
         <div className="bg-red-50 p-4 rounded-lg shadow border border-red-200">
           <div className="text-sm text-red-700 flex items-center gap-1">
@@ -261,7 +260,7 @@ const Pharmacy: React.FC = () => {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <Input
                 type="text"
-                placeholder="Search by name, brand, batch, or manufacturer..."
+                placeholder="Search by name..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -269,6 +268,15 @@ const Pharmacy: React.FC = () => {
             </div>
 
             <div className="flex gap-2">
+              <select
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
+              >
+                <option value="asc">Name A-Z</option>
+                <option value="desc">Name Z-A</option>
+              </select>
+
               <Button
                 variant="outline"
                 size="sm"
@@ -277,16 +285,6 @@ const Pharmacy: React.FC = () => {
               >
                 <Filter className="w-4 h-4 mr-1" />
                 {showExpired ? 'Hide' : 'Show'} Expired
-              </Button>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowInactive(!showInactive)}
-                className={showInactive ? 'bg-gray-200' : ''}
-              >
-                <Filter className="w-4 h-4 mr-1" />
-                {showInactive ? 'Hide' : 'Show'} Inactive
               </Button>
 
               <Button
@@ -367,14 +365,9 @@ const Pharmacy: React.FC = () => {
                         <div className="text-xs text-gray-500">Min: {item.minimum_stock_level}</div>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="text-sm text-gray-700">${item.unit_price}</div>
+                        <div className="text-sm text-gray-700">₱{item.unit_price}</div>
                       </td>
                       <td className="px-4 py-3">
-                        {!item.is_active && (
-                          <span className="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded-full">
-                            Inactive
-                          </span>
-                        )}
                         {renderStatusBadges(item)}
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -438,7 +431,7 @@ const Pharmacy: React.FC = () => {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <Input
                 type="text"
-                placeholder="Search by medication, patient, or notes..."
+                placeholder="Search by medication..."
                 value={requestSearchQuery}
                 onChange={(e) => setRequestSearchQuery(e.target.value)}
                 className="pl-10"
@@ -457,19 +450,6 @@ const Pharmacy: React.FC = () => {
               <option value="medication-name">Medication Name (A-Z)</option>
               <option value="quantity-high">Quantity (High to Low)</option>
               <option value="quantity-low">Quantity (Low to High)</option>
-            </select>
-
-            {/* Status Filter */}
-            <select
-              value={requestStatusFilter}
-              onChange={(e) => setRequestStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">All Statuses</option>
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
-              <option value="dispensed">Dispensed</option>
-              <option value="denied">Denied</option>
             </select>
           </div>
 
