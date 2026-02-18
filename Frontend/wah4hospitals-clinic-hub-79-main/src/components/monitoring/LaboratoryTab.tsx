@@ -101,7 +101,6 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
             priority: orderForm.priority,
             notes: orderForm.notes,
             lifecycleStatus: 'requested', // Default to requested (Active/Registered)
-            lifecycleStatus: 'requested', // Default to requested (Active/Registered)
             orderedBy: currentUserName || currentRole,
             orderedAt: new Date().toISOString(),
             patient_name: patientName,
