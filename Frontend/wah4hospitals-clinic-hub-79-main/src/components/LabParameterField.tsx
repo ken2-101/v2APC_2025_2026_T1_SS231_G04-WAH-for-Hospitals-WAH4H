@@ -5,21 +5,16 @@ interface LabParameterFieldProps {
     parameter: LabParameterConfig;
     value: string;
     onChange: (value: string) => void;
-    getInterpretation: (value: string, low: number, high: number) => { status: string; color: string };
 }
 
 /**
  * Reusable component for rendering a single lab parameter input field
- * with automatic LOW/NORMAL/HIGH interpretation indicator
  */
 export const LabParameterField: React.FC<LabParameterFieldProps> = ({
     parameter,
     value,
     onChange,
-    getInterpretation
 }) => {
-    const interpretation = getInterpretation(value, parameter.refLow, parameter.refHigh);
-
     return (
         <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -34,11 +29,6 @@ export const LabParameterField: React.FC<LabParameterFieldProps> = ({
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     placeholder={`e.g., ${parameter.placeholder}`}
                 />
-                {interpretation.status && (
-                    <span className={`px-2 py-1 rounded text-xs font-bold border whitespace-nowrap ${interpretation.color}`}>
-                        {interpretation.status}
-                    </span>
-                )}
             </div>
             <p className="text-xs text-gray-500 mt-1.5">
                 Ref: {parameter.refLow}-{parameter.refHigh} {parameter.unit}
@@ -54,7 +44,6 @@ interface LabPanelFormProps {
     parameters: LabParameterConfig[];
     formData: any;
     onFieldChange: (fieldKey: string, value: string) => void;
-    getInterpretation: (value: string, low: number, high: number) => { status: string; color: string };
 }
 
 /**
@@ -67,7 +56,6 @@ export const LabPanelForm: React.FC<LabPanelFormProps> = ({
     parameters,
     formData,
     onFieldChange,
-    getInterpretation
 }) => {
     const bgColor = `bg-${color}-50`;
     const borderColor = `border-${color}-200`;
@@ -83,7 +71,6 @@ export const LabPanelForm: React.FC<LabPanelFormProps> = ({
                         parameter={param}
                         value={formData[param.formKey]}
                         onChange={(value) => onFieldChange(param.formKey, value)}
-                        getInterpretation={getInterpretation}
                     />
                 ))}
             </div>

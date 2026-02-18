@@ -141,6 +141,7 @@ export interface LabResultListResponse extends PaginatedResponse<LabResult> { }
 // Filter/Search Params
 export interface LabRequestFilters {
   status?: LabStatus;
+  is_released?: boolean;
   priority?: LabPriority;
   test_type?: LabTestType;
   requesting_doctor?: number;

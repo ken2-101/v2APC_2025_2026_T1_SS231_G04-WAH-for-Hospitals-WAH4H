@@ -88,6 +88,10 @@ export const laboratoryService = {
       }
     }
 
+    if (filters?.is_released !== undefined) {
+      params.append('issued_datetime__isnull', (!filters.is_released).toString());
+    }
+
     if (filters?.search) params.append('search', filters.search);
     if (filters?.ordering) params.append('ordering', filters.ordering);
     if (filters?.page) params.append('page', filters.page.toString());

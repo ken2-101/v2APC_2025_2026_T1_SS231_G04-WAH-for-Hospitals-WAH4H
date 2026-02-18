@@ -78,16 +78,22 @@ export default function LaboratoryDashboard() {
 
       // Map activeTab to backend status filters
       let statusFilter: LabStatus | undefined;
+      let releasedFilter: boolean | undefined;
 
       if (activeTab === 'active') {
         statusFilter = 'active';
-      } else if (activeTab === 'completed' || activeTab === 'released') {
+      } else if (activeTab === 'completed') {
         statusFilter = 'completed';
+        releasedFilter = false;
+      } else if (activeTab === 'released') {
+        statusFilter = 'completed';
+        releasedFilter = true;
       }
 
       // Fetch requests based on tab
       const filters: LabRequestFilters = {
-        status: statusFilter, // Use mapped status
+        status: statusFilter,
+        is_released: releasedFilter,
         search: searchTerm,
         priority: priorityFilter !== 'all' ? priorityFilter : undefined,
       };

@@ -257,9 +257,7 @@ export const LaboratoryTab: React.FC<LaboratoryTabProps> = ({
                                             <div className="mt-3 p-3 bg-green-50 rounded border border-green-200">
                                                 <p className="font-medium text-green-900 mb-1">✓ Results Available</p>
                                                 <p className="text-sm text-green-800">
-                                                    {request.results[0]?.interpretation
-                                                        ? `Interpretation: ${request.results[0].interpretation}`
-                                                        : 'View details to see full results'}
+                                                    View details to see full results
                                                 </p>
                                             </div>
                                         )}

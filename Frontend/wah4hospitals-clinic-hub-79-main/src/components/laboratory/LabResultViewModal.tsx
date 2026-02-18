@@ -156,7 +156,6 @@ export const LabResultViewModal: React.FC<LabResultViewModalProps> = ({ isOpen, 
                                     <th className="text-center py-2 px-3 font-semibold">Result</th>
                                     <th className="text-center py-2 px-3 font-semibold">Unit</th>
                                     <th className="text-center py-2 px-3 font-semibold">Ref. Range</th>
-                                    <th className="text-center py-2 px-3 font-semibold">Status</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -167,12 +166,6 @@ export const LabResultViewModal: React.FC<LabResultViewModalProps> = ({ isOpen, 
                                             <td className="py-2.5 px-3 text-center font-bold text-gray-900">{res.value}</td>
                                             <td className="py-2.5 px-3 text-center text-gray-600">{res.unit || '—'}</td>
                                             <td className="py-2.5 px-3 text-center text-gray-600">{(res.referenceRange && res.referenceRange !== '0-0') ? res.referenceRange : '—'}</td>
-                                            <td className={`py-2.5 px-3 text-center font-semibold uppercase text-xs ${res.flag === 'HIGH' || res.interpretation === 'high' ? 'text-red-600' :
-                                                res.flag === 'LOW' || res.interpretation === 'low' ? 'text-orange-600' :
-                                                    res.flag === 'NORMAL' || res.interpretation === 'normal' ? 'text-green-600' : 'text-gray-500'
-                                                }`}>
-                                                {res.flag || res.interpretation || '—'}
-                                            </td>
                                         </tr>
                                     ))
                                 ) : request.result?.parameters && request.result.parameters.length > 0 ? (
@@ -182,12 +175,6 @@ export const LabResultViewModal: React.FC<LabResultViewModalProps> = ({ isOpen, 
                                             <td className="py-2.5 px-3 text-center font-bold text-gray-900">{param.result_value}</td>
                                             <td className="py-2.5 px-3 text-center text-gray-600">{param.unit || '—'}</td>
                                             <td className="py-2.5 px-3 text-center text-gray-600">{(param.reference_range && param.reference_range !== '0-0') ? param.reference_range : '—'}</td>
-                                            <td className={`py-2.5 px-3 text-center font-semibold uppercase text-xs ${param.interpretation === 'high' ? 'text-red-600' :
-                                                param.interpretation === 'low' ? 'text-orange-600' :
-                                                    param.interpretation === 'normal' ? 'text-green-600' : 'text-gray-500'
-                                                }`}>
-                                                {param.interpretation || '—'}
-                                            </td>
                                         </tr>
                                     ))
                                 ) : (
