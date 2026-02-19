@@ -37,7 +37,7 @@ const ModernLayout: React.FC<ModernLayoutProps> = ({
   tabs,
   onTabChange
 }) => {
-  const { isAdminMode, currentRole, availableTabs } = useRole();
+  const { currentRole, availableTabs } = useRole();
   const { user, logout } = useAuth();
   const [openTabs, setOpenTabs] = useState(['dashboard']);
   const [showNewTabDashboard, setShowNewTabDashboard] = useState(false);
@@ -157,29 +157,13 @@ const ModernLayout: React.FC<ModernLayoutProps> = ({
             onClick={() => handleTabClick(tab.id)}
           >
             <CardContent className="p-6 text-center relative">
-              <div className="absolute top-4 right-4 hidden sm:block">
-                <Tooltip delayDuration={0}>
-                  <TooltipTrigger asChild>
-                    <button className="text-gray-400 hover:text-primary transition-colors z-[9999]">
-                      <HelpCircle className="w-5 h-5" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    <span>
-                      This module lets you manage {tab.name}. <br />
-                      (Mock help text: More info about this module.)
-                    </span>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
+
               <div className="w-12 h-12 bg-gradient-to-r from-primary to-secondary rounded-lg mx-auto mb-3 flex items-center justify-center text-white">
                 {tab.icon}
               </div>
 
               <h3 className="font-medium text-gray-900">{tab.name}</h3>
-              <Badge variant="outline" className="mt-2 text-xs">
-                {getRoleDisplayName()} Access
-              </Badge>
+
             </CardContent>
           </Card>
         ))}
@@ -216,13 +200,13 @@ const ModernLayout: React.FC<ModernLayoutProps> = ({
 
           {/* Item 2: Empty Spacer (was Search Bar) */}
           <div className="col-start-1 col-end-3 row-start-2 row-end-3 sm:col-start-2 sm:col-end-3 sm:row-start-1 sm:row-end-2">
-             {/* Search bar removed */}
+            {/* Search bar removed */}
           </div>
 
           {/* Item 3: Right Actions (grid area: three) */}
           <div className="col-start-2 col-end-3 row-start-1 row-end-2 sm:col-start-3 sm:col-end-4 flex items-center justify-end">
             <div className="flex items-center space-x-4">
-              
+
               {/* Help Only */}
               <HelpSupportModal>
                 <Button variant="ghost" size="sm" className="hover-lift">
@@ -265,12 +249,12 @@ const ModernLayout: React.FC<ModernLayoutProps> = ({
                     <div className="text-left hidden md:block">
                       <p className="text-sm font-medium">
                         {(() => {
-                           if (!user) return 'Guest User';
-                           const fName = ((user as any)?.firstName || (user as any)?.first_name || '').trim();
-                           const lName = ((user as any)?.lastName || (user as any)?.last_name || '').trim();
-                           
-                           if (fName && lName) return `${fName} ${lName}`;
-                           return fName || lName || 'Unknown User';
+                          if (!user) return 'Guest User';
+                          const fName = ((user as any)?.firstName || (user as any)?.first_name || '').trim();
+                          const lName = ((user as any)?.lastName || (user as any)?.last_name || '').trim();
+
+                          if (fName && lName) return `${fName} ${lName}`;
+                          return fName || lName || 'Unknown User';
                         })()}
                       </p>
                       <p className="text-xs text-gray-500">{getRoleDisplayName()}</p>

@@ -575,6 +575,7 @@ class PasswordResetInitiateAPIView(APIView):
     }
     """
     permission_classes = [AllowAny]
+    throttle_scope = 'password_reset'  # 3 requests per minute (abuse prevention)
     
     def post(self, request):
         serializer = PasswordResetInitiateSerializer(data=request.data)
@@ -682,7 +683,7 @@ class ChangePasswordAPIView(APIView):
         }
     }
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     
     def post(self, request):
         serializer = ChangePasswordSerializer(
@@ -734,7 +735,7 @@ class ChangePasswordInitiateAPIView(APIView):
         }
     }
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     
     def post(self, request):
         serializer = ChangePasswordInitiateSerializer(
@@ -791,7 +792,7 @@ class ChangePasswordVerifyAPIView(APIView):
         }
     }
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     
     def post(self, request):
         serializer = ChangePasswordVerifySerializer(

@@ -1,9 +1,12 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { useToast } from '@/hooks/use-toast';
 import { UserRole } from './RoleContext';
 
 const API_BASE_URL = import.meta.env.LOCAL_8000 || 'http://127.0.0.1:8000';
+
+// Session idle timeout: 15 minutes (matches JWT access token lifetime)
+const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
 
 interface User {
   id: string;
@@ -84,6 +87,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Restore user from localStorage on mount so SPA refresh doesn't log out
   useEffect(() => {
@@ -98,6 +102,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.removeItem('currentUser');
     }
   }, []);
+
+  // =========================================================================
+  // IDLE TIMEOUT — Auto-logout after 15 minutes of inactivity
+  // =========================================================================
+  const performIdleLogout = useCallback(() => {
+    setUser(null);
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('currentUser');
+    localStorage.removeItem('userRole');
+
+    toast({
+      title: 'Session expired',
+      description: 'You have been logged out due to inactivity.',
+      variant: 'destructive',
+    });
+  }, [toast]);
+
+  useEffect(() => {
+    // Only run idle timer when user is authenticated AND not on auth pages
+    const path = window.location.pathname.toLowerCase();
+    const isAuthPage = path.includes('/login') || path.includes('/register') || path === '/';
+
+    if (!user || isAuthPage) {
+      if (idleTimerRef.current) {
+        clearTimeout(idleTimerRef.current);
+        idleTimerRef.current = null;
+      }
+      return;
+    }
+
+    const resetIdleTimer = () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = setTimeout(performIdleLogout, IDLE_TIMEOUT_MS);
+    };
+
+    // Activity events that reset the idle timer
+    const activityEvents = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+
+    // Start the timer and listen for activity
+    resetIdleTimer();
+    activityEvents.forEach((event) => window.addEventListener(event, resetIdleTimer));
+
+    return () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      activityEvents.forEach((event) => window.removeEventListener(event, resetIdleTimer));
+    };
+  }, [user, performIdleLogout]);
 
   // Create axios instance with base configuration
   const axiosInstance = axios.create({
@@ -150,15 +202,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           } catch (refreshError: any) {
             // Token refresh failed - clear stale tokens and logout
             console.error('Token refresh failed - clearing stale tokens:', refreshError);
-            
+
             // Clear all tokens (they might be stale/invalid)
             localStorage.removeItem('accessToken');
             localStorage.removeItem('refreshToken');
             localStorage.removeItem('currentUser');
             localStorage.removeItem('userRole');
-            
+
             setUser(null);
-            
+
             // Only show toast if not already on login page
             if (!window.location.pathname.includes('/login')) {
               toast({
@@ -167,7 +219,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 variant: 'destructive',
               });
             }
-            
+
             return Promise.reject(refreshError);
           }
         } else {
@@ -523,45 +575,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   /**
-   * Register Verify - Step 2: Verify OTP and create account with auto-login
-   * Returns true on success, false on failure
+   * Register Verify - Step 2: Verify OTP and create account
+   * Does NOT auto-login — user must log in via the login page.
    */
   const registerVerify = async (email: string, otp: string): Promise<AuthResult> => {
     setIsLoading(true);
 
     try {
-      const res = await axiosInstance.post('/api/accounts/register/verify/', {
+      await axiosInstance.post('/api/accounts/register/verify/', {
         email,
         otp,
       });
 
-      const { tokens, user: rawUser } = res.data.data;
-
-      // Store authentication tokens
-      localStorage.setItem('accessToken', tokens.access);
-      localStorage.setItem('refreshToken', tokens.refresh);
-
-      // Map backend user data to frontend User interface
-      const userObj: User = {
-        id: String(rawUser.id),
-        email: rawUser.email,
-        firstName: rawUser.first_name,
-        lastName: rawUser.last_name,
-        role: rawUser.role as UserRole,
-      };
-
-      setUser(userObj);
-      // Persist minimal user info so page refresh can restore session state
-      try {
-        localStorage.setItem('currentUser', JSON.stringify(userObj));
-        localStorage.setItem('userRole', String(userObj.role));
-      } catch (err) {
-        console.warn('Failed to persist currentUser to localStorage', err);
-      }
-
       toast({
-        title: 'Welcome!',
-        description: `Account created successfully. Welcome, ${userObj.firstName}!`,
+        title: 'Account created!',
+        description: 'Your account has been created successfully. Please log in with your credentials.',
       });
 
       return { ok: true };
@@ -639,9 +667,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isAuthenticated = !!user;
 
   return (
-    <AuthContext.Provider 
-      value={{ 
-        user, 
+    <AuthContext.Provider
+      value={{
+        user,
         loginInitiate,
         loginVerify,
         passwordResetInitiate,
@@ -651,8 +679,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         changePasswordVerify,
         register,
         registerInitiate,
-        registerVerify, 
-        logout, 
+        registerVerify,
+        logout,
         isLoading,
         isAuthenticated,
       }}

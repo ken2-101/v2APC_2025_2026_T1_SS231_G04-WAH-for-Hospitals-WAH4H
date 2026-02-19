@@ -11,7 +11,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
 
 # SECURITY
-SECRET_KEY = "django-insecure-rz74s8wlt7x+-10!5ky61@n4%7v*_o!$)fxe$e5@@8vh0kxo53"
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-dev-fallback-change-in-production')
 DEBUG = True
 ALLOWED_HOSTS = ["*"]
 
@@ -41,6 +41,7 @@ INSTALLED_APPS = [
 
     # Third-party
     "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "django_filters",
 
@@ -145,16 +146,19 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.ScopedRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
-        "anon": "20/minute",      # Anonymous users: 20 req/min (prevent scraping/spam)
-        "user": "100/minute",     # Authenticated users: 100 req/min (standard usage)
-        "login": "5/minute",      # Login attempts: 5 req/min (brute-force protection)
+        "anon": "20/minute",           # Anonymous users: 20 req/min (prevent scraping/spam)
+        "user": "100/minute",          # Authenticated users: 100 req/min (standard usage)
+        "login": "5/minute",           # Login attempts: 5 req/min (brute-force protection)
+        "password_reset": "3/minute",  # Password reset: 3 req/min (abuse prevention)
     },
 }
 
 # JWT Settings
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),   # OWASP standard for sensitive apps
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),      # 7 days for shift-based hospital staff
+    "ROTATE_REFRESH_TOKENS": True,                     # Issue new refresh token on each refresh
+    "BLACKLIST_AFTER_ROTATION": True,                   # Invalidate old refresh tokens
     "AUTH_HEADER_TYPES": ("Bearer",),
     # User model uses practitioner as primary key (OneToOneField)
     # Use 'pk' to work with any primary key configuration
@@ -164,9 +168,9 @@ SIMPLE_JWT = {
 
 # Feature flags
 # Set to False to disable OTP for login flow only (easy to re-enable)
-LOGIN_USE_OTP = False
+LOGIN_USE_OTP = True
 # Set to False to disable OTP for registration flow (creates account immediately)
-REGISTER_USE_OTP = False
+REGISTER_USE_OTP = True
 # ============================================================================
 # EMAIL CONFIGURATION (Console Backend for Development)
 # ============================================================================
