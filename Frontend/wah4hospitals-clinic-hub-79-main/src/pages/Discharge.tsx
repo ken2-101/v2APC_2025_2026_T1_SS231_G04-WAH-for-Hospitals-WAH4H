@@ -25,6 +25,7 @@ import { DischargeStatusBadge } from '@/components/discharge/DischargeStatusBadg
 import { PendingItemsSection } from '@/components/discharge/PendingItemsSection';
 import { DischargedPatientsReport } from '@/components/discharge/DischargedPatientsReport';
 import { dischargeService } from '@/services/dischargeService';
+import { useToast } from '@/hooks/use-toast';
 
 import {
   DischargeRequirements,
@@ -34,6 +35,7 @@ import {
 } from '@/types/discharge';
 
 const Discharge = () => {
+  const { toast } = useToast();
   const [pendingDischarges, setPendingDischarges] = useState<PendingPatient[]>([]);
   const [dischargedPatients, setDischargedPatients] = useState<DischargedPatient[]>([]);
 
@@ -86,17 +88,28 @@ const Discharge = () => {
       const result = await dischargeService.syncFromAdmissions();
 
       if (result.success) {
-        alert(result.message || `Synced ${result.created} patient(s) from admissions`);
+        toast({
+          title: "Sync Successful",
+          description: result.message || `Synced ${result.created} patient(s) from admissions`,
+        });
 
         // Reload pending discharges to show newly synced patients
         const pendingData = await dischargeService.getPending();
         setPendingDischarges(pendingData as any);
       } else {
-        alert('Failed to sync from admissions: ' + (result.error || 'Unknown error'));
+        toast({
+          variant: "destructive",
+          title: "Sync Failed",
+          description: result.error || 'Unknown error'
+        });
       }
     } catch (error) {
       console.error('Error syncing from admissions:', error);
-      alert('Failed to sync from admissions. Please try again.');
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to sync from admissions. Please try again."
+      });
     }
   };
 
@@ -128,7 +141,11 @@ const Discharge = () => {
       }
     } catch (error) {
       console.error('Error updating requirement:', error);
-      alert('Failed to update requirement. Please try again.');
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update requirement. Please try again."
+      });
     }
   };
 
@@ -177,7 +194,11 @@ const Discharge = () => {
       setIsAddRecordModalOpen(true);
     } catch (error) {
       console.error('Error loading billing patients:', error);
-      alert('Failed to load patients from billing records. Please try again.');
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load patients from billing records. Please try again."
+      });
     } finally {
       setIsLoadingBilling(false);
     }
@@ -193,7 +214,11 @@ const Discharge = () => {
 
   const handleImportFromBilling = async () => {
     if (selectedBillingIds.length === 0) {
-      alert('Please select at least one patient to add');
+      toast({
+        variant: "destructive",
+        title: "Selection Required",
+        description: "Please select at least one patient to add"
+      });
       return;
     }
 
@@ -203,9 +228,16 @@ const Discharge = () => {
 
       if (response.errors && response.errors.length > 0) {
         const errorMessages = response.errors.map((err: any) => err.error).join('\n');
-        alert(`Some records could not be added:\n${errorMessages}\n\nSuccessfully added: ${response.created} patient(s)`);
+        toast({
+          variant: "destructive",
+          title: "Partial Success",
+          description: `Some records could not be added. Successfully added: ${response.created} patient(s)`
+        });
       } else {
-        alert(`Successfully added ${response.created} patient(s) to discharge queue`);
+        toast({
+          title: "Import Successful",
+          description: `Successfully added ${response.created} patient(s) to discharge queue`
+        });
       }
 
       // Reload pending discharges
@@ -217,7 +249,11 @@ const Discharge = () => {
       setSelectedBillingIds([]);
     } catch (error: any) {
       console.error('Error importing from billing:', error);
-      alert(error?.response?.data?.error || 'Failed to add patients from billing');
+      toast({
+        variant: "destructive",
+        title: "Import Failed",
+        description: error?.response?.data?.error || 'Failed to add patients from billing'
+      });
     } finally {
       setIsLoadingBilling(false);
     }
@@ -227,7 +263,11 @@ const Discharge = () => {
     if (!selectedPatient) return;
 
     if (!dischargeForm.finalDiagnosis || !dischargeForm.hospitalStaySummary) {
-      alert('Please fill in all required fields');
+      toast({
+        variant: "destructive",
+        title: "Missing Fields",
+        description: "Please fill in all required fields"
+      });
       return;
     }
 
@@ -240,7 +280,11 @@ const Discharge = () => {
       selectedPatient.requirements.billingClearance;
 
     if (!allRequiredCompleted) {
-      alert('All required discharge items must be completed before final discharge');
+      toast({
+        variant: "destructive",
+        title: "Incomplete Requirements",
+        description: "All required discharge items must be completed before final discharge"
+      });
       return;
     }
 
@@ -257,7 +301,10 @@ const Discharge = () => {
         pendingItems: dischargeForm.pendingItems
       });
 
-      alert(`Discharge completed successfully for ${selectedPatient.patient_name}`);
+      toast({
+        title: "Discharge Completed",
+        description: `Discharge completed successfully for ${selectedPatient.patient_name}`,
+      });
 
       // Reload data
       const pendingData = await dischargeService.getPending();
@@ -280,7 +327,11 @@ const Discharge = () => {
       });
     } catch (error) {
       console.error('Error processing discharge:', error);
-      alert('Failed to process discharge. Please try again.');
+      toast({
+        variant: "destructive",
+        title: "Discharge Failed",
+        description: "Failed to process discharge. Please try again."
+      });
     }
   };
 
@@ -307,18 +358,25 @@ const Discharge = () => {
   const handleDeleteDischarge = async (id: number) => {
     try {
       await dischargeService.delete(id);
-      
+
       // Reload data
       const pendingData = await dischargeService.getPending();
       setPendingDischarges(pendingData as any);
-      
+
       const dischargedData = await dischargeService.getDischarged();
       setDischargedPatients(dischargedData as any);
-      
-      alert('Discharge record deleted successfully.');
+
+      toast({
+        title: "Success",
+        description: "Discharge record deleted successfully."
+      });
     } catch (error) {
       console.error('Error deleting discharge record:', error);
-      alert('Failed to delete discharge record. Please try again.');
+      toast({
+        variant: "destructive",
+        title: "Delete Failed",
+        description: "Failed to delete discharge record. Please try again."
+      });
     }
   };
 
@@ -344,7 +402,7 @@ const Discharge = () => {
       </div>
 
       <Tabs defaultValue="active" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 h-auto">
+        <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 h-auto">
           <TabsTrigger value="active" className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4" />
             Active Discharges
@@ -352,10 +410,6 @@ const Discharge = () => {
           <TabsTrigger value="discharged" className="flex items-center gap-2">
             <CheckCircle className="w-4 h-4" />
             Discharged Patients ({dischargedPatients.length})
-          </TabsTrigger>
-          <TabsTrigger value="analytics" className="flex items-center gap-2">
-            <Users className="w-4 h-4" />
-            Analytics
           </TabsTrigger>
         </TabsList>
 
@@ -483,13 +537,13 @@ const Discharge = () => {
                           </div>
                         </div>
                         <div className="flex justify-end gap-2">
-                          <Button 
-                            variant="destructive" size="sm" 
+                          <Button
+                            variant="destructive" size="sm"
                             onClick={() => {
-                              if(confirm('Delete this discharge record?')) handleDeleteDischarge(patient.id);
+                              if (confirm('Delete this discharge record?')) handleDeleteDischarge(patient.id);
                             }}
                           >
-                           Remove
+                            Remove
                           </Button>
                           <Button
                             size="sm"
@@ -553,10 +607,6 @@ const Discharge = () => {
         </TabsContent>
 
         <TabsContent value="discharged" className="space-y-6">
-          <DischargedPatientsReport dischargedPatients={dischargedPatients} onDelete={handleDeleteDischarge} />
-        </TabsContent>
-
-        <TabsContent value="analytics" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
               <CardContent className="p-6">
@@ -597,6 +647,7 @@ const Discharge = () => {
               </CardContent>
             </Card>
           </div>
+          <DischargedPatientsReport dischargedPatients={dischargedPatients} onDelete={handleDeleteDischarge} />
         </TabsContent>
       </Tabs>
 
