@@ -92,13 +92,13 @@ const Pharmacy: React.FC = () => {
   // ==================== Filter and Sort Requests ====================
   useEffect(() => {
     let result = [...requests];
-    
+
     // Apply search filter
     result = filterMedicationRequests(result, requestSearchQuery);
-    
+
     // Apply sorting
     result = sortMedicationRequests(result, requestSortBy);
-    
+
     setFilteredRequests(result);
   }, [requests, requestSearchQuery, requestSortBy]);
 
@@ -108,11 +108,11 @@ const Pharmacy: React.FC = () => {
 
     // Show/Hide Expired
     if (showExpired) {
-        // If filter is ON, show ONLY expired items
-        result = result.filter(item => item.is_expired);
+      // If filter is ON, show ONLY expired items
+      result = result.filter(item => item.is_expired);
     } else {
-        // If filter is OFF, show ONLY active (non-expired) items
-        result = result.filter(item => !item.is_expired);
+      // If filter is OFF, show ONLY active (non-expired) items
+      result = result.filter(item => !item.is_expired);
     }
 
     // Search Filter (Name only)
@@ -143,8 +143,8 @@ const Pharmacy: React.FC = () => {
   };
 
   const handleInventoryUpdate = (updatedItem: InventoryItem) => {
-    const updateList = (list: InventoryItem[]) => 
-        list.map((item) => (item.id === updatedItem.id ? updatedItem : item));
+    const updateList = (list: InventoryItem[]) =>
+      list.map((item) => (item.id === updatedItem.id ? updatedItem : item));
     setInventory(updateList);
   };
 
@@ -171,13 +171,12 @@ const Pharmacy: React.FC = () => {
         {item.status_indicators?.filter(i => i.type !== 'expiring_soon').map((indicator, idx) => (
           <span
             key={idx}
-            className={`text-xs px-2 py-1 rounded-full font-medium ${
-              indicator.severity === 'critical'
+            className={`text-xs px-2 py-1 rounded-full font-medium ${indicator.severity === 'critical'
                 ? 'bg-red-100 text-red-700'
                 : indicator.severity === 'warning'
-                ? 'bg-yellow-100 text-yellow-700'
-                : 'bg-blue-100 text-blue-700'
-            }`}
+                  ? 'bg-yellow-100 text-yellow-700'
+                  : 'bg-blue-100 text-blue-700'
+              }`}
           >
             {indicator.message}
           </span>
@@ -225,21 +224,19 @@ const Pharmacy: React.FC = () => {
       {/* Tabs */}
       <div className="flex gap-2 mb-6">
         <button
-          className={`px-6 py-2 rounded-lg font-medium transition-colors ${
-            activeTab === 'inventory'
+          className={`px-6 py-2 rounded-lg font-medium transition-colors ${activeTab === 'inventory'
               ? 'bg-green-600 text-white shadow-md'
               : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-          }`}
+            }`}
           onClick={() => setActiveTab('inventory')}
         >
           Inventory Management
         </button>
         <button
-          className={`px-6 py-2 rounded-lg font-medium transition-colors relative ${
-            activeTab === 'requests'
+          className={`px-6 py-2 rounded-lg font-medium transition-colors relative ${activeTab === 'requests'
               ? 'bg-blue-600 text-white shadow-md'
               : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-          }`}
+            }`}
           onClick={() => setActiveTab('requests')}
         >
           Medication Requests
@@ -475,15 +472,10 @@ const Pharmacy: React.FC = () => {
                       <div className="font-semibold text-gray-900 text-lg">
                         {req.inventory_item_detail?.generic_name || 'Unknown Medicine'}
                       </div>
-                      <div className="text-sm text-gray-600 mt-1">
-                        Brand: {req.inventory_item_detail?.brand_name || 'N/A'} | Batch:{' '}
-                        {req.inventory_item_detail?.batch_number || 'N/A'}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        Patient: {req.admission_info?.patient_name || 'N/A'}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        Prescribed by: {req.requested_by || 'Unknown'}
+                      <div className="text-sm text-gray-600 mt-1 space-y-1">
+                        <p><span className="font-medium">Brand:</span> {req.inventory_item_detail?.brand_name || 'N/A'} | <span className="font-medium">Batch:</span> {req.inventory_item_detail?.batch_number || 'N/A'}</p>
+                        <p><span className="font-medium">Patient:</span> {req.admission_info?.patient_name || 'N/A'}</p>
+                        <p><span className="font-medium">Prescribed by:</span> {req.requested_by || 'Unknown'}</p>
                       </div>
                       <div className="flex gap-4 mt-2">
                         <span className="text-sm">

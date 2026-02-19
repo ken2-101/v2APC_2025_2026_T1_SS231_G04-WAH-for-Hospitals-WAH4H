@@ -46,7 +46,9 @@ const Monitoring: React.FC = () => {
       try {
         const data = await admissionService.getAll();
         if (Array.isArray(data)) {
-          const mapped: MonitoringAdmission[] = data.map((adm: any) => ({
+          // Only show patients with active admissions (not discharged/finished)
+          const activeAdmissions = data.filter((adm: any) => adm.status === 'in-progress');
+          const mapped: MonitoringAdmission[] = activeAdmissions.map((adm: any) => ({
             id: adm.encounter_id,
             patientId: adm.subject_id,
             patientName: adm.patientName || 'Unknown Patient',
@@ -564,11 +566,11 @@ const Monitoring: React.FC = () => {
                   <LaboratoryTab
                     labRequests={labRequests}
                     currentUserName={(() => {
-                        if (!user) return '';
-                        const fName = ((user as any)?.firstName || (user as any)?.first_name || '').trim();
-                        const lName = ((user as any)?.lastName || (user as any)?.last_name || '').trim();
-                        const fullName = fName && lName ? `${fName} ${lName}` : (fName || lName || '');
-                        return ((user as any).role === 'doctor' && fullName) ? `Dr. ${fullName}` : fullName;
+                      if (!user) return '';
+                      const fName = ((user as any)?.firstName || (user as any)?.first_name || '').trim();
+                      const lName = ((user as any)?.lastName || (user as any)?.last_name || '').trim();
+                      const fullName = fName && lName ? `${fName} ${lName}` : (fName || lName || '');
+                      return ((user as any).role === 'doctor' && fullName) ? `Dr. ${fullName}` : fullName;
                     })()}
                     onAddRequest={handleAddLabRequest}
                     onUpdateResult={handleUpdateLabResult}
