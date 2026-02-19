@@ -314,6 +314,7 @@ class Immunization(FHIRResourceModel):
     performer_function_code = models.CharField(max_length=100, null=True, blank=True)
     performer_function_display = models.CharField(max_length=100, null=True, blank=True)
     actor_id = models.BigIntegerField(db_index=True, null=True, blank=True)
+    performer_name = models.CharField(max_length=255, null=True, blank=True)
 
     # Note
     note = models.TextField(null=True, blank=True)

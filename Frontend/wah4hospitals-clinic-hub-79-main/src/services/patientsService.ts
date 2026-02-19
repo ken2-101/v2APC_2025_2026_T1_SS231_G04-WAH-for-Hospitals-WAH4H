@@ -3,6 +3,41 @@ import type { Patient, PatientFormData, Condition, Allergy, Immunization } from 
 import type { ConditionFormData, AllergyFormData, ImmunizationFormData } from '../schemas/clinicalDataSchema';
 
 // ============================================================================
+// FHIR BUNDLE HELPERS
+// ============================================================================
+
+/** Map a single FHIR Immunization resource → flat Immunization UI model. */
+function fhirResourceToImmunization(resource: any): Immunization {
+  const dbPkEntry = resource.identifier?.find((i: any) => i.system === 'local-db-pk');
+  const labelEntry = resource.identifier?.find((i: any) => !i.system);
+  return {
+    immunization_id: dbPkEntry ? parseInt(dbPkEntry.value, 10) : 0,
+    identifier: labelEntry?.value,
+    status: resource.status,
+    vaccine_code: resource.vaccineCode?.coding?.[0]?.code,
+    vaccine_display: resource.vaccineCode?.text ?? resource.vaccineCode?.coding?.[0]?.display,
+    site_code: resource.site?.coding?.[0]?.code,
+    route_code: resource.route?.coding?.[0]?.code,
+    occurrence_datetime: resource.occurrenceDateTime,
+    lot_number: resource.lotNumber,
+    expiration_date: resource.expirationDate,
+    dose_quantity_value: resource.doseQuantity?.value?.toString(),
+    dose_quantity_unit: resource.doseQuantity?.unit,
+    performer_name: resource.performer?.[0]?.actor?.display,
+    note: resource.note?.[0]?.text,
+  };
+}
+
+/** Parse a FHIR Bundle (collection) into a flat Immunization array. */
+function parseFhirBundle(data: any): Immunization[] {
+  if (data?.resourceType === 'Bundle' && Array.isArray(data?.entry)) {
+    return data.entry.map((e: any) => fhirResourceToImmunization(e.resource));
+  }
+  // Fallback: already a plain array (older endpoint format)
+  return Array.isArray(data) ? data : [];
+}
+
+// ============================================================================
 // PATIENT SERVICES
 // ============================================================================
 
@@ -81,11 +116,11 @@ export const getPatientAllergies = async (patientId: number): Promise<Allergy[]>
 };
 
 /**
- * Get patient immunizations
+ * Get patient immunizations — parses FHIR Bundle (collection) response.
  */
 export const getPatientImmunizations = async (patientId: number): Promise<Immunization[]> => {
   const response = await api.get(`/api/patients/${patientId}/immunizations/`);
-  return response.data;
+  return parseFhirBundle(response.data);
 };
 
 // ============================================================================

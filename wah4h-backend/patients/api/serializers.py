@@ -314,18 +314,22 @@ class ImmunizationSerializer(serializers.ModelSerializer):
 class ImmunizationCreateSerializer(serializers.ModelSerializer):
     """
     Immunization Create Serializer
-    
+
     Handles immunization creation with required field validation.
     """
-    
+
     class Meta:
         model = Immunization
         fields = [
             'identifier', 'status', 'vaccine_code', 'vaccine_display',
             'patient', 'encounter_id',
             'occurrence_datetime', 'recorded_datetime',
-            'lot_number', 'dose_quantity_value', 'dose_quantity_unit',
-            'note'
+            'lot_number', 'expiration_date',
+            'site_code', 'site_display',
+            'route_code', 'route_display',
+            'dose_quantity_value', 'dose_quantity_unit',
+            'performer_name',
+            'note',
         ]
         extra_kwargs = {
             'identifier': {'required': True},

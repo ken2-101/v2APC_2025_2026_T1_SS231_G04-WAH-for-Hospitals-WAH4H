@@ -43,6 +43,8 @@ interface PatientRegistrationModalProps {
   onSuccess?: (patient: any) => void;
   isLoading?: boolean;
   error?: string;
+  /** When provided, pre-fills the form fields with data from a WAH4PC network search. */
+  prefillData?: Partial<PatientFormData>;
 }
 
 export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> = ({
@@ -51,6 +53,7 @@ export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> =
   onSuccess,
   isLoading = false,
   error,
+  prefillData,
 }) => {
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
   const [allStepsData, setAllStepsData] = useState<Partial<PatientFormData>>({});
@@ -94,6 +97,49 @@ export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> =
       consent_flag: false,
     },
   });
+
+  // Pre-fill all three step forms when the modal opens with network-search data.
+  React.useEffect(() => {
+    if (!isOpen || !prefillData || Object.keys(prefillData).length === 0) return;
+    // Seed the accumulated data so later steps inherit the values.
+    setAllStepsData(prefillData);
+    // Reset each step form with only the fields it owns.
+    step1Form.reset({
+      first_name:      prefillData.first_name      ?? '',
+      last_name:       prefillData.last_name        ?? '',
+      middle_name:     prefillData.middle_name,
+      suffix_name:     prefillData.suffix_name,
+      birthdate:       prefillData.birthdate        ?? '',
+      gender:          prefillData.gender,
+      civil_status:    prefillData.civil_status,
+      blood_type:      prefillData.blood_type,
+      pwd_type:        prefillData.pwd_type,
+      indigenous_flag: prefillData.indigenous_flag,
+      indigenous_group:prefillData.indigenous_group,
+      nationality:     prefillData.nationality,
+      religion:        prefillData.religion,
+      occupation:      prefillData.occupation,
+      education:       prefillData.education,
+      philhealth_id:   prefillData.philhealth_id,
+    });
+    step2Form.reset({
+      mobile_number:       prefillData.mobile_number       ?? '',
+      address_line:        prefillData.address_line        ?? '',
+      address_city:        prefillData.address_city        ?? '',
+      address_district:    prefillData.address_district,
+      address_state:       prefillData.address_state,
+      address_postal_code: prefillData.address_postal_code,
+      address_country:     prefillData.address_country,
+    });
+    step3Form.reset({
+      contact_first_name:   prefillData.contact_first_name,
+      contact_last_name:    prefillData.contact_last_name,
+      contact_mobile_number:prefillData.contact_mobile_number ?? '',
+      contact_relationship: prefillData.contact_relationship,
+      consent_flag: false, // user must explicitly consent
+    });
+    setCurrentStep(1);
+  }, [isOpen, prefillData]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
 

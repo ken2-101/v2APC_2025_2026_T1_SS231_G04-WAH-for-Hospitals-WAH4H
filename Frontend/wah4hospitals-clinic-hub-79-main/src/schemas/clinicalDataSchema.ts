@@ -64,8 +64,12 @@ export const immunizationFormSchema = z.object({
   occurrence_datetime: z.string().optional(),
   recorded_datetime: z.string().optional(),
   lot_number: z.string().max(255).optional(),
+  expiration_date: z.string().optional(),
+  site_code: z.string().max(10).optional(),
+  route_code: z.string().max(10).optional(),
   dose_quantity_value: z.string().optional(),
   dose_quantity_unit: z.string().max(50).optional(),
+  performer_name: z.string().max(255).optional(),
   note: z.string().optional(),
 });
 

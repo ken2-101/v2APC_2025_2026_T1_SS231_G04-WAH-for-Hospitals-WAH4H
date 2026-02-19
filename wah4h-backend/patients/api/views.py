@@ -24,7 +24,11 @@ from rest_framework.filters import SearchFilter
 
 import requests as http_requests
 
-from patients.wah4pc import request_patient, fhir_to_dict, push_patient, patient_to_fhir, get_providers
+from patients.wah4pc import (
+    request_patient, fhir_to_dict, push_patient, patient_to_fhir, get_providers,
+    immunization_to_fhir, immunizations_to_bundle,
+    procedures_to_bundle, encounters_to_bundle,
+)
 from patients.models import Patient, WAH4PCTransaction
 
 from patients.api.serializers import (
@@ -343,11 +347,16 @@ class PatientViewSet(viewsets.ViewSet):
     @action(detail=True, methods=['get'])
     def immunizations(self, request, pk=None):
         """
-        Get all immunizations for a patient.
+        Get all immunizations for a patient as a FHIR Bundle (collection).
 
         Example: GET /patients/{id}/immunizations/
 
-        Delegates to: PatientACL.get_patient_immunizations(id)
+        Returns:
+            {
+                "resourceType": "Bundle",
+                "type": "collection",
+                "entry": [ { "resource": <FHIR Immunization> }, ... ]
+            }
         """
         try:
             patient_id = int(pk)
@@ -357,9 +366,88 @@ class PatientViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Delegate to ACL
-        immunizations = patient_acl.get_patient_immunizations(patient_id)
-        return Response(immunizations, status=status.HTTP_200_OK)
+        qs = Immunization.objects.filter(
+            patient_id=patient_id
+        ).select_related('patient').order_by('-occurrence_datetime', '-created_at')
+        return Response(immunizations_to_bundle(qs), status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['get'], url_path='procedures')
+    def get_procedures(self, request, pk=None):
+        """
+        Get all procedures for a patient as a FHIR Bundle (collection).
+
+        Reads from the Admission module (source of truth) — read-only.
+        Admission models are imported locally to avoid circular dependencies.
+
+        Example: GET /patients/{id}/procedures/
+
+        Returns:
+            {
+                "resourceType": "Bundle",
+                "type": "collection",
+                "entry": [ { "resource": <FHIR Procedure> }, ... ]
+            }
+        """
+        try:
+            patient_id = int(pk)
+        except (ValueError, TypeError):
+            return Response(
+                {'error': 'Invalid patient ID'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not patient_acl.validate_patient_exists(patient_id):
+            return Response(
+                {'error': 'Patient not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Local import — avoids circular dependency; Admission is read-only here.
+        from admission.models import Procedure
+
+        qs = Procedure.objects.filter(
+            subject_id=patient_id
+        ).order_by('-performed_datetime', '-created_at')
+        return Response(procedures_to_bundle(qs), status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['get'], url_path='encounters')
+    def get_encounters(self, request, pk=None):
+        """
+        Get all encounters for a patient as a FHIR Bundle (collection).
+
+        Reads from the Admission module (source of truth) — read-only.
+        Admission models are imported locally to avoid circular dependencies.
+
+        Example: GET /patients/{id}/encounters/
+
+        Returns:
+            {
+                "resourceType": "Bundle",
+                "type": "collection",
+                "entry": [ { "resource": <FHIR Encounter> }, ... ]
+            }
+        """
+        try:
+            patient_id = int(pk)
+        except (ValueError, TypeError):
+            return Response(
+                {'error': 'Invalid patient ID'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not patient_acl.validate_patient_exists(patient_id):
+            return Response(
+                {'error': 'Patient not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Local import — avoids circular dependency; Admission is read-only here.
+        from admission.models import Encounter
+
+        qs = Encounter.objects.filter(
+            subject_id=patient_id
+        ).order_by('-period_start', '-created_at')
+        return Response(encounters_to_bundle(qs), status=status.HTTP_200_OK)
 
     def destroy(self, request, pk=None):
         """
@@ -578,6 +666,20 @@ class ImmunizationViewSet(viewsets.ModelViewSet):
             return ImmunizationCreateSerializer
         return ImmunizationSerializer
 
+    def list(self, request, *args, **kwargs):
+        """
+        List immunizations as a FHIR Bundle (collection).
+
+        Returns:
+            {
+                "resourceType": "Bundle",
+                "type": "collection",
+                "entry": [ { "resource": <FHIR Immunization> }, ... ]
+            }
+        """
+        queryset = self.filter_queryset(self.get_queryset())
+        return Response(immunizations_to_bundle(queryset))
+
     def create(self, request, *args, **kwargs):
         """
         Create a new immunization via ClinicalDataService.
@@ -613,12 +715,20 @@ class ImmunizationViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Serialize output with read serializer
-        output_serializer = ImmunizationSerializer(immunization)
+        # Return raw FHIR resource (not wrapped in Bundle) for single-record operations
         return Response(
-            output_serializer.data,
+            immunization_to_fhir(immunization),
             status=status.HTTP_201_CREATED
         )
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Retrieve a single immunization as a raw FHIR Immunization resource.
+
+        Returns the standalone resource object directly — NOT wrapped in a Bundle.
+        """
+        instance = self.get_object()
+        return Response(immunization_to_fhir(instance))
 
 
 # ============================================================================
@@ -646,19 +756,35 @@ def fetch_wah4pc(request):
             status=result.get('status_code', 500)
         )
 
-    txn_id = result.get('data', {}).get('id') if 'data' in result else result.get('id')
+    # Gateway may return the transaction ID as 'transactionId' or 'id' (flat or nested under 'data')
+    _data = result.get('data') or {}
+    txn_id = (
+        result.get('transactionId') or
+        result.get('id') or
+        _data.get('transactionId') or
+        _data.get('id')
+    )
     idempotency_key = result.get('idempotency_key')
 
     if txn_id:
-        WAH4PCTransaction.objects.create(
+        WAH4PCTransaction.objects.get_or_create(
             transaction_id=txn_id,
-            type='fetch',
-            status='PENDING',
-            target_provider_id=target_id,
-            idempotency_key=idempotency_key,
+            defaults={
+                'type': 'fetch',
+                'status': 'PENDING',
+                'target_provider_id': target_id,
+                'idempotency_key': idempotency_key,
+            },
+        )
+    else:
+        return Response(
+            {'error': 'Gateway did not return a transaction ID. Check gateway credentials or try again.'},
+            status=status.HTTP_502_BAD_GATEWAY,
         )
 
-    return Response(result, status=status.HTTP_202_ACCEPTED)
+    # Guarantee transactionId is always top-level so the frontend can find it
+    # regardless of whether the gateway wraps it under a 'data' key.
+    return Response({**result, 'transactionId': txn_id}, status=status.HTTP_202_ACCEPTED)
 
 
 @api_view(['POST'])
@@ -705,11 +831,56 @@ def webhook_receive(request):
     if request.data.get('status') == 'SUCCESS':
         txn.raw_payload = raw_payload
         txn.status = 'COMPLETED'
+
+        # Auto-register the patient so they appear in the dashboard immediately.
+        # Mirrors the logic in webhook_receive_push.
+        fhir_data = request.data.get('data')
+        if fhir_data and isinstance(fhir_data, dict):
+            # Gateway wraps the Patient resource inside a FHIR Bundle — unwrap it.
+            if fhir_data.get('resourceType') == 'Bundle':
+                entries = fhir_data.get('entry', [])
+                fhir_data = next(
+                    (e['resource'] for e in entries
+                     if isinstance(e.get('resource'), dict)
+                     and e['resource'].get('resourceType') == 'Patient'),
+                    None,
+                )
+        if fhir_data and isinstance(fhir_data, dict):
+            try:
+                patient_dict = fhir_to_dict(fhir_data)
+                try:
+                    patient = PatientRegistrationService.register_patient(patient_dict)
+                except DjangoValidationError:
+                    # Patient already exists — find by philhealth_id or name+birthdate
+                    philhealth_id = patient_dict.get('philhealth_id')
+                    patient = None
+                    if philhealth_id:
+                        patient = Patient.objects.filter(philhealth_id=philhealth_id).first()
+                    if not patient:
+                        patient = Patient.objects.filter(
+                            first_name__iexact=patient_dict.get('first_name', ''),
+                            last_name__iexact=patient_dict.get('last_name', ''),
+                            birthdate=patient_dict.get('birthdate'),
+                        ).first()
+                if patient:
+                    txn.related_patient = patient
+                    txn.patient_id = patient.id
+            except Exception as exc:
+                logger.warning(
+                    '[WAH4PC] Could not auto-register patient from fetch webhook (txn=%s): %s',
+                    txn_id, exc,
+                )
+
         txn.save()
     else:
         txn.raw_payload = raw_payload
         txn.status = 'FAILED'
-        txn.error_message = request.data.get('data', {}).get('error', 'Unknown')
+        error_data = request.data.get('data')
+        txn.error_message = (
+            error_data.get('error', 'Unknown')
+            if isinstance(error_data, dict)
+            else 'Unknown'
+        )
         txn.save()
 
     return Response({'status': 'received'}, status=status.HTTP_200_OK)
@@ -740,18 +911,26 @@ def send_to_wah4pc(request):
             status=result.get('status_code', 500)
         )
 
-    txn_id = result.get('id')
+    _data_send = result.get('data') or {}
+    txn_id = (
+        result.get('transactionId') or
+        result.get('id') or
+        _data_send.get('transactionId') or
+        _data_send.get('id')
+    )
     idempotency_key = result.get('idempotency_key')
 
     if txn_id:
-        WAH4PCTransaction.objects.create(
+        WAH4PCTransaction.objects.get_or_create(
             transaction_id=txn_id,
-            type='send',
-            status=result.get('status', 'PENDING'),
-            patient_id=patient.id,
-            related_patient=patient,
-            target_provider_id=target_id,
-            idempotency_key=idempotency_key,
+            defaults={
+                'type': 'send',
+                'status': result.get('status', 'PENDING'),
+                'patient_id': patient.id,
+                'related_patient': patient,
+                'target_provider_id': target_id,
+                'idempotency_key': idempotency_key,
+            },
         )
 
     return Response(result, status=status.HTTP_202_ACCEPTED)
@@ -890,6 +1069,17 @@ def webhook_process_query(request):
     identifiers = request.data.get('identifiers', [])
     return_url = request.data.get('gatewayReturnUrl')
     requester_id = request.data.get('requesterId')
+    # Detect which resource type was requested: explicit param wins, then infer from return URL.
+    requested_resource = request.data.get('resourceType', '')
+    if not requested_resource:
+        if return_url and 'Encounter' in return_url:
+            requested_resource = 'Encounter'
+        elif return_url and 'Procedure' in return_url:
+            requested_resource = 'Procedure'
+        elif return_url and 'Immunization' in return_url:
+            requested_resource = 'Immunization'
+        else:
+            requested_resource = 'Patient'
 
     if not txn_id or not return_url:
         return Response(
@@ -945,7 +1135,37 @@ def webhook_process_query(request):
                 return
 
             # ----------------------------------------------------------------
-            # 3. Send the result back to the gateway (10 s hard timeout)
+            # 3. Build the response payload for the requested resource type
+            # ----------------------------------------------------------------
+            if not patient:
+                response_data = {'error': 'Patient not found'}
+                response_status = 'REJECTED'
+            elif requested_resource == 'Encounter':
+                from admission.models import Encounter as EncounterModel
+                enc_qs = EncounterModel.objects.filter(
+                    subject_id=patient.id
+                ).order_by('-period_start', '-created_at')
+                response_data = encounters_to_bundle(enc_qs)
+                response_status = 'SUCCESS'
+            elif requested_resource == 'Procedure':
+                from admission.models import Procedure as ProcedureModel
+                proc_qs = ProcedureModel.objects.filter(
+                    subject_id=patient.id
+                ).order_by('-performed_datetime', '-created_at')
+                response_data = procedures_to_bundle(proc_qs)
+                response_status = 'SUCCESS'
+            elif requested_resource == 'Immunization':
+                imm_qs = Immunization.objects.filter(
+                    patient=patient
+                ).select_related('patient').order_by('-occurrence_datetime', '-created_at')
+                response_data = immunizations_to_bundle(imm_qs)
+                response_status = 'SUCCESS'
+            else:
+                response_data = patient_to_fhir(patient)
+                response_status = 'SUCCESS'
+
+            # ----------------------------------------------------------------
+            # 4. Send the result back to the gateway (10 s hard timeout)
             # ----------------------------------------------------------------
             http_requests.post(
                 return_url,
@@ -956,8 +1176,8 @@ def webhook_process_query(request):
                 },
                 json={
                     'transactionId': txn_id,
-                    'status': 'SUCCESS' if patient else 'REJECTED',
-                    'data': patient_to_fhir(patient) if patient else {'error': 'Patient not found'},
+                    'status': response_status,
+                    'data': response_data,
                 },
                 timeout=10,
             )
@@ -1003,13 +1223,16 @@ def list_providers(request):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def list_transactions(request):
-    """List WAH4PC transactions with optional filters.
+    """List WAH4PC transactions with optional filters and pagination.
 
     Query params:
         patient_id: Filter by patient ID
         status: Filter by transaction status (PENDING, COMPLETED, FAILED, etc.)
-        type: Filter by transaction type (fetch, send)
+        type: Filter by transaction type (fetch, send, receive_push, process_query)
+        page: Page number (1-based, default 1)
+        page_size: Records per page (default 50, max 200)
     """
     txns = WAH4PCTransaction.objects.all().order_by('-created_at')
 
@@ -1026,22 +1249,45 @@ def list_transactions(request):
     if type_filter:
         txns = txns.filter(type=type_filter)
 
-    return Response([
-        {
-            'id': t.transaction_id,
-            'type': t.type,
-            'status': t.status,
-            'patientId': t.patient_id,
-            'targetProviderId': t.target_provider_id,
-            'error': t.error_message,
-            'createdAt': t.created_at,
-            'updatedAt': t.updated_at,
-        }
-        for t in txns
-    ])
+    # Pagination
+    try:
+        page = max(1, int(request.query_params.get('page', 1)))
+        page_size = min(200, max(1, int(request.query_params.get('page_size', 50))))
+    except (ValueError, TypeError):
+        page = 1
+        page_size = 50
+
+    total = txns.count()
+    offset = (page - 1) * page_size
+    page_txns = txns[offset: offset + page_size]
+
+    return Response({
+        'count': total,
+        'page': page,
+        'pageSize': page_size,
+        'totalPages': max(1, (total + page_size - 1) // page_size),
+        'results': [
+            {
+                'id': t.transaction_id,
+                'type': t.type,
+                'status': t.status,
+                'patientId': t.patient_id,
+                'relatedPatientId': t.related_patient_id,
+                'targetProviderId': t.target_provider_id,
+                'requesterId': t.requester_id,
+                'senderId': t.sender_id,
+                'rawPayload': t.raw_payload,
+                'error': t.error_message,
+                'createdAt': t.created_at,
+                'updatedAt': t.updated_at,
+            }
+            for t in page_txns
+        ],
+    })
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_transaction(request, transaction_id):
     """Get detailed information about a specific WAH4PC transaction.
 
@@ -1068,6 +1314,7 @@ def get_transaction(request, transaction_id):
         'targetProviderId': txn.target_provider_id,
         'requesterId': txn.requester_id,
         'senderId': txn.sender_id,
+        'rawPayload': txn.raw_payload,
         'error': txn.error_message,
         'idempotencyKey': txn.idempotency_key,
         'createdAt': txn.created_at,

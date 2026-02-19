@@ -407,14 +407,23 @@ const ImmunizationsTab: React.FC<{
                     {immunization.status}
                   </Badge>
                 </div>
-                {immunization.lot_number && (
-                  <p className="text-sm text-gray-600">Lot: {immunization.lot_number}</p>
-                )}
-                {immunization.dose_quantity_value && immunization.dose_quantity_unit && (
-                  <p className="text-sm text-gray-600">
-                    Dose: {immunization.dose_quantity_value} {immunization.dose_quantity_unit}
-                  </p>
-                )}
+                <div className="grid grid-cols-2 gap-x-6 text-sm text-gray-600">
+                  {immunization.lot_number && (
+                    <p>Lot: {immunization.lot_number}</p>
+                  )}
+                  {immunization.dose_quantity_value && (
+                    <p>Dose: {immunization.dose_quantity_value} {immunization.dose_quantity_unit}</p>
+                  )}
+                  {immunization.site_code && (
+                    <p>Site: {immunization.site_code}</p>
+                  )}
+                  {immunization.route_code && (
+                    <p>Route: {immunization.route_code}</p>
+                  )}
+                  {immunization.performer_name && (
+                    <p>By: {immunization.performer_name}</p>
+                  )}
+                </div>
                 {immunization.occurrence_datetime && (
                   <p className="text-xs text-gray-400 mt-2">
                     Date: {new Date(immunization.occurrence_datetime).toLocaleDateString()}
