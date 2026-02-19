@@ -259,13 +259,29 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         # Note: In a real world scenario, this might need a more complex link (e.g. via PaymentNotice or LineItem)
         # For now, we creating a PaymentReconciliation record to track the event
         
+        # Auto-generate OR Number (reference)
+        # Format: OR-{YYMMDD}-{Seq} (e.g., OR-240219-0001)
+        # Unique per day
+        today_str = timezone.now().strftime('%y%m%d')
+        
+        # Count existing payments for today to determine sequence
+        # Note: This is a simple counter. For high concurrency, use a sequence table or UUID.
+        # Given the clinic scale, this is acceptable.
+        start_of_day = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        daily_count = PaymentReconciliation.objects.filter(
+            created_datetime__gte=start_of_day
+        ).count()
+        
+        sequence = daily_count + 1
+        payment_identifier = f"OR-{today_str}-{sequence:04d}"
+
         payment = PaymentReconciliation.objects.create(
             identifier=f"PAY-{uuid.uuid4()}",
             status='active',
             invoice=invoice, # Direct link
             payment_amount_value=amount_val,
             payment_amount_currency='PHP',
-            payment_identifier=reference,
+            payment_identifier=payment_identifier, # Auto-generated OR
             disposition=f"Payment for Invoice {invoice.identifier} via {method}",
             created_datetime=timezone.now(),
             requestor_id=requestor_id # Save the Payment Processor
@@ -287,7 +303,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             "message": "Payment recorded",
             "total_paid": total_paid,
             "balance": invoice.total_net_value - total_paid,
-            "status": invoice.status
+            "status": invoice.status,
+            "payment_identifier": payment_identifier # Return OR for receipt
         }, status=status.HTTP_200_OK)
 
 class PaymentReconciliationViewSet(viewsets.ModelViewSet):
