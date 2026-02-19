@@ -235,7 +235,7 @@ class DiagnosticReportViewSet(viewsets.ModelViewSet):
         from django.db.models import Count, Q
         from django.utils import timezone
         
-        today = timezone.now().date()
+        today = timezone.localdate()
         
         # Efficient aggregation query instead of fetching all objects
         stats = DiagnosticReport.objects.aggregate(
