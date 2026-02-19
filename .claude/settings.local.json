@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python manage.py runserver:*)",
+      "Bash(npm run dev:*)",
+      "Bash(python3 manage.py runserver:*)",
+      "Bash(py --version)",
+      "Bash(ls:*)",
+      "Bash(npx tsc:*)",
+      "Bash(timeout:*)",
+      "Bash(curl:*)",
+      "Bash(test:*)",
+      "Bash(python -c:*)",
+      "Bash(GATEWAY_AUTH_KEY=test-secret python:*)",
+      "Bash(python manage.py makemigrations:*)",
+      "Bash(python manage.py migrate:*)",
+      "Bash(python manage.py shell:*)",
+      "Bash(python manage.py check:*)",
+      "Bash(python manage.py show_urls:*)",
+      "Bash(findstr:*)",
+      "Bash(python test_webhooks.py:*)",
+      "Bash(del:*)",
+      "Bash(python:*)"
+    ]
+  }
+}
