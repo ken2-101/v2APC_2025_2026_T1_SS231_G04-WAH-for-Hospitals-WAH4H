@@ -102,6 +102,29 @@ class DischargeViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(instances, many=True)
         return Response(serializer.data)
 
+    @action(detail=True, methods=['get'], url_path='pdf')
+    def generate_pdf(self, request, pk=None):
+        """Generate PDF discharge packet for a discharge record."""
+        from .pdf_generator import DischargePDFView
+        from django.http import HttpResponse
+
+        instance = self.get_object()
+
+        # Only allow PDF for discharged patients
+        if instance.workflow_status != 'discharged':
+            return Response(
+                {"error": "Only discharged patients can have a discharge packet printed."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        pdf_buffer = DischargePDFView.generate_pdf(instance)
+
+        response = HttpResponse(pdf_buffer, content_type='application/pdf')
+        filename = f"DischargePacket_{instance.discharge_id}.pdf"
+        response['Content-Disposition'] = f'inline; filename="{filename}"'
+
+        return response
+
     @action(detail=True, methods=['post'])
     def process_discharge(self, request, pk=None):
         """Finalizes the discharge process and updates encounter status."""
